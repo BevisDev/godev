@@ -1,0 +1,40 @@
+# Go binary files
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Go workspace file
+go.work
+go.work.sum
+
+# Go test binary
+*.test
+
+# IDE/Editor specific files
+.idea/
+.vscode/
+*.sublime-workspace
+*.sublime-project
+
+# Log files
+*.log
+
+# Build directories
+bin/
+build/
+dist/
+
+# Vendor directory (if using Go modules and vendoring)
+vendor/
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Go modules and cache
+/.cache/
+/go/pkg/
+/go/bin/
+/go/src/
