@@ -5,7 +5,13 @@ import (
 	"os"
 )
 
-func GetConfig(dest interface{}, path string) error {
+type Config struct {
+	Path       string
+	ConfigType string
+	Dest       interface{}
+}
+
+func NewConfig(config *Config) error {
 	var (
 		err     error
 		profile = os.Getenv("GO_PROFILE")
@@ -15,9 +21,9 @@ func GetConfig(dest interface{}, path string) error {
 	}
 
 	v := viper.New()
-	v.AddConfigPath(path)
+	v.AddConfigPath(config.Path)
 	v.SetConfigName(profile)
-	v.SetConfigType("yml")
+	v.SetConfigType(config.ConfigType)
 	v.AutomaticEnv()
 
 	// read config
@@ -35,7 +41,7 @@ func GetConfig(dest interface{}, path string) error {
 		}
 	}
 
-	err = v.Unmarshal(&dest)
+	err = v.Unmarshal(&config.Dest)
 	return err
 }
 
