@@ -3,11 +3,9 @@ package logger
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/BevisDev/godev/helper"
 	"github.com/robfig/cron/v3"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -20,7 +18,7 @@ type AppLogger struct {
 
 type ConfigLogger struct {
 	Profile    string
-	DirName    string
+	Filename   string
 	MaxSize    int
 	MaxBackups int
 	MaxAge     int
@@ -91,9 +89,8 @@ func writeSync(cf *ConfigLogger) zapcore.WriteSyncer {
 		return zapcore.AddSync(os.Stdout)
 	}
 
-	now := time.Now().Format(helper.YYYY_MM_DD)
 	lumberLogger := lumberjack.Logger{
-		Filename:   filepath.Join(cf.DirName, now, "app.log"),
+		Filename:   cf.Filename,
 		MaxSize:    cf.MaxSize,
 		MaxBackups: cf.MaxBackups,
 		MaxAge:     cf.MaxAge,
@@ -104,7 +101,7 @@ func writeSync(cf *ConfigLogger) zapcore.WriteSyncer {
 	if cf.IsSplit {
 		c := cron.New()
 		c.AddFunc("0 0 * * *", func() {
-			lumberLogger.Filename = filepath.Join(cf.DirName, now, "app.log")
+			lumberLogger.Filename = cf.Filename
 			lumberLogger.Close()
 		})
 		c.Start()
@@ -117,6 +114,7 @@ func (l *AppLogger) logApp(level zapcore.Level, state string, msg string, args .
 	if l.logger == nil {
 		return
 	}
+
 	// formater message
 	var message string
 	if len(args) != 0 {
@@ -124,6 +122,7 @@ func (l *AppLogger) logApp(level zapcore.Level, state string, msg string, args .
 	} else {
 		message = msg
 	}
+
 	// skip caller before
 	logging := l.logger.WithOptions(zap.AddCallerSkip(2))
 	switch level {
@@ -146,11 +145,19 @@ func (l *AppLogger) logApp(level zapcore.Level, state string, msg string, args .
 
 func (l *AppLogger) formatMessage(msg string, args ...interface{}) string {
 	var message string
-	if !strings.Contains(msg, "%") && strings.Contains(msg, "{}") {
-		message = strings.ReplaceAll(msg, "{}", "%+v")
-	} else {
-		message = msg
+
+	if len(args) == 0 {
+		return msg
 	}
+
+	if strings.Contains(msg, "{}") {
+		message = strings.ReplaceAll(msg, "{}", "%+v")
+	}
+
+	if !strings.Contains(msg, "%") {
+		msg += strings.Repeat(" :%+v", len(args))
+	}
+
 	return fmt.Sprintf(message, args...)
 }
 
