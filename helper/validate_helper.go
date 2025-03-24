@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"slices"
 	"strings"
 )
 
@@ -31,12 +32,18 @@ func IsNilOrEmpty(inp interface{}) bool {
 }
 
 func IsContains[T comparable](arr []T, value T) bool {
-	for _, v := range arr {
-		if v == value {
-			return true
-		}
+	return slices.Contains(arr, value)
+}
+
+func IsStruct(i interface{}) bool {
+	if i == nil {
+		return false
 	}
-	return false
+	t := reflect.TypeOf(i)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	return t.Kind() == reflect.Struct
 }
 
 func IsTimedOut(err error) bool {
