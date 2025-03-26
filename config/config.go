@@ -9,15 +9,22 @@ type Config struct {
 	Path       string
 	ConfigType string
 	Dest       interface{}
+	Profile    string
 }
 
 func NewConfig(config *Config) error {
 	var (
 		err     error
-		profile = os.Getenv("GO_PROFILE")
+		profile = config.Profile
 	)
+
 	if profile == "" {
-		profile = "dev" // set default
+		p := os.Getenv("GO_PROFILE")
+		if p == "" {
+			profile = "dev"
+		} else {
+			profile = p
+		}
 	}
 
 	v := viper.New()

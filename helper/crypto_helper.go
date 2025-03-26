@@ -6,6 +6,7 @@ import (
 	"crypto/md5"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/hex"
@@ -50,15 +51,6 @@ func DecryptAES(ciphertext string, key []byte) (string, error) {
 	return string(data), nil
 }
 
-func EncryptMD5(str string) string {
-	hash := md5.Sum([]byte(str))
-	return hex.EncodeToString(hash[:])
-}
-
-func EncodeBase64(str string) string {
-	return base64.StdEncoding.EncodeToString([]byte(str))
-}
-
 func ReadPublicKey(filePath string) (*rsa.PublicKey, error) {
 	pubKeyBytes, err := os.ReadFile(filePath)
 	if err != nil {
@@ -83,10 +75,24 @@ func ReadPublicKey(filePath string) (*rsa.PublicKey, error) {
 	return rsaPub, nil
 }
 
+func EncodeBase64(str string) string {
+	return base64.StdEncoding.EncodeToString([]byte(str))
+}
+
 func DecodeBase64(str string) string {
 	data, err := base64.StdEncoding.DecodeString(str)
 	if err != nil {
 		return ""
 	}
 	return string(data)
+}
+
+func HexSHA256(str string) string {
+	hash := sha256.Sum256([]byte(str))
+	return hex.EncodeToString(hash[:])
+}
+
+func HexMD5(str string) string {
+	hash := md5.Sum([]byte(str))
+	return hex.EncodeToString(hash[:])
 }

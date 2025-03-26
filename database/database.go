@@ -9,10 +9,6 @@ import (
 	"time"
 
 	"github.com/BevisDev/godev/helper"
-
-	//_ "github.com/denisenkom/go-mssqldb"
-	//_ "github.com/godror/godror"
-	//_ "github.com/lib/pq"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -128,7 +124,7 @@ func (d *Database) GetList(c context.Context, dest interface{}, query string, ar
 	return d.db.SelectContext(ctx, dest, query, args...)
 }
 
-func (d *Database) GetOne(c context.Context, dest interface{}, query string, args ...interface{}) error {
+func (d *Database) GetAny(c context.Context, dest interface{}, query string, args ...interface{}) error {
 	var err error
 	if d.isQueryIN(query) {
 		query, args, err = sqlx.In(query, args...)
@@ -177,7 +173,12 @@ func (d *Database) ExecQuery(c context.Context, query string, args ...interface{
 	return err
 }
 
-func (d *Database) Insert(c context.Context, query string, args interface{}) error {
+// Save using for Insert Or Update query
+// Any named placeholder parameters are replaced with fields from arg.
+// Example query: INSERT INTO person (first_name,last_name,email) VALUES (:first,:last,:email)
+// args: map[string]interface{}{ "first": "Bin","last": "Smuth", "email": "bensmith@allblacks.nz"}
+// or struct with the `db` tag
+func (d *Database) Save(c context.Context, query string, args interface{}) error {
 	d.logQuery(query)
 	ctx, cancel := helper.CreateCtxTimeout(c, d.timeoutSec)
 	defer cancel()
@@ -196,6 +197,8 @@ func (d *Database) Insert(c context.Context, query string, args interface{}) err
 	return err
 }
 
+// LastInsertId function shouldn not be used with this SQL Server driver
+// Please use OUTPUT clause or SCOPE_IDENTITY() to the end of your query
 func (d *Database) InsertedId(c context.Context, query string, args ...interface{}) (int, error) {
 	var id int
 	d.logQuery(query)
@@ -214,25 +217,6 @@ func (d *Database) InsertedId(c context.Context, query string, args ...interface
 	}
 	tx.Commit()
 	return id, err
-}
-
-func (d *Database) Update(c context.Context, query string, args interface{}) error {
-	d.logQuery(query)
-	ctx, cancel := helper.CreateCtxTimeout(c, d.timeoutSec)
-	defer cancel()
-
-	tx, err := d.db.BeginTxx(ctx, nil)
-	if err != nil {
-		return err
-	}
-
-	_, err = d.db.NamedExecContext(ctx, query, args)
-	if err != nil {
-		tx.Rollback()
-		return err
-	}
-	tx.Commit()
-	return err
 }
 
 func (d *Database) Delete(c context.Context, query string, args interface{}) error {

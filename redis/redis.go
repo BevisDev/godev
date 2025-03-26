@@ -40,6 +40,7 @@ func NewRedisCache(ctx context.Context, cf *RedisCacheConfig) (*RedisCache, erro
 	}
 
 	log.Println("Redis connect success")
+
 	return &RedisCache{
 		client:     rdb,
 		timeoutSec: cf.TimeoutSec,
@@ -52,7 +53,7 @@ func (r *RedisCache) Close() {
 	}
 }
 
-func (r *RedisCache) ConvertValue(value interface{}) interface{} {
+func (r *RedisCache) convertValue(value interface{}) interface{} {
 	v := reflect.ValueOf(value)
 	if v.Kind() == reflect.Ptr ||
 		v.Kind() == reflect.Struct ||
@@ -64,18 +65,18 @@ func (r *RedisCache) ConvertValue(value interface{}) interface{} {
 	return value
 }
 
-func (r *RedisCache) Set(ctx context.Context, key string, value interface{}, expiredTimeSec int) error {
-	ctx, cancel := helper.CreateCtxTimeout(ctx, r.timeoutSec)
+func (r *RedisCache) Set(c context.Context, key string, value interface{}, expiredTimeSec int) error {
+	ctx, cancel := helper.CreateCtxTimeout(c, r.timeoutSec)
 	defer cancel()
-	err := r.client.Set(ctx, key, r.ConvertValue(value), time.Duration(expiredTimeSec)*time.Second).Err()
+	err := r.client.Set(ctx, key, r.convertValue(value), time.Duration(expiredTimeSec)*time.Second).Err()
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (r *RedisCache) Get(ctx context.Context, key string, result interface{}) error {
-	ctx, cancel := helper.CreateCtxTimeout(ctx, r.timeoutSec)
+func (r *RedisCache) Get(c context.Context, key string, result interface{}) error {
+	ctx, cancel := helper.CreateCtxTimeout(c, r.timeoutSec)
 	defer cancel()
 	val, err := r.client.Get(ctx, key).Result()
 	if err != nil {
@@ -88,8 +89,8 @@ func (r *RedisCache) Get(ctx context.Context, key string, result interface{}) er
 	return err
 }
 
-func (r *RedisCache) Delete(ctx context.Context, key string) error {
-	ctx, cancel := helper.CreateCtxTimeout(ctx, r.timeoutSec)
+func (r *RedisCache) Delete(c context.Context, key string) error {
+	ctx, cancel := helper.CreateCtxTimeout(c, r.timeoutSec)
 	defer cancel()
 	err := r.client.Del(ctx, key).Err()
 	if err != nil {
@@ -98,8 +99,8 @@ func (r *RedisCache) Delete(ctx context.Context, key string) error {
 	return nil
 }
 
-func (r *RedisCache) GetListValueByPrefixKey(ctx context.Context, prefix string) ([]string, error) {
-	ctx, cancel := helper.CreateCtxTimeout(ctx, r.timeoutSec)
+func (r *RedisCache) GetListValueByPrefixKey(c context.Context, prefix string) ([]string, error) {
+	ctx, cancel := helper.CreateCtxTimeout(c, r.timeoutSec)
 	defer cancel()
 	var (
 		cursor uint64

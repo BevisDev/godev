@@ -2,26 +2,37 @@ package migration
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"os"
 
 	"github.com/BevisDev/godev/helper"
-	"github.com/jmoiron/sqlx"
 	"github.com/pressly/goose/v3"
 )
 
 type Migration struct {
-	Dir        string
-	Sqlx       *sqlx.DB
-	TypeSQL    string
-	TimeoutSec int
-	Ctx        context.Context
-	Version    int64
+	dir     string
+	typeSQL string
+	db      *sql.DB
+}
+
+func NewMigration(dir, typeSQL string, db *sql.DB) (*Migration, error) {
+	m := Migration{
+		dir:     dir,
+		typeSQL: typeSQL,
+		db:      db,
+	}
+
+	if err := m.Init(); err != nil {
+		return nil, err
+	}
+
+	return &m, nil
 }
 
 func (m *Migration) Init() error {
 	var dialect string
-	switch m.TypeSQL {
+	switch m.typeSQL {
 	case helper.SQLServer:
 		dialect = "mssql"
 		break
@@ -31,58 +42,47 @@ func (m *Migration) Init() error {
 	default:
 		return errors.New("type SQL unsupported")
 	}
+
 	if err := goose.SetDialect(dialect); err != nil {
 		return err
 	}
-	if _, err := os.Stat(m.Dir); os.IsNotExist(err) {
+	if _, err := os.Stat(m.dir); os.IsNotExist(err) {
 		return err
 	}
+
 	goose.SetTableName("db_version")
-	if m.Ctx == nil {
-		m.Ctx = context.Background()
-	}
 	return nil
 }
 
-func (m *Migration) Up() error {
-	if err := m.Init(); err != nil {
-		return err
-	}
-	ctx, cancel := helper.CreateCtxTimeout(m.Ctx, m.TimeoutSec)
-	defer cancel()
-	if m.Version != 0 {
-		if err := goose.UpToContext(ctx, m.Sqlx.DB, m.Dir, m.Version); err != nil {
+func (m *Migration) Up(ctx context.Context, version int64) error {
+	if version != 0 {
+		if err := goose.UpToContext(ctx, m.db, m.dir, version); err != nil {
 			return err
 		}
 	} else {
-		if err := goose.UpContext(ctx, m.Sqlx.DB, m.Dir); err != nil {
+		if err := goose.UpContext(ctx, m.db, m.dir); err != nil {
 			return err
 		}
 	}
 
-	if err := goose.Status(m.Sqlx.DB, m.Dir); err != nil {
+	if err := goose.Status(m.db, m.dir); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (m *Migration) Down() error {
-	if err := m.Init(); err != nil {
-		return err
-	}
-	ctx, cancel := helper.CreateCtxTimeout(m.Ctx, m.TimeoutSec)
-	defer cancel()
-	if m.Version != 0 {
-		if err := goose.DownToContext(ctx, m.Sqlx.DB, m.Dir, m.Version); err != nil {
+func (m *Migration) Down(ctx context.Context, version int64) error {
+	if version != 0 {
+		if err := goose.DownToContext(ctx, m.db, m.dir, version); err != nil {
 			return err
 		}
 	} else {
-		if err := goose.DownContext(ctx, m.Sqlx.DB, m.Dir); err != nil {
+		if err := goose.DownContext(ctx, m.db, m.dir); err != nil {
 			return err
 		}
 	}
 
-	if err := goose.Status(m.Sqlx.DB, m.Dir); err != nil {
+	if err := goose.Status(m.db, m.dir); err != nil {
 		return err
 	}
 	return nil

@@ -1,6 +1,7 @@
-# Go Backend
+# GoDev
 
-this is repository contains base code
+This module contains helper utilities and libraries to support developers in simplifying common tasks, improving code
+reusability, and enhancing development efficiency
 
 ## Getting started
 
@@ -8,35 +9,26 @@ this is repository contains base code
 
 - [Go 1.23.4](https://go.dev/doc/install) or higher
 
-then create folder project
+then install
 
 ```sh
-mkdir go-backend
-cd go-backend
+go get github.com/BevisDev/godev@latest
 ```
 
-using Go module
+## Dependencies
 
-```sh
-go mod init github.com/BevisDev/go-backend
-```
-
-using dependencies
-
-- [Framework](#getting-framework)
 - [Configuration](#getting-viper)
-- [Logger](#getting-logger)
-- [Lumberjack](#getting-write-logs-to-rolling-files)
+- [Zap](#getting-zap)
+- [Lumberjack](#getting-lumberjack)
 - [Cron](#getting-cron)
 - [Database](#getting-database)
 - [Redis](#getting-redis)
 - [Migration](#getting-migration)
 - [Keycloak](#getting-keycloak)
 
-Utilities
+Helper
 
 - [UUID](https://github.com/google/uuid)
-- [Wire](https://github.com/google/wire)
 - [RabbitMQ](#getting-rabbitmq)
 - [Decimal](https://github.com/shopspring/decimal)
 
@@ -44,7 +36,7 @@ Utilities
 
 > **Note:**
 >
-> To switch to a difference enviroment, you need to set the environment variable
+> To switch to a difference environment, you need to set the environment variable
 >
 > On Windows:
 >
@@ -58,21 +50,6 @@ Utilities
 > export GO_PROFILE=dev
 > ```
 
-### Getting Makefile Tools
-
-To install `make`
-
-On Windows: using **Chocolatey**
-
-Open PowerShell with **Administrator privileges** and run the following command:
-
-```sh
-Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
-```
-
-After Chocolatey is installed, you can install `make` by running the following command in the PowerShell or Command
-Prompt:
-
 ```sh
 choco install make
 ```
@@ -84,44 +61,6 @@ sudo apt update
 sudo apt install make
 ```
 
-### Getting Framework
-
-Using [Gin Gonic](https://github.com/gin-gonic/gin)
-
-```sh
-go get -u github.com/gin-gonic/gin
-```
-
-### Running Gin
-
-```go
-package main
-
-import (
-	"net/http"
-
-	"github.com/gin-gonic/gin"
-)
-
-func main() {
-	r := gin.Default()
-	r.GET("/ping", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"message": "pong",
-		})
-	})
-	r.Run() // listen and serve on 0.0.0.0:8080 (for windows "localhost:8080")
-}
-```
-
-To run the code, use the `go run` command, like:
-
-```sh
-go run main.go
-```
-
-Then visit [`0.0.0.0:8080/ping`](http://0.0.0.0:8080/ping) in your browser to see the response!
-
 ### Getting Viper
 
 Document: [Viper](https://github.com/spf13/viper)
@@ -130,7 +69,7 @@ Document: [Viper](https://github.com/spf13/viper)
 go get github.com/spf13/viper
 ```
 
-### Getting logger
+### Getting Zap
 
 Document: [Zap](https://github.com/uber-go/zap)
 
@@ -138,7 +77,7 @@ Document: [Zap](https://github.com/uber-go/zap)
 go get -u go.uber.org/zap
 ```
 
-### Getting write logs to rolling files
+### Getting Lumberjack
 
 Document: [Lumberjack](https://github.com/natefinch/lumberjack)
 
@@ -178,12 +117,6 @@ c.Start()
 | Month        | Yes        | 1-12 or JAN-DEC | * / , -                    |
 | Day of week  | Yes        | 0-6 or SUN-SAT  | * / , - ?                  |
 
-### Getting DI
-
-```sh
-go get github.com/google/wire/cmd/wire
-```
-
 ### Getting Database
 
 ***Install Driver***
@@ -213,20 +146,6 @@ Document: [Redis](https://github.com/redis/go-redis)
 go get github.com/redis/go-redis/v9
 ```
 
-### Getting Swagger
-
-Document: [Swagger](https://github.com/swaggo/swag)
-
-```sh
-go get -u github.com/swaggo/swag/cmd/swag
-go get -u github.com/swaggo/gin-swagger
-go get -u github.com/swaggo/files
-```
-
-```sh
-swag init --generalInfo ./src/main/startup/run.go --output ./src/resources/swagger
-```
-
 ### Getting RabbitMQ
 
 Document: [RabbitMQ](https://github.com/rabbitmq/amqp091-go)
@@ -236,13 +155,13 @@ go get github.com/rabbitmq/amqp091-go
 ```
 
 - ack(multiple bool)
-	- true: confirm all message sucessful
-	- false: confirm one message sucessfuly
+    - true: confirm all message sucessful
+    - false: confirm one message sucessfuly
 
 - nack(multiple, requeue bool)
     - multiple like ack
 
-### Getting migration
+### Getting Migration
 
 Document: [Goose](https://github.com/pressly/goose)
 
