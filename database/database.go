@@ -13,7 +13,6 @@ import (
 )
 
 type ConfigDB struct {
-	Profile      string
 	Kind         string
 	Schema       string
 	TimeoutSec   int
@@ -24,17 +23,18 @@ type ConfigDB struct {
 	MaxOpenConns int
 	MaxIdleConns int
 	MaxLifeTime  int
+	ShowQuery    bool
 }
 
 type Database struct {
 	db         *sqlx.DB
-	profile    string
+	showQuery  bool
 	timeoutSec int
 }
 
 func NewDB(cf *ConfigDB) (*Database, error) {
 	database := &Database{
-		profile:    cf.Profile,
+		showQuery:  cf.ShowQuery,
 		timeoutSec: cf.TimeoutSec,
 	}
 	db, err := database.newConnection(cf)
@@ -93,8 +93,8 @@ func (d *Database) Close() {
 	d.db.Close()
 }
 
-func (d *Database) logQuery(query string) {
-	if d.profile == "dev" {
+func (d *Database) viewQuery(query string) {
+	if d.showQuery {
 		log.Printf("Query: %s\n", query)
 	}
 }
@@ -112,7 +112,7 @@ func (d *Database) GetList(c context.Context, dest interface{}, query string, ar
 		}
 	}
 	query = d.db.Rebind(query)
-	d.logQuery(query)
+	d.viewQuery(query)
 
 	ctx, cancel := helper.CreateCtxTimeout(c, d.timeoutSec)
 	defer cancel()
@@ -133,7 +133,7 @@ func (d *Database) GetAny(c context.Context, dest interface{}, query string, arg
 		}
 	}
 	query = d.db.Rebind(query)
-	d.logQuery(query)
+	d.viewQuery(query)
 
 	ctx, cancel := helper.CreateCtxTimeout(c, d.timeoutSec)
 	defer cancel()
@@ -154,7 +154,7 @@ func (d *Database) ExecQuery(c context.Context, query string, args ...interface{
 		}
 	}
 	query = d.db.Rebind(query)
-	d.logQuery(query)
+	d.viewQuery(query)
 
 	ctx, cancel := helper.CreateCtxTimeout(c, d.timeoutSec)
 	defer cancel()
@@ -179,7 +179,8 @@ func (d *Database) ExecQuery(c context.Context, query string, args ...interface{
 // args: map[string]interface{}{ "first": "Bin","last": "Smuth", "email": "bensmith@allblacks.nz"}
 // or struct with the `db` tag
 func (d *Database) Save(c context.Context, query string, args interface{}) error {
-	d.logQuery(query)
+	d.viewQuery(query)
+
 	ctx, cancel := helper.CreateCtxTimeout(c, d.timeoutSec)
 	defer cancel()
 
@@ -193,15 +194,18 @@ func (d *Database) Save(c context.Context, query string, args interface{}) error
 		tx.Rollback()
 		return err
 	}
+
 	tx.Commit()
 	return err
 }
 
-// LastInsertId function shouldn not be used with this SQL Server driver
+// InsertedId inserts record and returns id
+// LastInsertId function should not be used with this SQL Server driver
 // Please use OUTPUT clause or SCOPE_IDENTITY() to the end of your query
 func (d *Database) InsertedId(c context.Context, query string, args ...interface{}) (int, error) {
 	var id int
-	d.logQuery(query)
+	d.viewQuery(query)
+
 	ctx, cancel := helper.CreateCtxTimeout(c, d.timeoutSec)
 	defer cancel()
 
@@ -215,12 +219,13 @@ func (d *Database) InsertedId(c context.Context, query string, args ...interface
 		tx.Rollback()
 		return id, err
 	}
+
 	tx.Commit()
 	return id, err
 }
 
 func (d *Database) Delete(c context.Context, query string, args interface{}) error {
-	d.logQuery(query)
+	d.viewQuery(query)
 	ctx, cancel := helper.CreateCtxTimeout(c, d.timeoutSec)
 	defer cancel()
 
@@ -234,6 +239,7 @@ func (d *Database) Delete(c context.Context, query string, args interface{}) err
 		tx.Rollback()
 		return err
 	}
+
 	tx.Commit()
 	return err
 }

@@ -31,6 +31,8 @@ const (
 	Authorization       = "Authorization"
 	ApplicationJSON     = "application/json"
 	ApplicationFormData = "application/x-www-form-urlencoded"
+	Bearer_             = "Bearer "
+	Basic_              = "Basic "
 )
 
 // form data
@@ -39,6 +41,9 @@ const (
 	ClientSecret      = "client_secret"
 	GrantType         = "grant_type"
 	ClientCredentials = "client_credentials"
+	AuthorizationCode = "authorization_code"
+	Password          = "password"
+	RefreshToken      = "refresh_token"
 )
 
 // type db
