@@ -3,9 +3,12 @@ package rest
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/BevisDev/godev/helper"
@@ -13,55 +16,183 @@ import (
 )
 
 type RestRequest struct {
-	State    string
 	URL      string
-	Params   map[string]any
+	Query    map[string]string
+	Params   map[string]string
+	BodyForm map[string]string
 	Header   map[string]string
 	Body     any
-	BodyForm url.Values
 	Result   any
 }
 
 type RestClient struct {
-	client     *http.Client
-	timeoutSec int
+	Client     *http.Client
+	TimeoutSec int
 	logger     *logger.AppLogger
 }
 
 func NewRestClient(timeoutSec int, logger *logger.AppLogger) *RestClient {
 	return &RestClient{
-		client:     &http.Client{},
-		timeoutSec: timeoutSec,
+		Client:     &http.Client{},
+		TimeoutSec: timeoutSec,
 		logger:     logger,
 	}
 }
 
-func addHeaders(rq *http.Request, headers map[string]string) {
-	if helper.IsNilOrEmpty(headers) || headers[helper.ContentType] == "" {
-		rq.Header.Set(helper.ContentType, helper.ApplicationJSON)
+func (r *RestClient) Get(c context.Context, restReq *RestRequest) error {
+	urlStr := r.buildQuery(restReq.URL, restReq.Query)
+
+	// build params
+	params := r.buildParams(restReq.Params)
+	if params != "" {
+		if strings.Contains(urlStr, "?") {
+			urlStr += "&" + params
+		} else {
+			urlStr += "?" + params
+		}
 	}
-	for key, value := range headers {
-		rq.Header.Add(key, value)
-	}
+
+	restReq.URL = urlStr
+	return r.restTemplate(c, http.MethodGet, restReq)
 }
 
-func (r *RestClient) execute(state string, request *http.Request, restReq *RestRequest, startTime time.Time) error {
+func (r *RestClient) Post(c context.Context, restReq *RestRequest) error {
+	return r.restTemplate(c, http.MethodPost, restReq)
+}
+
+func (r *RestClient) PostForm(c context.Context, restReq *RestRequest) error {
+	return r.restTemplate(c, http.MethodPost, restReq)
+}
+
+func (r *RestClient) Put(c context.Context, restReq *RestRequest) error {
+	return r.restTemplate(c, http.MethodPut, restReq)
+}
+
+func (r *RestClient) Patch(c context.Context, restReq *RestRequest) error {
+	return r.restTemplate(c, http.MethodPatch, restReq)
+}
+
+func (r *RestClient) Delete(c context.Context, restReq *RestRequest) error {
+	return r.restTemplate(c, http.MethodDelete, restReq)
+}
+
+func (r *RestClient) restTemplate(c context.Context, method string, restReq *RestRequest) error {
 	var (
-		respBodyBytes []byte
+		state      = helper.GetState(c)
+		reqBody    []byte
+		bodyStr    string
+		isLog      = !helper.IsNilOrEmpty(r.logger)
+		isFormData = helper.IsNilOrEmpty(restReq)
 	)
-	response, err := r.client.Do(request)
+
+	// serialize body
+	if isFormData {
+		bodyStr = r.buildParams(restReq.BodyForm)
+	} else if !helper.IsNilOrEmpty(restReq.Body) {
+		reqBody = helper.ToJSONBytes(restReq.Body)
+		bodyStr = helper.ToString(reqBody)
+	}
+
+	// log request
+	startTime := time.Now()
+	if isLog {
+		r.logger.LogExtRequest(&logger.RequestLogger{
+			State:  state,
+			URL:    restReq.URL,
+			Method: method,
+			Body:   bodyStr,
+			Time:   startTime,
+		})
+	} else {
+		var sb strings.Builder
+		sb.WriteString("===== REQUEST EXTERNAL INFO =====\n")
+		sb.WriteString(fmt.Sprintf("State: %s\n", state))
+		sb.WriteString(fmt.Sprintf("URL: %s\n", restReq.URL))
+		sb.WriteString(fmt.Sprintf("Method: %s\n", method))
+		sb.WriteString(fmt.Sprintf("Time: %s\n", helper.TimeToString(startTime, helper.DATETIME_FULL)))
+		if bodyStr != "" {
+			sb.WriteString(fmt.Sprintf("Body: %s\n", bodyStr))
+		}
+		sb.WriteString("=================================\n")
+		log.Println(sb.String())
+	}
+
+	ctx, cancel := helper.CreateCtxTimeout(c, r.TimeoutSec)
+	defer cancel()
+
+	// create request
+	var (
+		request *http.Request
+		err     error
+	)
+	if isFormData {
+		request, err = http.NewRequestWithContext(ctx, method, restReq.URL, bytes.NewBufferString(bodyStr))
+	} else if helper.IsNilOrEmpty(reqBody) {
+		request, err = http.NewRequestWithContext(ctx, method, restReq.URL, nil)
+	} else {
+		request, err = http.NewRequestWithContext(ctx, method, restReq.URL, bytes.NewBuffer(reqBody))
+	}
 	if err != nil {
 		return err
 	}
-	defer response.Body.Close()
 
-	// response logger
-	responseLogger := &logger.ResponseLogger{
-		State:       state,
-		Status:      response.StatusCode,
-		DurationSec: time.Since(startTime),
+	// build header
+	if isFormData {
+		r.buildHeaders(request, restReq.Header, helper.ApplicationFormData)
+	} else {
+		r.buildHeaders(request, restReq.Header, helper.ApplicationJSON)
 	}
-	defer r.logger.LogExtResponse(responseLogger)
+
+	// execute request
+	return r.execute(request, restReq, startTime, state)
+}
+
+func (r *RestClient) buildQuery(url string, queryParams map[string]string) string {
+	for key, value := range queryParams {
+		placeholder := ":" + key
+		url = strings.ReplaceAll(url, placeholder, value)
+	}
+	return url
+}
+
+func (r *RestClient) execute(request *http.Request, restReq *RestRequest,
+	startTime time.Time, state string) error {
+	var (
+		respBodyBytes []byte
+		isLog         = r.logger != nil
+	)
+	response, err := r.Client.Do(request)
+	if err != nil {
+		return err
+	}
+
+	// log response
+	var (
+		responseLogger *logger.ResponseLogger
+		sb             strings.Builder
+	)
+	defer func() {
+		response.Body.Close()
+		if isLog {
+			r.logger.LogExtResponse(responseLogger)
+		} else {
+			sb.WriteString("==================================\n")
+			log.Println(sb.String())
+		}
+	}()
+
+	if isLog {
+		responseLogger = &logger.ResponseLogger{
+			State:       state,
+			Status:      response.StatusCode,
+			DurationSec: time.Since(startTime),
+		}
+	} else {
+		sb.WriteString("===== RESPONSE EXTERNAL INFO =====\n")
+		sb.WriteString(fmt.Sprintf("State: %s\n", state))
+		sb.WriteString(fmt.Sprintf("Status: %d\n", response.StatusCode))
+		sb.WriteString(fmt.Sprintf("Duration: %s\n", time.Since(startTime)))
+	}
 
 	// read body
 	respBodyBytes, err = io.ReadAll(response.Body)
@@ -72,9 +203,15 @@ func (r *RestClient) execute(state string, request *http.Request, restReq *RestR
 	// check body
 	hasBody := !helper.IsNilOrEmpty(respBodyBytes)
 	if hasBody {
-		responseLogger.Body = helper.JSONToStr(respBodyBytes)
+		respBodyStr := helper.ToString(respBodyBytes)
+		if isLog {
+			responseLogger.Body = respBodyStr
+		} else {
+			sb.WriteString(fmt.Sprintf("Body: %s\n", respBodyStr))
+		}
 
-		if err = helper.ToStruct(respBodyBytes, restReq.Result); err != nil {
+		err = helper.JSONBytesToStruct(respBodyBytes, restReq.Result)
+		if err != nil {
 			return err
 		}
 	}
@@ -82,76 +219,22 @@ func (r *RestClient) execute(state string, request *http.Request, restReq *RestR
 	return nil
 }
 
-func (r *RestClient) Post(c context.Context, restReq *RestRequest) error {
-	var (
-		state        = helper.GetState(c)
-		reqBodyBytes []byte
-	)
-
-	// serialize body
-	if !helper.IsNilOrEmpty(restReq.Body) {
-		reqBodyBytes = helper.ToJSON(restReq.Body)
+func (r *RestClient) buildParams(params map[string]string) string {
+	if helper.IsNilOrEmpty(params) {
+		return ""
 	}
-
-	startTime := time.Now()
-	// log request
-	r.logger.LogExtRequest(&logger.RequestLogger{
-		URL:    restReq.URL,
-		Method: http.MethodPost,
-		Body:   helper.ToJSONStr(restReq.Body),
-		Time:   startTime,
-	})
-
-	ctx, cancel := helper.CreateCtxTimeout(c, r.timeoutSec)
-	defer cancel()
-
-	// created request
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost,
-		restReq.URL, bytes.NewBuffer(reqBodyBytes))
-	if err != nil {
-		return err
+	urlParams := url.Values{}
+	for k, v := range params {
+		urlParams.Add(k, v)
 	}
-
-	// build header
-	addHeaders(request, restReq.Header)
-
-	// execute request
-	return r.execute(state, request, restReq, startTime)
+	return urlParams.Encode()
 }
 
-func (r *RestClient) PostForm(c context.Context, restReq *RestRequest) error {
-	var (
-		state   = helper.GetState(c)
-		reqBody = restReq.BodyForm.Encode()
-	)
-	startTime := time.Now()
-	// log request
-	r.logger.LogExtRequest(&logger.RequestLogger{
-		State:  state,
-		URL:    restReq.URL,
-		Method: http.MethodPost,
-		Body:   reqBody,
-		Time:   startTime,
-	})
-	ctx, cancel := helper.CreateCtxTimeout(c, r.timeoutSec)
-	defer cancel()
-
-	// created request
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, restReq.URL,
-		bytes.NewBufferString(reqBody))
-	if err != nil {
-		return err
+func (r *RestClient) buildHeaders(rq *http.Request, headers map[string]string, contentType string) {
+	if helper.IsNilOrEmpty(headers) || headers[helper.ContentType] == "" {
+		rq.Header.Set(helper.ContentType, contentType)
 	}
-
-	// build header
-	if helper.IsNilOrEmpty(restReq.Header) {
-		restReq.Header = make(map[string]string)
-		restReq.Header[helper.ContentType] = helper.ApplicationFormData
-	} else if restReq.Header[helper.ContentType] == "" {
-		restReq.Header[helper.ContentType] = helper.ApplicationFormData
+	for key, value := range headers {
+		rq.Header.Add(key, value)
 	}
-	addHeaders(request, restReq.Header)
-
-	// execute request
-	return r.execute(state, request, restReq, startTime)
 }

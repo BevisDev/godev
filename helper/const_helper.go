@@ -9,8 +9,9 @@ const (
 	YYYYMMDDHHMMSS   = "20060102150405"
 
 	// Date time ISO 8601
-	DATETIME_FULL  = "2006-01-02T15:04:05Z07:00"
-	DATETIME_NO_TZ = "2006-01-02 15:04:05.000"
+	DATETIME_FULL      = "2006-01-02T15:04:05Z07:00"
+	DATETIME_NO_OFFSET = "2006-01-02T15:04:05Z"
+	DATETIME_NO_TZ     = "2006-01-02 15:04:05.000"
 
 	// format time
 	TIME_FULL   = "150405"
@@ -31,6 +32,11 @@ const (
 	Authorization       = "Authorization"
 	ApplicationJSON     = "application/json"
 	ApplicationFormData = "application/x-www-form-urlencoded"
+	ApplicationXML      = "application/xml"
+	TextXML             = "text/xml"
+	TextPlain           = "text/plain"
+	TextHTML            = "text/html"
+	MultipartFormData   = "multipart/form-data"
 	Bearer_             = "Bearer "
 	Basic_              = "Basic "
 )

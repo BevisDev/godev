@@ -2,7 +2,10 @@ package helper
 
 import (
 	"context"
+	"fmt"
+	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -47,6 +50,23 @@ func CreateCtxCancel(ctx context.Context) (context.Context, context.CancelFunc) 
 		ctx = context.Background()
 	}
 	return context.WithCancel(ctx)
+}
+
+func ToString(value any) string {
+	switch v := value.(type) {
+	case string:
+		return v
+	case int, int8, int16, int32, int64:
+		return strconv.FormatInt(reflect.ValueOf(v).Int(), 10)
+	case float32, float64:
+		return strconv.FormatFloat(reflect.ValueOf(v).Float(), 'f', 2, 64)
+	case bool:
+		return strconv.FormatBool(v)
+	case []byte:
+		return string(v)
+	default:
+		return fmt.Sprintf("%v", v)
+	}
 }
 
 func RemoveAccent(str string) string {

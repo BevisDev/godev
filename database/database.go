@@ -27,18 +27,18 @@ type ConfigDB struct {
 }
 
 type Database struct {
-	db         *sqlx.DB
+	DB         *sqlx.DB
 	showQuery  bool
-	timeoutSec int
+	TimeoutSec int
 }
 
 func NewDB(cf *ConfigDB) (*Database, error) {
 	database := &Database{
 		showQuery:  cf.ShowQuery,
-		timeoutSec: cf.TimeoutSec,
+		TimeoutSec: cf.TimeoutSec,
 	}
 	db, err := database.newConnection(cf)
-	database.db = db
+	database.DB = db
 	return database, err
 }
 
@@ -90,7 +90,7 @@ func (d *Database) newConnection(cf *ConfigDB) (*sqlx.DB, error) {
 }
 
 func (d *Database) Close() {
-	d.db.Close()
+	d.DB.Close()
 }
 
 func (d *Database) viewQuery(query string) {
@@ -111,17 +111,17 @@ func (d *Database) GetList(c context.Context, dest interface{}, query string, ar
 			return err
 		}
 	}
-	query = d.db.Rebind(query)
+	query = d.DB.Rebind(query)
 	d.viewQuery(query)
 
-	ctx, cancel := helper.CreateCtxTimeout(c, d.timeoutSec)
+	ctx, cancel := helper.CreateCtxTimeout(c, d.TimeoutSec)
 	defer cancel()
 
 	if helper.IsNilOrEmpty(args) {
-		return d.db.SelectContext(ctx, dest, query)
+		return d.DB.SelectContext(ctx, dest, query)
 	}
 
-	return d.db.SelectContext(ctx, dest, query, args...)
+	return d.DB.SelectContext(ctx, dest, query, args...)
 }
 
 func (d *Database) GetAny(c context.Context, dest interface{}, query string, args ...interface{}) error {
@@ -132,17 +132,17 @@ func (d *Database) GetAny(c context.Context, dest interface{}, query string, arg
 			return err
 		}
 	}
-	query = d.db.Rebind(query)
+	query = d.DB.Rebind(query)
 	d.viewQuery(query)
 
-	ctx, cancel := helper.CreateCtxTimeout(c, d.timeoutSec)
+	ctx, cancel := helper.CreateCtxTimeout(c, d.TimeoutSec)
 	defer cancel()
 
 	if helper.IsNilOrEmpty(args) {
-		return d.db.GetContext(ctx, dest, query)
+		return d.DB.GetContext(ctx, dest, query)
 	}
 
-	return d.db.GetContext(ctx, dest, query, args...)
+	return d.DB.GetContext(ctx, dest, query, args...)
 }
 
 func (d *Database) ExecQuery(c context.Context, query string, args ...interface{}) error {
@@ -153,18 +153,18 @@ func (d *Database) ExecQuery(c context.Context, query string, args ...interface{
 			return err
 		}
 	}
-	query = d.db.Rebind(query)
+	query = d.DB.Rebind(query)
 	d.viewQuery(query)
 
-	ctx, cancel := helper.CreateCtxTimeout(c, d.timeoutSec)
+	ctx, cancel := helper.CreateCtxTimeout(c, d.TimeoutSec)
 	defer cancel()
 
-	tx, err := d.db.BeginTxx(ctx, nil)
+	tx, err := d.DB.BeginTxx(ctx, nil)
 	if err != nil {
 		return err
 	}
 
-	_, err = d.db.ExecContext(ctx, query, args...)
+	_, err = d.DB.ExecContext(ctx, query, args...)
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -181,15 +181,15 @@ func (d *Database) ExecQuery(c context.Context, query string, args ...interface{
 func (d *Database) Save(c context.Context, query string, args interface{}) error {
 	d.viewQuery(query)
 
-	ctx, cancel := helper.CreateCtxTimeout(c, d.timeoutSec)
+	ctx, cancel := helper.CreateCtxTimeout(c, d.TimeoutSec)
 	defer cancel()
 
-	tx, err := d.db.BeginTxx(ctx, nil)
+	tx, err := d.DB.BeginTxx(ctx, nil)
 	if err != nil {
 		return err
 	}
 
-	_, err = d.db.NamedExecContext(ctx, query, args)
+	_, err = d.DB.NamedExecContext(ctx, query, args)
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -206,15 +206,15 @@ func (d *Database) InsertedId(c context.Context, query string, args ...interface
 	var id int
 	d.viewQuery(query)
 
-	ctx, cancel := helper.CreateCtxTimeout(c, d.timeoutSec)
+	ctx, cancel := helper.CreateCtxTimeout(c, d.TimeoutSec)
 	defer cancel()
 
-	tx, err := d.db.BeginTxx(ctx, nil)
+	tx, err := d.DB.BeginTxx(ctx, nil)
 	if err != nil {
 		return id, err
 	}
 
-	err = d.db.QueryRowContext(ctx, query, args...).Scan(&id)
+	err = d.DB.QueryRowContext(ctx, query, args...).Scan(&id)
 	if err != nil {
 		tx.Rollback()
 		return id, err
@@ -226,15 +226,15 @@ func (d *Database) InsertedId(c context.Context, query string, args ...interface
 
 func (d *Database) Delete(c context.Context, query string, args interface{}) error {
 	d.viewQuery(query)
-	ctx, cancel := helper.CreateCtxTimeout(c, d.timeoutSec)
+	ctx, cancel := helper.CreateCtxTimeout(c, d.TimeoutSec)
 	defer cancel()
 
-	tx, err := d.db.BeginTxx(ctx, nil)
+	tx, err := d.DB.BeginTxx(ctx, nil)
 	if err != nil {
 		return err
 	}
 
-	_, err = d.db.NamedExecContext(ctx, query, args)
+	_, err = d.DB.NamedExecContext(ctx, query, args)
 	if err != nil {
 		tx.Rollback()
 		return err

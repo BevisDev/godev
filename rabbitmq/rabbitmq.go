@@ -1,6 +1,7 @@
 package rabbitmq
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/BevisDev/godev/helper"
@@ -17,8 +18,8 @@ type RabbitMQConfig struct {
 
 type RabbitMQ struct {
 	connection *amqp.Connection
-	channel    *amqp.Channel
-	timeoutSec int
+	Channel    *amqp.Channel
+	TimeoutSec int
 }
 
 func NewRabbitMQ(config *RabbitMQConfig) (*RabbitMQ, error) {
@@ -33,14 +34,14 @@ func NewRabbitMQ(config *RabbitMQConfig) (*RabbitMQ, error) {
 	}
 	return &RabbitMQ{
 		connection: conn,
-		channel:    ch,
-		timeoutSec: config.TimeoutSec,
+		Channel:    ch,
+		TimeoutSec: config.TimeoutSec,
 	}, nil
 }
 
 func (r *RabbitMQ) Close() {
-	if r.channel != nil {
-		r.channel.Close()
+	if r.Channel != nil {
+		r.Channel.Close()
 	}
 	if r.connection != nil {
 		r.connection.Close()
@@ -48,7 +49,7 @@ func (r *RabbitMQ) Close() {
 }
 
 func (r *RabbitMQ) DeclareQueue(queueName string) (amqp.Queue, error) {
-	return r.channel.QueueDeclare(
+	return r.Channel.QueueDeclare(
 		queueName,
 		true,
 		false,
@@ -58,12 +59,13 @@ func (r *RabbitMQ) DeclareQueue(queueName string) (amqp.Queue, error) {
 	)
 }
 
-func (r *RabbitMQ) PutMessageToQueue(queueName string, message interface{}) error {
-	json := helper.ToJSON(message)
+func (r *RabbitMQ) PutMessageToQueue(c context.Context, queueName string, message interface{}) error {
+	json := helper.ToJSONBytes(message)
 	if len(json) > 50000 {
-		return fmt.Errorf("Message is too large: %d", len(json))
+		return fmt.Errorf("message is too large: %d", len(json))
 	}
-	ctx, cancel := helper.CreateCtxTimeout(nil, r.timeoutSec)
+
+	ctx, cancel := helper.CreateCtxTimeout(c, r.TimeoutSec)
 	defer cancel()
 
 	q, err := r.DeclareQueue(queueName)
@@ -71,7 +73,7 @@ func (r *RabbitMQ) PutMessageToQueue(queueName string, message interface{}) erro
 		return err
 	}
 
-	err = r.channel.PublishWithContext(
+	err = r.Channel.PublishWithContext(
 		ctx,
 		"",
 		q.Name,
@@ -94,7 +96,7 @@ func (r *RabbitMQ) ConsumeMessage(queueName string, handler func(amqp.Delivery))
 		return err
 	}
 
-	msgs, err := r.channel.Consume(
+	msgs, err := r.Channel.Consume(
 		q.Name,
 		"",
 		false,
