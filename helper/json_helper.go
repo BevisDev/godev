@@ -35,3 +35,12 @@ func JSONToStruct(jsonStr string, result any) error {
 	}
 	return nil
 }
+
+func StructToMap(entry interface{}) map[string]interface{} {
+	j := ToJSONBytes(entry)
+	var result map[string]interface{}
+	if err := JSONBytesToStruct(j, &result); err != nil {
+		return nil
+	}
+	return result
+}
