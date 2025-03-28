@@ -2,7 +2,9 @@ package logger
 
 import (
 	"fmt"
+	"github.com/BevisDev/godev/helper"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -13,17 +15,18 @@ import (
 )
 
 type AppLogger struct {
-	logger *zap.Logger
+	Logger *zap.Logger
 }
 
 type ConfigLogger struct {
 	Profile    string
-	Filename   string
 	MaxSize    int
 	MaxBackups int
 	MaxAge     int
 	Compress   bool
 	IsSplit    bool
+	DirName    string
+	Filename   string
 }
 
 type RequestLogger struct {
@@ -50,7 +53,7 @@ func NewLogger(cf *ConfigLogger) *AppLogger {
 	appWrite := writeSync(cf)
 	appCore := zapcore.NewCore(encoder, appWrite, zapcore.InfoLevel)
 	zapLogger = zap.New(appCore, zap.AddCaller())
-	return &AppLogger{logger: zapLogger}
+	return &AppLogger{Logger: zapLogger}
 }
 
 func getEncoderLog(cf *ConfigLogger) zapcore.Encoder {
@@ -70,6 +73,7 @@ func getEncoderLog(cf *ConfigLogger) zapcore.Encoder {
 		encodeConfig.EncodeCaller = zapcore.ShortCallerEncoder
 		return zapcore.NewJSONEncoder(encodeConfig)
 	}
+
 	// for other
 	encodeConfig = zap.NewDevelopmentEncoderConfig()
 	encodeConfig.EncodeTime = zapcore.ISO8601TimeEncoder
@@ -77,6 +81,8 @@ func getEncoderLog(cf *ConfigLogger) zapcore.Encoder {
 	encodeConfig.LevelKey = "level"
 	encodeConfig.CallerKey = "caller"
 	encodeConfig.MessageKey = "message"
+
+	// for dev
 	if cf.Profile == "dev" {
 		return zapcore.NewConsoleEncoder(encodeConfig)
 	}
@@ -90,7 +96,7 @@ func writeSync(cf *ConfigLogger) zapcore.WriteSyncer {
 	}
 
 	lumberLogger := lumberjack.Logger{
-		Filename:   cf.Filename,
+		Filename:   getFilename(cf.DirName, cf.Filename),
 		MaxSize:    cf.MaxSize,
 		MaxBackups: cf.MaxBackups,
 		MaxAge:     cf.MaxAge,
@@ -101,8 +107,8 @@ func writeSync(cf *ConfigLogger) zapcore.WriteSyncer {
 	if cf.IsSplit {
 		c := cron.New()
 		c.AddFunc("0 0 * * *", func() {
-			lumberLogger.Filename = cf.Filename
-			lumberLogger.Close()
+			lumberLogger.Filename = getFilename(cf.DirName, cf.Filename)
+			lumberLogger.Rotate()
 		})
 		c.Start()
 	}
@@ -110,21 +116,21 @@ func writeSync(cf *ConfigLogger) zapcore.WriteSyncer {
 	return zapcore.AddSync(&lumberLogger)
 }
 
+func getFilename(dir, fileName string) string {
+	now := time.Now().Format(helper.YYYY_MM_DD)
+	return filepath.Join(dir, now, fileName)
+}
+
 func (l *AppLogger) logApp(level zapcore.Level, state string, msg string, args ...interface{}) {
-	if l.logger == nil {
+	if l.Logger == nil {
 		return
 	}
 
-	// formater message
-	var message string
-	if len(args) != 0 {
-		message = l.formatMessage(msg, args...)
-	} else {
-		message = msg
-	}
+	// format message
+	var message = l.formatMessage(msg, args...)
 
 	// skip caller before
-	logging := l.logger.WithOptions(zap.AddCallerSkip(2))
+	logging := l.Logger.WithOptions(zap.AddCallerSkip(2))
 	switch level {
 	case zapcore.InfoLevel:
 		logging.Info(message, zap.String("state", state))
@@ -145,7 +151,6 @@ func (l *AppLogger) logApp(level zapcore.Level, state string, msg string, args .
 
 func (l *AppLogger) formatMessage(msg string, args ...interface{}) string {
 	var message string
-
 	if len(args) == 0 {
 		return msg
 	}
@@ -153,7 +158,6 @@ func (l *AppLogger) formatMessage(msg string, args ...interface{}) string {
 	if strings.Contains(msg, "{}") {
 		message = strings.ReplaceAll(msg, "{}", "%+v")
 	}
-
 	if !strings.Contains(msg, "%") {
 		msg += strings.Repeat(" :%+v", len(args))
 	}
@@ -161,9 +165,9 @@ func (l *AppLogger) formatMessage(msg string, args ...interface{}) string {
 	return fmt.Sprintf(message, args...)
 }
 
-func (l *AppLogger) SyncAll() {
-	if l.logger != nil {
-		l.logger.Sync()
+func (l *AppLogger) Sync() {
+	if l.Logger != nil {
+		l.Logger.Sync()
 	}
 }
 
@@ -184,7 +188,7 @@ func (l *AppLogger) Fatal(state, msg string, args ...interface{}) {
 }
 
 func (l *AppLogger) LogRequest(req *RequestLogger) {
-	l.logger.WithOptions(
+	l.Logger.WithOptions(
 		zap.AddCallerSkip(1)).Info(
 		"[===== REQUEST INFO =====]",
 		zap.String("state", req.State),
@@ -198,7 +202,7 @@ func (l *AppLogger) LogRequest(req *RequestLogger) {
 }
 
 func (l *AppLogger) LogResponse(resp *ResponseLogger) {
-	l.logger.WithOptions(
+	l.Logger.WithOptions(
 		zap.AddCallerSkip(1)).Info(
 		"[===== RESPONSE INFO =====]",
 		zap.String("state", resp.State),
@@ -210,7 +214,7 @@ func (l *AppLogger) LogResponse(resp *ResponseLogger) {
 }
 
 func (l *AppLogger) LogExtRequest(req *RequestLogger) {
-	l.logger.WithOptions(
+	l.Logger.WithOptions(
 		zap.AddCallerSkip(2)).Info(
 		"[===== REQUEST EXTERNAL INFO =====]",
 		zap.String("state", req.State),
@@ -223,7 +227,7 @@ func (l *AppLogger) LogExtRequest(req *RequestLogger) {
 }
 
 func (l *AppLogger) LogExtResponse(resp *ResponseLogger) {
-	l.logger.WithOptions(
+	l.Logger.WithOptions(
 		zap.AddCallerSkip(1)).Info(
 		"[===== RESPONSE EXTERNAL INFO =====]",
 		zap.String("state", resp.State),
