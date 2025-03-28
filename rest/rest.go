@@ -82,7 +82,7 @@ func (r *RestClient) restTemplate(c context.Context, method string, restReq *Res
 		reqBody    []byte
 		bodyStr    string
 		isLog      = !helper.IsNilOrEmpty(r.logger)
-		isFormData = helper.IsNilOrEmpty(restReq)
+		isFormData = !helper.IsNilOrEmpty(restReq)
 	)
 
 	// serialize body
