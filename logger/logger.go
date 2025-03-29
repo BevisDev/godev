@@ -2,7 +2,7 @@ package logger
 
 import (
 	"fmt"
-	"github.com/BevisDev/godev/helper"
+	"github.com/BevisDev/godev/utils"
 	"os"
 	"path/filepath"
 	"strings"
@@ -117,11 +117,11 @@ func writeSync(cf *ConfigLogger) zapcore.WriteSyncer {
 }
 
 func getFilename(dir, fileName string) string {
-	now := time.Now().Format(helper.YYYY_MM_DD)
+	now := time.Now().Format(utils.YYYY_MM_DD)
 	return filepath.Join(dir, now, fileName)
 }
 
-func (l *AppLogger) logApp(level zapcore.Level, state string, msg string, args ...interface{}) {
+func (l AppLogger) logApp(level zapcore.Level, state string, msg string, args ...interface{}) {
 	if l.Logger == nil {
 		return
 	}
@@ -133,23 +133,23 @@ func (l *AppLogger) logApp(level zapcore.Level, state string, msg string, args .
 	logging := l.Logger.WithOptions(zap.AddCallerSkip(2))
 	switch level {
 	case zapcore.InfoLevel:
-		logging.Info(message, zap.String("state", state))
+		logging.Info(message, zap.String(utils.State, state))
 		break
 	case zapcore.WarnLevel:
-		logging.Warn(message, zap.String("state", state))
+		logging.Warn(message, zap.String(utils.State, state))
 		break
 	case zapcore.ErrorLevel:
-		logging.Error(message, zap.String("state", state))
+		logging.Error(message, zap.String(utils.State, state))
 		break
 	case zapcore.FatalLevel:
-		logging.Fatal(message, zap.String("state", state))
+		logging.Fatal(message, zap.String(utils.State, state))
 		break
 	default:
-		logging.Info(message, zap.String("state", state))
+		logging.Info(message, zap.String(utils.State, state))
 	}
 }
 
-func (l *AppLogger) formatMessage(msg string, args ...interface{}) string {
+func (l AppLogger) formatMessage(msg string, args ...interface{}) string {
 	var message string
 	if len(args) == 0 {
 		return msg
@@ -171,27 +171,27 @@ func (l *AppLogger) Sync() {
 	}
 }
 
-func (l *AppLogger) Info(state, msg string, args ...interface{}) {
+func (l AppLogger) Info(state, msg string, args ...interface{}) {
 	l.logApp(zapcore.InfoLevel, state, msg, args...)
 }
 
-func (l *AppLogger) Error(state, msg string, args ...interface{}) {
+func (l AppLogger) Error(state, msg string, args ...interface{}) {
 	l.logApp(zapcore.ErrorLevel, state, msg, args...)
 }
 
-func (l *AppLogger) Warn(state, msg string, args ...interface{}) {
+func (l AppLogger) Warn(state, msg string, args ...interface{}) {
 	l.logApp(zapcore.WarnLevel, state, msg, args...)
 }
 
-func (l *AppLogger) Fatal(state, msg string, args ...interface{}) {
+func (l AppLogger) Fatal(state, msg string, args ...interface{}) {
 	l.logApp(zapcore.FatalLevel, state, msg, args...)
 }
 
-func (l *AppLogger) LogRequest(req *RequestLogger) {
+func (l AppLogger) LogRequest(req *RequestLogger) {
 	l.Logger.WithOptions(
 		zap.AddCallerSkip(1)).Info(
 		"[===== REQUEST INFO =====]",
-		zap.String("state", req.State),
+		zap.String(utils.State, req.State),
 		zap.String("url", req.URL),
 		zap.Time("time", req.Time),
 		zap.String("method", req.Method),
@@ -201,7 +201,7 @@ func (l *AppLogger) LogRequest(req *RequestLogger) {
 	)
 }
 
-func (l *AppLogger) LogResponse(resp *ResponseLogger) {
+func (l AppLogger) LogResponse(resp *ResponseLogger) {
 	l.Logger.WithOptions(
 		zap.AddCallerSkip(1)).Info(
 		"[===== RESPONSE INFO =====]",
@@ -213,11 +213,11 @@ func (l *AppLogger) LogResponse(resp *ResponseLogger) {
 	)
 }
 
-func (l *AppLogger) LogExtRequest(req *RequestLogger) {
+func (l AppLogger) LogExtRequest(req *RequestLogger) {
 	l.Logger.WithOptions(
 		zap.AddCallerSkip(2)).Info(
 		"[===== REQUEST EXTERNAL INFO =====]",
-		zap.String("state", req.State),
+		zap.String(utils.State, req.State),
 		zap.String("url", req.URL),
 		zap.Time("time", req.Time),
 		zap.String("method", req.Method),
@@ -226,11 +226,11 @@ func (l *AppLogger) LogExtRequest(req *RequestLogger) {
 	)
 }
 
-func (l *AppLogger) LogExtResponse(resp *ResponseLogger) {
+func (l AppLogger) LogExtResponse(resp *ResponseLogger) {
 	l.Logger.WithOptions(
 		zap.AddCallerSkip(1)).Info(
 		"[===== RESPONSE EXTERNAL INFO =====]",
-		zap.String("state", resp.State),
+		zap.String(utils.State, resp.State),
 		zap.Int("status", resp.Status),
 		zap.Float64("durationSec", resp.DurationSec.Seconds()),
 		zap.Any("body", resp.Body),

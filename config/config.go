@@ -1,6 +1,8 @@
 package config
 
 import (
+	"errors"
+	"github.com/BevisDev/godev/utils"
 	"github.com/spf13/viper"
 	"os"
 )
@@ -9,6 +11,7 @@ type Config struct {
 	Path       string
 	ConfigType string
 	Dest       interface{}
+	AutoEnv    bool
 	Profile    string
 }
 
@@ -17,7 +20,9 @@ func NewConfig(config *Config) error {
 		err     error
 		profile = config.Profile
 	)
-
+	if !utils.IsPointer(config.Dest) {
+		return errors.New("must be a pointer")
+	}
 	if profile == "" {
 		p := os.Getenv("GO_PROFILE")
 		if p == "" {
@@ -31,7 +36,9 @@ func NewConfig(config *Config) error {
 	v.AddConfigPath(config.Path)
 	v.SetConfigName(profile)
 	v.SetConfigType(config.ConfigType)
-	v.AutomaticEnv()
+	if config.AutoEnv {
+		v.AutomaticEnv()
+	}
 
 	// read config
 	if err = v.ReadInConfig(); err != nil {
@@ -39,7 +46,7 @@ func NewConfig(config *Config) error {
 	}
 
 	// read environment
-	if profile != "dev" {
+	if config.AutoEnv && profile != "dev" {
 		settings := v.AllSettings()
 		replaceEnvVars(settings)
 		err = v.MergeConfigMap(settings)

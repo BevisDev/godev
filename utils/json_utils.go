@@ -1,7 +1,8 @@
-package helper
+package utils
 
 import (
 	"encoding/json"
+	"errors"
 )
 
 func ToJSONBytes(v any) []byte {
@@ -12,8 +13,11 @@ func ToJSONBytes(v any) []byte {
 	return jsonBytes
 }
 
-func JSONBytesToStruct(jsonBytes []byte, result any) error {
-	err := json.Unmarshal(jsonBytes, result)
+func JSONBytesToStruct(jsonBytes []byte, entry interface{}) error {
+	if !IsPointer(entry) {
+		return errors.New("must be a pointer")
+	}
+	err := json.Unmarshal(jsonBytes, entry)
 	if err != nil {
 		return err
 	}
@@ -28,8 +32,11 @@ func ToJSON(v any) string {
 	return ToString(jsonBytes)
 }
 
-func JSONToStruct(jsonStr string, result any) error {
-	err := json.Unmarshal([]byte(jsonStr), result)
+func JSONToStruct(jsonStr string, entry interface{}) error {
+	if !IsPointer(entry) {
+		return errors.New("must be a pointer")
+	}
+	err := json.Unmarshal([]byte(jsonStr), entry)
 	if err != nil {
 		return err
 	}

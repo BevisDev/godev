@@ -1,4 +1,4 @@
-package helper
+package utils
 
 import (
 	"context"
@@ -33,6 +33,10 @@ func IsNilOrEmpty(inp interface{}) bool {
 
 func IsContains[T comparable](arr []T, value T) bool {
 	return slices.Contains(arr, value)
+}
+
+func IsPointer(i interface{}) bool {
+	return reflect.ValueOf(i).Kind() != reflect.Ptr
 }
 
 func IsStruct(i interface{}) bool {

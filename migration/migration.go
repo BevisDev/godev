@@ -6,7 +6,7 @@ import (
 	"errors"
 	"os"
 
-	"github.com/BevisDev/godev/helper"
+	"github.com/BevisDev/godev/utils"
 	"github.com/pressly/goose/v3"
 )
 
@@ -33,10 +33,10 @@ func NewMigration(dir, typeSQL string, db *sql.DB) (*Migration, error) {
 func (m *Migration) Init() error {
 	var dialect string
 	switch m.typeSQL {
-	case helper.SQLServer:
+	case utils.SQLServer:
 		dialect = "mssql"
 		break
-	case helper.Postgres:
+	case utils.Postgres:
 		dialect = "postgres"
 		break
 	default:

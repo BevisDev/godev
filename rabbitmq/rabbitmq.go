@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/BevisDev/godev/helper"
+	"github.com/BevisDev/godev/utils"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -39,7 +39,7 @@ func NewRabbitMQ(config *RabbitMQConfig) (*RabbitMQ, error) {
 	}, nil
 }
 
-func (r *RabbitMQ) Close() {
+func (r RabbitMQ) Close() {
 	if r.Channel != nil {
 		r.Channel.Close()
 	}
@@ -48,7 +48,7 @@ func (r *RabbitMQ) Close() {
 	}
 }
 
-func (r *RabbitMQ) DeclareQueue(queueName string) (amqp.Queue, error) {
+func (r RabbitMQ) DeclareQueue(queueName string) (amqp.Queue, error) {
 	return r.Channel.QueueDeclare(
 		queueName,
 		true,
@@ -59,13 +59,13 @@ func (r *RabbitMQ) DeclareQueue(queueName string) (amqp.Queue, error) {
 	)
 }
 
-func (r *RabbitMQ) PutMessageToQueue(c context.Context, queueName string, message interface{}) error {
-	json := helper.ToJSONBytes(message)
+func (r RabbitMQ) PutMessageToQueue(c context.Context, queueName string, message interface{}) error {
+	json := utils.ToJSONBytes(message)
 	if len(json) > 50000 {
 		return fmt.Errorf("message is too large: %d", len(json))
 	}
 
-	ctx, cancel := helper.CreateCtxTimeout(c, r.TimeoutSec)
+	ctx, cancel := utils.CreateCtxTimeout(c, r.TimeoutSec)
 	defer cancel()
 
 	q, err := r.DeclareQueue(queueName)
@@ -80,7 +80,7 @@ func (r *RabbitMQ) PutMessageToQueue(c context.Context, queueName string, messag
 		false,
 		false,
 		amqp.Publishing{
-			ContentType: helper.ApplicationJSON,
+			ContentType: utils.ApplicationJSON,
 			Body:        json,
 		},
 	)
@@ -90,7 +90,7 @@ func (r *RabbitMQ) PutMessageToQueue(c context.Context, queueName string, messag
 	return nil
 }
 
-func (r *RabbitMQ) ConsumeMessage(queueName string, handler func(amqp.Delivery)) error {
+func (r RabbitMQ) ConsumeMessage(queueName string, handler func(amqp.Delivery)) error {
 	q, err := r.DeclareQueue(queueName)
 	if err != nil {
 		return err

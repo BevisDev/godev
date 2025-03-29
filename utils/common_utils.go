@@ -1,4 +1,4 @@
-package helper
+package utils
 
 import (
 	"context"
@@ -22,20 +22,15 @@ func GetState(ctx context.Context) string {
 	if ctx == nil {
 		return GenUUID()
 	}
-	state, ok := ctx.Value("state").(string)
+	state, ok := ctx.Value(State).(string)
 	if !ok {
 		state = GenUUID()
 	}
 	return state
 }
 
-func CreateCtx(state string) context.Context {
-	ctx := context.Background()
-	if state == "" {
-		state = GenUUID()
-	}
-	ctx = context.WithValue(ctx, "state", state)
-	return ctx
+func CreateCtx() context.Context {
+	return context.WithValue(context.Background(), State, GenUUID())
 }
 
 func CreateCtxTimeout(ctx context.Context, timeoutSec int) (context.Context, context.CancelFunc) {
@@ -58,6 +53,8 @@ func ToString(value any) string {
 		return v
 	case int, int8, int16, int32, int64:
 		return strconv.FormatInt(reflect.ValueOf(v).Int(), 10)
+	case uint, uint8, uint16, uint32, uint64:
+		return strconv.FormatUint(reflect.ValueOf(v).Uint(), 10)
 	case float32, float64:
 		return strconv.FormatFloat(reflect.ValueOf(v).Float(), 'f', 2, 64)
 	case bool:
@@ -65,7 +62,7 @@ func ToString(value any) string {
 	case []byte:
 		return string(v)
 	default:
-		return fmt.Sprintf("%v", v)
+		return fmt.Sprintf("%+v", v)
 	}
 }
 

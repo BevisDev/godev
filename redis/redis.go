@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/BevisDev/godev/helper"
+	"github.com/BevisDev/godev/utils"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -47,36 +47,39 @@ func NewRedisCache(cf *RedisCacheConfig) (*RedisCache, error) {
 	}, nil
 }
 
-func (r *RedisCache) Close() {
+func (r RedisCache) Close() {
 	if r.Client != nil {
 		r.Client.Close()
 	}
 }
 
-func (r *RedisCache) convertValue(value interface{}) interface{} {
-	v := reflect.ValueOf(value)
-	if v.Kind() == reflect.Ptr ||
-		v.Kind() == reflect.Struct ||
-		v.Kind() == reflect.Map ||
-		v.Kind() == reflect.Slice ||
-		v.Kind() == reflect.Array {
-		return helper.ToJSONBytes(value)
-	}
-	return value
-}
-
-func (r *RedisCache) Set(c context.Context, key string, value interface{}, expiredTimeSec int) error {
-	ctx, cancel := helper.CreateCtxTimeout(c, r.TimeoutSec)
+func (r RedisCache) Set(c context.Context, key string, value interface{}, expiredTimeSec int) error {
+	ctx, cancel := utils.CreateCtxTimeout(c, r.TimeoutSec)
 	defer cancel()
-	err := r.Client.Set(ctx, key, r.convertValue(value), time.Duration(expiredTimeSec)*time.Second).Err()
+	err := r.Client.Set(ctx, key, convertValue(value), time.Duration(expiredTimeSec)*time.Second).Err()
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (r *RedisCache) Get(c context.Context, key string, result interface{}) error {
-	ctx, cancel := helper.CreateCtxTimeout(c, r.TimeoutSec)
+func convertValue(value interface{}) interface{} {
+	v := reflect.ValueOf(value)
+	if v.Kind() == reflect.Ptr ||
+		v.Kind() == reflect.Struct ||
+		v.Kind() == reflect.Map ||
+		v.Kind() == reflect.Slice ||
+		v.Kind() == reflect.Array {
+		return utils.ToJSONBytes(value)
+	}
+	return value
+}
+
+func (r RedisCache) Get(c context.Context, key string, result interface{}) error {
+	if !utils.IsPointer(result) {
+		return errors.New("must be a pointer")
+	}
+	ctx, cancel := utils.CreateCtxTimeout(c, r.TimeoutSec)
 	defer cancel()
 	val, err := r.Client.Get(ctx, key).Result()
 	if err != nil {
@@ -85,12 +88,25 @@ func (r *RedisCache) Get(c context.Context, key string, result interface{}) erro
 		}
 		return err
 	}
-	err = helper.JSONToStruct(val, result)
+	err = utils.JSONToStruct(val, result)
 	return err
 }
 
-func (r *RedisCache) Delete(c context.Context, key string) error {
-	ctx, cancel := helper.CreateCtxTimeout(c, r.TimeoutSec)
+func (r RedisCache) GetString(c context.Context, key string) (string, error) {
+	ctx, cancel := utils.CreateCtxTimeout(c, r.TimeoutSec)
+	defer cancel()
+	val, err := r.Client.Get(ctx, key).Result()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return "", nil
+		}
+		return "", err
+	}
+	return val, nil
+}
+
+func (r RedisCache) Delete(c context.Context, key string) error {
+	ctx, cancel := utils.CreateCtxTimeout(c, r.TimeoutSec)
 	defer cancel()
 	err := r.Client.Del(ctx, key).Err()
 	if err != nil {
@@ -99,8 +115,8 @@ func (r *RedisCache) Delete(c context.Context, key string) error {
 	return nil
 }
 
-func (r *RedisCache) GetListValueByPrefixKey(c context.Context, prefix string) ([]string, error) {
-	ctx, cancel := helper.CreateCtxTimeout(c, r.TimeoutSec)
+func (r RedisCache) GetListValueByPrefixKey(c context.Context, prefix string) ([]string, error) {
+	ctx, cancel := utils.CreateCtxTimeout(c, r.TimeoutSec)
 	defer cancel()
 	var (
 		cursor uint64
@@ -112,13 +128,9 @@ func (r *RedisCache) GetListValueByPrefixKey(c context.Context, prefix string) (
 			return nil, err
 		}
 		for _, key := range keys {
-			val, err := r.Client.Get(ctx, key).Result()
+			val, err := r.GetString(ctx, key)
 			if err != nil {
-				if errors.Is(err, redis.Nil) {
-					result = append(result, val)
-					continue
-				}
-				return nil, err
+				continue
 			}
 			result = append(result, val)
 		}

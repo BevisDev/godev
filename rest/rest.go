@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/BevisDev/godev/helper"
 	"github.com/BevisDev/godev/logger"
+	"github.com/BevisDev/godev/utils"
 )
 
 type RestRequest struct {
@@ -39,7 +39,7 @@ func NewRestClient(timeoutSec int, logger *logger.AppLogger) *RestClient {
 	}
 }
 
-func (r *RestClient) Get(c context.Context, restReq *RestRequest) error {
+func (r RestClient) Get(c context.Context, restReq *RestRequest) error {
 	urlStr := r.buildQuery(restReq.URL, restReq.Query)
 
 	// build params
@@ -56,41 +56,41 @@ func (r *RestClient) Get(c context.Context, restReq *RestRequest) error {
 	return r.restTemplate(c, http.MethodGet, restReq)
 }
 
-func (r *RestClient) Post(c context.Context, restReq *RestRequest) error {
+func (r RestClient) Post(c context.Context, restReq *RestRequest) error {
 	return r.restTemplate(c, http.MethodPost, restReq)
 }
 
-func (r *RestClient) PostForm(c context.Context, restReq *RestRequest) error {
+func (r RestClient) PostForm(c context.Context, restReq *RestRequest) error {
 	return r.restTemplate(c, http.MethodPost, restReq)
 }
 
-func (r *RestClient) Put(c context.Context, restReq *RestRequest) error {
+func (r RestClient) Put(c context.Context, restReq *RestRequest) error {
 	return r.restTemplate(c, http.MethodPut, restReq)
 }
 
-func (r *RestClient) Patch(c context.Context, restReq *RestRequest) error {
+func (r RestClient) Patch(c context.Context, restReq *RestRequest) error {
 	return r.restTemplate(c, http.MethodPatch, restReq)
 }
 
-func (r *RestClient) Delete(c context.Context, restReq *RestRequest) error {
+func (r RestClient) Delete(c context.Context, restReq *RestRequest) error {
 	return r.restTemplate(c, http.MethodDelete, restReq)
 }
 
-func (r *RestClient) restTemplate(c context.Context, method string, restReq *RestRequest) error {
+func (r RestClient) restTemplate(c context.Context, method string, restReq *RestRequest) error {
 	var (
-		state      = helper.GetState(c)
+		state      = utils.GetState(c)
 		reqBody    []byte
 		bodyStr    string
-		isLog      = !helper.IsNilOrEmpty(r.logger)
-		isFormData = !helper.IsNilOrEmpty(restReq.BodyForm)
+		isLog      = !utils.IsNilOrEmpty(r.logger)
+		isFormData = !utils.IsNilOrEmpty(restReq.BodyForm)
 	)
 
 	// serialize body
 	if isFormData {
 		bodyStr = r.buildParams(restReq.BodyForm)
-	} else if !helper.IsNilOrEmpty(restReq.Body) {
-		reqBody = helper.ToJSONBytes(restReq.Body)
-		bodyStr = helper.ToString(reqBody)
+	} else if !utils.IsNilOrEmpty(restReq.Body) {
+		reqBody = utils.ToJSONBytes(restReq.Body)
+		bodyStr = utils.ToString(reqBody)
 	}
 
 	// log request
@@ -109,7 +109,7 @@ func (r *RestClient) restTemplate(c context.Context, method string, restReq *Res
 		sb.WriteString(fmt.Sprintf("State: %s\n", state))
 		sb.WriteString(fmt.Sprintf("URL: %s\n", restReq.URL))
 		sb.WriteString(fmt.Sprintf("Method: %s\n", method))
-		sb.WriteString(fmt.Sprintf("Time: %s\n", helper.TimeToString(startTime, helper.DATETIME_FULL)))
+		sb.WriteString(fmt.Sprintf("Time: %s\n", utils.TimeToString(startTime, utils.DATETIME_FULL)))
 		if bodyStr != "" {
 			sb.WriteString(fmt.Sprintf("Body: %s\n", bodyStr))
 		}
@@ -117,7 +117,7 @@ func (r *RestClient) restTemplate(c context.Context, method string, restReq *Res
 		log.Println(sb.String())
 	}
 
-	ctx, cancel := helper.CreateCtxTimeout(c, r.TimeoutSec)
+	ctx, cancel := utils.CreateCtxTimeout(c, r.TimeoutSec)
 	defer cancel()
 
 	// create request
@@ -127,7 +127,7 @@ func (r *RestClient) restTemplate(c context.Context, method string, restReq *Res
 	)
 	if isFormData {
 		request, err = http.NewRequestWithContext(ctx, method, restReq.URL, bytes.NewBufferString(bodyStr))
-	} else if helper.IsNilOrEmpty(reqBody) {
+	} else if utils.IsNilOrEmpty(reqBody) {
 		request, err = http.NewRequestWithContext(ctx, method, restReq.URL, nil)
 	} else {
 		request, err = http.NewRequestWithContext(ctx, method, restReq.URL, bytes.NewBuffer(reqBody))
@@ -138,16 +138,16 @@ func (r *RestClient) restTemplate(c context.Context, method string, restReq *Res
 
 	// build header
 	if isFormData {
-		r.buildHeaders(request, restReq.Header, helper.ApplicationFormData)
+		r.buildHeaders(request, restReq.Header, utils.ApplicationFormData)
 	} else {
-		r.buildHeaders(request, restReq.Header, helper.ApplicationJSON)
+		r.buildHeaders(request, restReq.Header, utils.ApplicationJSON)
 	}
 
 	// execute request
 	return r.execute(request, restReq, startTime, state)
 }
 
-func (r *RestClient) buildQuery(url string, queryParams map[string]string) string {
+func (r RestClient) buildQuery(url string, queryParams map[string]string) string {
 	for key, value := range queryParams {
 		placeholder := ":" + key
 		url = strings.ReplaceAll(url, placeholder, value)
@@ -155,7 +155,7 @@ func (r *RestClient) buildQuery(url string, queryParams map[string]string) strin
 	return url
 }
 
-func (r *RestClient) execute(request *http.Request, restReq *RestRequest,
+func (r RestClient) execute(request *http.Request, restReq *RestRequest,
 	startTime time.Time, state string) error {
 	var (
 		respBodyBytes []byte
@@ -201,16 +201,16 @@ func (r *RestClient) execute(request *http.Request, restReq *RestRequest,
 	}
 
 	// check body
-	hasBody := !helper.IsNilOrEmpty(respBodyBytes)
+	hasBody := !utils.IsNilOrEmpty(respBodyBytes)
 	if hasBody {
-		respBodyStr := helper.ToString(respBodyBytes)
+		respBodyStr := utils.ToString(respBodyBytes)
 		if isLog {
 			responseLogger.Body = respBodyStr
 		} else {
 			sb.WriteString(fmt.Sprintf("Body: %s\n", respBodyStr))
 		}
 
-		err = helper.JSONBytesToStruct(respBodyBytes, restReq.Result)
+		err = utils.JSONBytesToStruct(respBodyBytes, restReq.Result)
 		if err != nil {
 			return err
 		}
@@ -219,8 +219,8 @@ func (r *RestClient) execute(request *http.Request, restReq *RestRequest,
 	return nil
 }
 
-func (r *RestClient) buildParams(params map[string]string) string {
-	if helper.IsNilOrEmpty(params) {
+func (r RestClient) buildParams(params map[string]string) string {
+	if utils.IsNilOrEmpty(params) {
 		return ""
 	}
 	urlParams := url.Values{}
@@ -230,9 +230,9 @@ func (r *RestClient) buildParams(params map[string]string) string {
 	return urlParams.Encode()
 }
 
-func (r *RestClient) buildHeaders(rq *http.Request, headers map[string]string, contentType string) {
-	if helper.IsNilOrEmpty(headers) || headers[helper.ContentType] == "" {
-		rq.Header.Set(helper.ContentType, contentType)
+func (r RestClient) buildHeaders(rq *http.Request, headers map[string]string, contentType string) {
+	if utils.IsNilOrEmpty(headers) || headers[utils.ContentType] == "" {
+		rq.Header.Set(utils.ContentType, contentType)
 	}
 	for key, value := range headers {
 		rq.Header.Add(key, value)
