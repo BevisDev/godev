@@ -36,7 +36,7 @@ func IsContains[T comparable](arr []T, value T) bool {
 }
 
 func IsPointer(i interface{}) bool {
-	return reflect.ValueOf(i).Kind() != reflect.Ptr
+	return reflect.ValueOf(i).Kind() == reflect.Ptr
 }
 
 func IsStruct(i interface{}) bool {
