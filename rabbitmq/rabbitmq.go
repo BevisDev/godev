@@ -3,6 +3,7 @@ package rabbitmq
 import (
 	"context"
 	"fmt"
+	"github.com/BevisDev/godev/constants"
 
 	"github.com/BevisDev/godev/utils"
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -80,7 +81,7 @@ func (r RabbitMQ) PutMessageToQueue(c context.Context, queueName string, message
 		false,
 		false,
 		amqp.Publishing{
-			ContentType: utils.ApplicationJSON,
+			ContentType: constants.ApplicationJSON,
 			Body:        json,
 		},
 	)

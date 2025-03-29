@@ -3,6 +3,7 @@ package utils
 import (
 	"context"
 	"fmt"
+	"github.com/BevisDev/godev/constants"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -22,7 +23,7 @@ func GetState(ctx context.Context) string {
 	if ctx == nil {
 		return GenUUID()
 	}
-	state, ok := ctx.Value(State).(string)
+	state, ok := ctx.Value(constants.State).(string)
 	if !ok {
 		state = GenUUID()
 	}
@@ -30,7 +31,7 @@ func GetState(ctx context.Context) string {
 }
 
 func CreateCtx() context.Context {
-	return context.WithValue(context.Background(), State, GenUUID())
+	return context.WithValue(context.Background(), constants.State, GenUUID())
 }
 
 func CreateCtxTimeout(ctx context.Context, timeoutSec int) (context.Context, context.CancelFunc) {

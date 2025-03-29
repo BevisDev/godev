@@ -4,9 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"github.com/BevisDev/godev/constants"
 	"os"
 
-	"github.com/BevisDev/godev/utils"
 	"github.com/pressly/goose/v3"
 )
 
@@ -33,10 +33,10 @@ func NewMigration(dir, typeSQL string, db *sql.DB) (*Migration, error) {
 func (m *Migration) Init() error {
 	var dialect string
 	switch m.typeSQL {
-	case utils.SQLServer:
+	case constants.SQLServer:
 		dialect = "mssql"
 		break
-	case utils.Postgres:
+	case constants.Postgres:
 		dialect = "postgres"
 		break
 	default:

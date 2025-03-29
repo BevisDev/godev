@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/BevisDev/godev/constants"
 	"log"
 	"strings"
 	"time"
@@ -52,16 +53,16 @@ func (d Database) newConnection(cf *ConfigDB) (*sqlx.DB, error) {
 
 	// build connectionString
 	switch cf.Kind {
-	case utils.SQLServer:
+	case constants.SQLServer:
 		connStr = fmt.Sprintf("server=%s;port=%d;user id=%s;password=%s;database=%s",
 			cf.Host, cf.Port, cf.Username, cf.Password, cf.Schema)
 		driver = "sqlserver"
 		break
-	case utils.Postgres:
+	case constants.Postgres:
 		connStr = fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
 			cf.Host, cf.Port, cf.Username, cf.Password, cf.Schema)
 		driver = "postgres"
-	case utils.Oracle:
+	case constants.Oracle:
 		connStr = fmt.Sprintf("user=%s password=%s connectString=%s:%d/%s",
 			cf.Username, cf.Password, cf.Host, cf.Port, cf.Schema)
 		driver = "godror"

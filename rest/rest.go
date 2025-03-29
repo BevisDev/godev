@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/BevisDev/godev/constants"
 	"io"
 	"log"
 	"net/http"
@@ -138,9 +139,9 @@ func (r RestClient) restTemplate(c context.Context, method string, restReq *Rest
 
 	// build header
 	if isFormData {
-		r.buildHeaders(request, restReq.Header, utils.ApplicationFormData)
+		r.buildHeaders(request, restReq.Header, constants.ApplicationFormData)
 	} else {
-		r.buildHeaders(request, restReq.Header, utils.ApplicationJSON)
+		r.buildHeaders(request, restReq.Header, constants.ApplicationJSON)
 	}
 
 	// execute request
@@ -231,8 +232,8 @@ func (r RestClient) buildParams(params map[string]string) string {
 }
 
 func (r RestClient) buildHeaders(rq *http.Request, headers map[string]string, contentType string) {
-	if utils.IsNilOrEmpty(headers) || headers[utils.ContentType] == "" {
-		rq.Header.Set(utils.ContentType, contentType)
+	if utils.IsNilOrEmpty(headers) || headers[constants.ContentType] == "" {
+		rq.Header.Set(constants.ContentType, contentType)
 	}
 	for key, value := range headers {
 		rq.Header.Add(key, value)

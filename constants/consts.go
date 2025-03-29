@@ -1,4 +1,4 @@
-package utils
+package constants
 
 // header
 const (
@@ -33,7 +33,6 @@ const (
 	Postgres  = "Postgres"
 )
 
-// common
 const (
 	State = "state"
 )

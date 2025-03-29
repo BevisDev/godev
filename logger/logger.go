@@ -2,6 +2,7 @@ package logger
 
 import (
 	"fmt"
+	"github.com/BevisDev/godev/constants"
 	"github.com/BevisDev/godev/utils"
 	"os"
 	"path/filepath"
@@ -133,19 +134,19 @@ func (l AppLogger) logApp(level zapcore.Level, state string, msg string, args ..
 	logging := l.Logger.WithOptions(zap.AddCallerSkip(2))
 	switch level {
 	case zapcore.InfoLevel:
-		logging.Info(message, zap.String(utils.State, state))
+		logging.Info(message, zap.String(constants.State, state))
 		break
 	case zapcore.WarnLevel:
-		logging.Warn(message, zap.String(utils.State, state))
+		logging.Warn(message, zap.String(constants.State, state))
 		break
 	case zapcore.ErrorLevel:
-		logging.Error(message, zap.String(utils.State, state))
+		logging.Error(message, zap.String(constants.State, state))
 		break
 	case zapcore.FatalLevel:
-		logging.Fatal(message, zap.String(utils.State, state))
+		logging.Fatal(message, zap.String(constants.State, state))
 		break
 	default:
-		logging.Info(message, zap.String(utils.State, state))
+		logging.Info(message, zap.String(constants.State, state))
 	}
 }
 
@@ -191,7 +192,7 @@ func (l AppLogger) LogRequest(req *RequestLogger) {
 	l.Logger.WithOptions(
 		zap.AddCallerSkip(1)).Info(
 		"[===== REQUEST INFO =====]",
-		zap.String(utils.State, req.State),
+		zap.String(constants.State, req.State),
 		zap.String("url", req.URL),
 		zap.Time("time", req.Time),
 		zap.String("method", req.Method),
@@ -217,7 +218,7 @@ func (l AppLogger) LogExtRequest(req *RequestLogger) {
 	l.Logger.WithOptions(
 		zap.AddCallerSkip(2)).Info(
 		"[===== REQUEST EXTERNAL INFO =====]",
-		zap.String(utils.State, req.State),
+		zap.String(constants.State, req.State),
 		zap.String("url", req.URL),
 		zap.Time("time", req.Time),
 		zap.String("method", req.Method),
@@ -230,7 +231,7 @@ func (l AppLogger) LogExtResponse(resp *ResponseLogger) {
 	l.Logger.WithOptions(
 		zap.AddCallerSkip(1)).Info(
 		"[===== RESPONSE EXTERNAL INFO =====]",
-		zap.String(utils.State, resp.State),
+		zap.String(constants.State, resp.State),
 		zap.Int("status", resp.Status),
 		zap.Float64("durationSec", resp.DurationSec.Seconds()),
 		zap.Any("body", resp.Body),
