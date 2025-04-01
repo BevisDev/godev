@@ -53,6 +53,10 @@ func (r RedisCache) Close() {
 	}
 }
 
+func (r RedisCache) IsNil(err error) bool {
+	return errors.Is(err, redis.Nil)
+}
+
 func (r RedisCache) Set(c context.Context, key string, value interface{}, expiredTimeSec int) error {
 	ctx, cancel := utils.CreateCtxTimeout(c, r.TimeoutSec)
 	defer cancel()
@@ -83,6 +87,9 @@ func (r RedisCache) Get(c context.Context, key string, result interface{}) error
 	defer cancel()
 	val, err := r.Client.Get(ctx, key).Result()
 	if err != nil {
+		if r.IsNil(err) {
+			return nil
+		}
 		return err
 	}
 	err = utils.JSONToStruct(val, result)
@@ -94,6 +101,9 @@ func (r RedisCache) GetString(c context.Context, key string) (string, error) {
 	defer cancel()
 	val, err := r.Client.Get(ctx, key).Result()
 	if err != nil {
+		if r.IsNil(err) {
+			return "", nil
+		}
 		return "", err
 	}
 	return val, nil
@@ -124,6 +134,9 @@ func (r RedisCache) GetBatch(c context.Context, keys []string) ([]interface{}, e
 	defer cancel()
 	vals, err := r.Client.MGet(ctx, keys...).Result()
 	if err != nil {
+		if r.IsNil(err) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	return vals, nil
