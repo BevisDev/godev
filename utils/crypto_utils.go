@@ -3,6 +3,7 @@ package utils
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/hmac"
 	"crypto/md5"
 	"crypto/rand"
 	"crypto/rsa"
@@ -87,12 +88,20 @@ func DecodeBase64(str string) string {
 	return string(data)
 }
 
-func HexSHA256(str string) string {
+func HexSha256(str string) string {
 	hash := sha256.Sum256([]byte(str))
 	return hex.EncodeToString(hash[:])
 }
 
-func HexMD5(str string) string {
+func HexMd5(str string) string {
 	hash := md5.Sum([]byte(str))
 	return hex.EncodeToString(hash[:])
+}
+
+func HmacSha256(message, secret string) string {
+	key := []byte(secret)
+	h := hmac.New(sha256.New, key)
+	h.Write([]byte(message))
+	hash := h.Sum(nil)
+	return hex.EncodeToString(hash)
 }

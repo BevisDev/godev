@@ -83,9 +83,6 @@ func (r RedisCache) Get(c context.Context, key string, result interface{}) error
 	defer cancel()
 	val, err := r.Client.Get(ctx, key).Result()
 	if err != nil {
-		if errors.Is(err, redis.Nil) {
-			return nil
-		}
 		return err
 	}
 	err = utils.JSONToStruct(val, result)
@@ -97,9 +94,6 @@ func (r RedisCache) GetString(c context.Context, key string) (string, error) {
 	defer cancel()
 	val, err := r.Client.Get(ctx, key).Result()
 	if err != nil {
-		if errors.Is(err, redis.Nil) {
-			return "", nil
-		}
 		return "", err
 	}
 	return val, nil
@@ -113,6 +107,26 @@ func (r RedisCache) Delete(c context.Context, key string) error {
 		return err
 	}
 	return nil
+}
+
+func (r RedisCache) SetBatch(c context.Context, args map[string]string) error {
+	ctx, cancel := utils.CreateCtxTimeout(c, r.TimeoutSec)
+	defer cancel()
+	err := r.Client.MSet(ctx, args).Err()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r RedisCache) GetBatch(c context.Context, keys []string) ([]interface{}, error) {
+	ctx, cancel := utils.CreateCtxTimeout(c, r.TimeoutSec)
+	defer cancel()
+	vals, err := r.Client.MGet(ctx, keys...).Result()
+	if err != nil {
+		return nil, err
+	}
+	return vals, nil
 }
 
 func (r RedisCache) GetListValueByPrefixKey(c context.Context, prefix string) ([]string, error) {
