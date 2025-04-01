@@ -31,6 +31,13 @@ func IsNilOrEmpty(inp interface{}) bool {
 	}
 }
 
+func IsErrorOrEmpty(err error, i interface{}) bool {
+	if err != nil || IsNilOrEmpty(i) {
+		return true
+	}
+	return false
+}
+
 func IsContains[T comparable](arr []T, value T) bool {
 	return slices.Contains(arr, value)
 }

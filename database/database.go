@@ -31,12 +31,14 @@ type Database struct {
 	DB         *sqlx.DB
 	showQuery  bool
 	TimeoutSec int
+	kindDB     string
 }
 
 func NewDB(cf *ConfigDB) (*Database, error) {
 	database := &Database{
 		showQuery:  cf.ShowQuery,
 		TimeoutSec: cf.TimeoutSec,
+		kindDB:     cf.Kind,
 	}
 	db, err := database.newConnection(cf)
 	database.DB = db
@@ -100,8 +102,8 @@ func (d Database) viewQuery(query string) {
 	}
 }
 
-func (d Database) BeginTrans() (*sqlx.Tx, error) {
-	return d.DB.Beginx()
+func (d Database) BeginTrans(ctx context.Context) (*sqlx.Tx, error) {
+	return d.DB.BeginTxx(ctx, nil)
 }
 
 func (d Database) mustBePointer(dest interface{}) error {
@@ -167,7 +169,6 @@ func (d Database) GetAny(c context.Context, dest interface{}, query string, args
 
 func (d Database) ExecQuery(c context.Context, query string, args ...interface{}) error {
 	var err error
-
 	if d.isIn(query) {
 		query, args, err = sqlx.In(query, args...)
 		if err != nil {
@@ -180,7 +181,7 @@ func (d Database) ExecQuery(c context.Context, query string, args ...interface{}
 	ctx, cancel := utils.CreateCtxTimeout(c, d.TimeoutSec)
 	defer cancel()
 
-	tx, err := d.DB.BeginTxx(ctx, nil)
+	tx, err := d.BeginTrans(ctx)
 	if err != nil {
 		return err
 	}
@@ -205,7 +206,7 @@ func (d Database) Save(c context.Context, query string, args interface{}) error 
 	ctx, cancel := utils.CreateCtxTimeout(c, d.TimeoutSec)
 	defer cancel()
 
-	tx, err := d.DB.BeginTxx(ctx, nil)
+	tx, err := d.BeginTrans(ctx)
 	if err != nil {
 		return err
 	}
@@ -230,7 +231,7 @@ func (d Database) InsertedId(c context.Context, query string, args ...interface{
 	ctx, cancel := utils.CreateCtxTimeout(c, d.TimeoutSec)
 	defer cancel()
 
-	tx, err := d.DB.BeginTxx(ctx, nil)
+	tx, err := d.BeginTrans(ctx)
 	if err != nil {
 		return id, err
 	}
@@ -245,12 +246,25 @@ func (d Database) InsertedId(c context.Context, query string, args ...interface{
 	return id, err
 }
 
+func (d Database) InsertBatch(c context.Context, query string, size, col int, args ...interface{}) error {
+	var placeholders []string
+	for i := 0; i < size; i++ {
+		var row []string
+		for j := 1; j <= col; j++ {
+			row = append(row, fmt.Sprintf("@p%d", i*col+j))
+		}
+		placeholders = append(placeholders, "("+strings.Join(row, ", ")+")")
+	}
+	query += strings.Join(placeholders, ", ")
+	return d.ExecQuery(c, query, args...)
+}
+
 func (d Database) Delete(c context.Context, query string, args interface{}) error {
 	d.viewQuery(query)
 	ctx, cancel := utils.CreateCtxTimeout(c, d.TimeoutSec)
 	defer cancel()
 
-	tx, err := d.DB.BeginTxx(ctx, nil)
+	tx, err := d.BeginTrans(ctx)
 	if err != nil {
 		return err
 	}
