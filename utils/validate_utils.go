@@ -42,7 +42,7 @@ func IsContains[T comparable](arr []T, value T) bool {
 	return slices.Contains(arr, value)
 }
 
-func IsPointer(i interface{}) bool {
+func IsPtr(i interface{}) bool {
 	return reflect.ValueOf(i).Kind() == reflect.Ptr
 }
 

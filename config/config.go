@@ -20,7 +20,7 @@ func NewConfig(config *Config) error {
 		err     error
 		profile = config.Profile
 	)
-	if !utils.IsPointer(config.Dest) {
+	if !utils.IsPtr(config.Dest) {
 		return errors.New("must be a pointer")
 	}
 	if profile == "" {

@@ -3,24 +3,34 @@ package migration
 import (
 	"context"
 	"database/sql"
-	"errors"
-	"github.com/BevisDev/godev/constants"
 	"os"
 
 	"github.com/pressly/goose/v3"
 )
 
 type Migration struct {
-	dir     string
-	typeSQL string
-	db      *sql.DB
+	dir  string
+	kind KindDB
+	db   *sql.DB
 }
 
-func NewMigration(dir, typeSQL string, db *sql.DB) (*Migration, error) {
+type KindDB string
+
+const (
+	SQLServer KindDB = "sqlserver"
+	Postgres  KindDB = "postgres"
+)
+
+var dialectMap = map[KindDB]string{
+	SQLServer: "mssql",
+	Postgres:  "postgres",
+}
+
+func NewMigration(dir string, kind KindDB, db *sql.DB) (*Migration, error) {
 	m := Migration{
-		dir:     dir,
-		typeSQL: typeSQL,
-		db:      db,
+		dir:  dir,
+		kind: kind,
+		db:   db,
 	}
 
 	if err := m.Init(); err != nil {
@@ -31,19 +41,7 @@ func NewMigration(dir, typeSQL string, db *sql.DB) (*Migration, error) {
 }
 
 func (m *Migration) Init() error {
-	var dialect string
-	switch m.typeSQL {
-	case constants.SQLServer:
-		dialect = "mssql"
-		break
-	case constants.Postgres:
-		dialect = "postgres"
-		break
-	default:
-		return errors.New("type SQL unsupported")
-	}
-
-	if err := goose.SetDialect(dialect); err != nil {
+	if err := goose.SetDialect(dialectMap[m.kind]); err != nil {
 		return err
 	}
 	if _, err := os.Stat(m.dir); os.IsNotExist(err) {

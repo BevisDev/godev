@@ -2,9 +2,9 @@ package database
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/BevisDev/godev/constants"
 	"log"
 	"strings"
 	"time"
@@ -13,28 +13,62 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+type KindDB string
+type DriverDB string
+
 type ConfigDB struct {
-	Kind         string
-	Schema       string
-	TimeoutSec   int
-	Host         string
-	Port         int
-	Username     string
-	Password     string
-	MaxOpenConns int
-	MaxIdleConns int
-	MaxLifeTime  int
-	ShowQuery    bool
+	Kind           KindDB
+	Schema         string
+	TimeoutSec     int
+	Host           string
+	Port           int
+	Username       string
+	Password       string
+	MaxOpenConns   int
+	MaxIdleConns   int
+	MaxIdleTimeSec int
+	MaxLifeTimeSec int
+	ShowQuery      bool
+	Params         map[string]string
+}
+
+var defaultTimeoutSec = 30
+
+// kind db
+const (
+	SqlServer KindDB = "SQLServer"
+	Postgres  KindDB = "Postgres"
+	Oracle    KindDB = "Oracle"
+	MySQL     KindDB = "MySQL"
+)
+
+// driver db
+const (
+	SqlServerDriver DriverDB = "sqlserver"
+	PostgresDriver  DriverDB = "postgres"
+	GodrorDriver    DriverDB = "godror"
+	MySQLDriver     DriverDB = "mysql"
+)
+
+// mapping driver
+var sqlDriverMap = map[KindDB]DriverDB{
+	SqlServer: SqlServerDriver,
+	Postgres:  PostgresDriver,
+	Oracle:    GodrorDriver,
+	MySQL:     MySQLDriver,
 }
 
 type Database struct {
 	DB         *sqlx.DB
 	showQuery  bool
 	TimeoutSec int
-	kindDB     string
+	kindDB     KindDB
 }
 
 func NewDB(cf *ConfigDB) (*Database, error) {
+	if cf.TimeoutSec <= 0 {
+		cf.TimeoutSec = defaultTimeoutSec
+	}
 	database := &Database{
 		showQuery:  cf.ShowQuery,
 		TimeoutSec: cf.TimeoutSec,
@@ -50,39 +84,45 @@ func (d Database) newConnection(cf *ConfigDB) (*sqlx.DB, error) {
 		connStr string
 		db      *sqlx.DB
 		err     error
-		driver  string
 	)
 
 	// build connectionString
 	switch cf.Kind {
-	case constants.SQLServer:
-		connStr = fmt.Sprintf("server=%s;port=%d;user id=%s;password=%s;database=%s",
-			cf.Host, cf.Port, cf.Username, cf.Password, cf.Schema)
-		driver = "sqlserver"
-		break
-	case constants.Postgres:
-		connStr = fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-			cf.Host, cf.Port, cf.Username, cf.Password, cf.Schema)
-		driver = "postgres"
-	case constants.Oracle:
-		connStr = fmt.Sprintf("user=%s password=%s connectString=%s:%d/%s",
+	case SqlServer:
+		connStr = fmt.Sprintf("sqlserver://%s:%s@%s:%d?database=%s",
 			cf.Username, cf.Password, cf.Host, cf.Port, cf.Schema)
-		driver = "godror"
-		break
+	case Postgres:
+		connStr = fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
+			cf.Username, cf.Password, cf.Host, cf.Port, cf.Schema)
+	case Oracle:
+		connStr = fmt.Sprintf("%s/%s@%s:%d/%s",
+			cf.Username, cf.Password, cf.Host, cf.Port, cf.Schema)
+	case MySQL:
+		connStr = fmt.Sprintf("%s:%s@tcp(%s:%d)/%s",
+			cf.Username, cf.Password, cf.Host, cf.Port, cf.Schema)
 	default:
-		return nil, errors.New("unsupported database kind " + cf.Kind)
+		return nil, errors.New("unsupported database kind " + string(cf.Kind))
 	}
 
 	// connect
-	db, err = sqlx.Connect(driver, connStr)
+	db, err = sqlx.Connect(string(sqlDriverMap[cf.Kind]), connStr)
 	if err != nil {
 		return nil, err
 	}
 
 	// set pool
-	db.SetMaxOpenConns(cf.MaxOpenConns)
-	db.SetMaxIdleConns(cf.MaxIdleConns)
-	db.SetConnMaxIdleTime(time.Duration(cf.MaxLifeTime) * time.Second)
+	if cf.MaxOpenConns > 0 {
+		db.SetMaxOpenConns(cf.MaxOpenConns)
+	}
+	if cf.MaxIdleConns > 0 {
+		db.SetMaxIdleConns(cf.MaxIdleConns)
+	}
+	if cf.MaxIdleTimeSec > 0 {
+		db.SetConnMaxIdleTime(time.Duration(cf.MaxIdleTimeSec) * time.Second)
+	}
+	if cf.MaxLifeTimeSec > 0 {
+		db.SetConnMaxLifetime(time.Duration(cf.MaxLifeTimeSec) * time.Second)
+	}
 
 	// ping check connection
 	if err = db.Ping(); err != nil {
@@ -106,11 +146,15 @@ func (d Database) BeginTrans(ctx context.Context) (*sqlx.Tx, error) {
 	return d.DB.BeginTxx(ctx, nil)
 }
 
-func (d Database) mustBePointer(dest interface{}) error {
-	if !utils.IsPointer(dest) {
+func (d Database) mustBePtr(dest interface{}) error {
+	if !utils.IsPtr(dest) {
 		return errors.New("must be a pointer")
 	}
 	return nil
+}
+
+func (d Database) IsNoResult(err error) bool {
+	return errors.Is(err, sql.ErrNoRows)
 }
 
 func (d Database) isIn(query string) bool {
@@ -118,7 +162,7 @@ func (d Database) isIn(query string) bool {
 }
 
 func (d Database) GetList(c context.Context, dest interface{}, query string, args ...interface{}) error {
-	err := d.mustBePointer(dest)
+	err := d.mustBePtr(dest)
 	if err != nil {
 		return err
 	}
@@ -143,7 +187,7 @@ func (d Database) GetList(c context.Context, dest interface{}, query string, arg
 }
 
 func (d Database) GetAny(c context.Context, dest interface{}, query string, args ...interface{}) error {
-	err := d.mustBePointer(dest)
+	err := d.mustBePtr(dest)
 	if err != nil {
 		return err
 	}

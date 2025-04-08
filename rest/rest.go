@@ -26,13 +26,29 @@ type RestRequest struct {
 	Result   any
 }
 
+var defaultTimeoutSec = 30
+
 type RestClient struct {
 	Client     *http.Client
 	TimeoutSec int
 	logger     *logger.AppLogger
 }
 
-func NewRestClient(timeoutSec int, logger *logger.AppLogger) *RestClient {
+func NewRestClient(timeoutSec int) *RestClient {
+	if timeoutSec <= 0 {
+		timeoutSec = defaultTimeoutSec
+	}
+	return &RestClient{
+		Client:     &http.Client{},
+		TimeoutSec: timeoutSec,
+		logger:     nil,
+	}
+}
+
+func NewRestWithLogger(timeoutSec int, logger *logger.AppLogger) *RestClient {
+	if timeoutSec <= 0 {
+		timeoutSec = defaultTimeoutSec
+	}
 	return &RestClient{
 		Client:     &http.Client{},
 		TimeoutSec: timeoutSec,

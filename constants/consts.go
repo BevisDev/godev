@@ -26,13 +26,6 @@ const (
 	RefreshToken      = "refresh_token"
 )
 
-// type db
-const (
-	SQLServer = "SQLServer"
-	Oracle    = "Oracle"
-	Postgres  = "Postgres"
-)
-
 const (
 	State = "state"
 )

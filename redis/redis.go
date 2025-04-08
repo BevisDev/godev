@@ -21,6 +21,8 @@ type RedisCacheConfig struct {
 	TimeoutSec int
 }
 
+var defaultTimeoutSec = 30
+
 type RedisCache struct {
 	Client     *redis.Client
 	TimeoutSec int
@@ -40,11 +42,10 @@ func NewRedisCache(cf *RedisCacheConfig) (*RedisCache, error) {
 	}
 
 	log.Println("Redis connect success")
-
-	return &RedisCache{
-		Client:     rdb,
-		TimeoutSec: cf.TimeoutSec,
-	}, nil
+	if cf.TimeoutSec <= 0 {
+		cf.TimeoutSec = defaultTimeoutSec
+	}
+	return &RedisCache{rdb, cf.TimeoutSec}, nil
 }
 
 func (r RedisCache) Close() {
@@ -55,6 +56,16 @@ func (r RedisCache) Close() {
 
 func (r RedisCache) IsNil(err error) bool {
 	return errors.Is(err, redis.Nil)
+}
+
+func (r RedisCache) Setx(c context.Context, key string, value interface{}) error {
+	ctx, cancel := utils.CreateCtxTimeout(c, r.TimeoutSec)
+	defer cancel()
+	err := r.Client.Set(ctx, key, convertValue(value), redis.KeepTTL).Err()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (r RedisCache) Set(c context.Context, key string, value interface{}, expiredTimeSec int) error {
@@ -80,16 +91,13 @@ func convertValue(value interface{}) interface{} {
 }
 
 func (r RedisCache) Get(c context.Context, key string, result interface{}) error {
-	if !utils.IsPointer(result) {
+	if !utils.IsPtr(result) {
 		return errors.New("must be a pointer")
 	}
 	ctx, cancel := utils.CreateCtxTimeout(c, r.TimeoutSec)
 	defer cancel()
 	val, err := r.Client.Get(ctx, key).Result()
 	if err != nil {
-		if r.IsNil(err) {
-			return nil
-		}
 		return err
 	}
 	err = utils.JSONToStruct(val, result)

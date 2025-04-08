@@ -14,7 +14,7 @@ func ToJSONBytes(v any) []byte {
 }
 
 func JSONBytesToStruct(jsonBytes []byte, entry interface{}) error {
-	if !IsPointer(entry) {
+	if !IsPtr(entry) {
 		return errors.New("must be a pointer")
 	}
 	err := json.Unmarshal(jsonBytes, entry)
@@ -33,7 +33,7 @@ func ToJSON(v any) string {
 }
 
 func JSONToStruct(jsonStr string, entry interface{}) error {
-	if !IsPointer(entry) {
+	if !IsPtr(entry) {
 		return errors.New("must be a pointer")
 	}
 	err := json.Unmarshal([]byte(jsonStr), entry)
