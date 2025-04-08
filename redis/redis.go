@@ -59,13 +59,7 @@ func (r RedisCache) IsNil(err error) bool {
 }
 
 func (r RedisCache) Setx(c context.Context, key string, value interface{}) error {
-	ctx, cancel := utils.CreateCtxTimeout(c, r.TimeoutSec)
-	defer cancel()
-	err := r.Client.Set(ctx, key, convertValue(value), redis.KeepTTL).Err()
-	if err != nil {
-		return err
-	}
-	return nil
+	return r.Set(c, key, value, -1)
 }
 
 func (r RedisCache) Set(c context.Context, key string, value interface{}, expiredTimeSec int) error {
