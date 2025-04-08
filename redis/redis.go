@@ -48,21 +48,21 @@ func NewRedisCache(cf *RedisCacheConfig) (*RedisCache, error) {
 	return &RedisCache{rdb, cf.TimeoutSec}, nil
 }
 
-func (r RedisCache) Close() {
+func (r *RedisCache) Close() {
 	if r.Client != nil {
 		r.Client.Close()
 	}
 }
 
-func (r RedisCache) IsNil(err error) bool {
+func (r *RedisCache) IsNil(err error) bool {
 	return errors.Is(err, redis.Nil)
 }
 
-func (r RedisCache) Setx(c context.Context, key string, value interface{}) error {
+func (r *RedisCache) Setx(c context.Context, key string, value interface{}) error {
 	return r.Set(c, key, value, -1)
 }
 
-func (r RedisCache) Set(c context.Context, key string, value interface{}, expiredTimeSec int) error {
+func (r *RedisCache) Set(c context.Context, key string, value interface{}, expiredTimeSec int) error {
 	ctx, cancel := utils.CreateCtxTimeout(c, r.TimeoutSec)
 	defer cancel()
 	err := r.Client.Set(ctx, key, convertValue(value), time.Duration(expiredTimeSec)*time.Second).Err()
@@ -84,7 +84,7 @@ func convertValue(value interface{}) interface{} {
 	return value
 }
 
-func (r RedisCache) Get(c context.Context, key string, result interface{}) error {
+func (r *RedisCache) Get(c context.Context, key string, result interface{}) error {
 	if !utils.IsPtr(result) {
 		return errors.New("must be a pointer")
 	}
@@ -98,7 +98,7 @@ func (r RedisCache) Get(c context.Context, key string, result interface{}) error
 	return err
 }
 
-func (r RedisCache) GetString(c context.Context, key string) (string, error) {
+func (r *RedisCache) GetString(c context.Context, key string) (string, error) {
 	ctx, cancel := utils.CreateCtxTimeout(c, r.TimeoutSec)
 	defer cancel()
 	val, err := r.Client.Get(ctx, key).Result()
@@ -111,7 +111,7 @@ func (r RedisCache) GetString(c context.Context, key string) (string, error) {
 	return val, nil
 }
 
-func (r RedisCache) Delete(c context.Context, key string) error {
+func (r *RedisCache) Delete(c context.Context, key string) error {
 	ctx, cancel := utils.CreateCtxTimeout(c, r.TimeoutSec)
 	defer cancel()
 	err := r.Client.Del(ctx, key).Err()
@@ -121,7 +121,7 @@ func (r RedisCache) Delete(c context.Context, key string) error {
 	return nil
 }
 
-func (r RedisCache) SetBatch(c context.Context, args map[string]string) error {
+func (r *RedisCache) SetBatch(c context.Context, args map[string]string) error {
 	ctx, cancel := utils.CreateCtxTimeout(c, r.TimeoutSec)
 	defer cancel()
 	err := r.Client.MSet(ctx, args).Err()
@@ -131,7 +131,7 @@ func (r RedisCache) SetBatch(c context.Context, args map[string]string) error {
 	return nil
 }
 
-func (r RedisCache) GetBatch(c context.Context, keys []string) ([]interface{}, error) {
+func (r *RedisCache) GetBatch(c context.Context, keys []string) ([]interface{}, error) {
 	ctx, cancel := utils.CreateCtxTimeout(c, r.TimeoutSec)
 	defer cancel()
 	vals, err := r.Client.MGet(ctx, keys...).Result()
@@ -144,7 +144,7 @@ func (r RedisCache) GetBatch(c context.Context, keys []string) ([]interface{}, e
 	return vals, nil
 }
 
-func (r RedisCache) GetListValueByPrefixKey(c context.Context, prefix string) ([]string, error) {
+func (r *RedisCache) GetListValueByPrefixKey(c context.Context, prefix string) ([]string, error) {
 	ctx, cancel := utils.CreateCtxTimeout(c, r.TimeoutSec)
 	defer cancel()
 	var (

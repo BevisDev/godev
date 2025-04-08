@@ -16,14 +16,14 @@ func NewKeyCloak(host string, port int) *KeyCloak {
 	}
 }
 
-func (k KeyCloak) LoginClient(ctx context.Context, clientId, clientSecret, realm string) (*gocloak.JWT, error) {
+func (k *KeyCloak) LoginClient(ctx context.Context, clientId, clientSecret, realm string) (*gocloak.JWT, error) {
 	return k.Client.LoginClient(ctx, clientId, clientSecret, realm)
 }
 
-func (k KeyCloak) RetrospectToken(ctx context.Context, token, clientId, clientSecret, realm string) (*gocloak.IntroSpectTokenResult, error) {
+func (k *KeyCloak) RetrospectToken(ctx context.Context, token, clientId, clientSecret, realm string) (*gocloak.IntroSpectTokenResult, error) {
 	return k.Client.RetrospectToken(ctx, token, clientId, clientSecret, realm)
 }
 
-func (k KeyCloak) GetUserInfo(ctx context.Context, token, realm string) (*gocloak.UserInfo, error) {
+func (k *KeyCloak) GetUserInfo(ctx context.Context, token, realm string) (*gocloak.UserInfo, error) {
 	return k.Client.GetUserInfo(ctx, token, realm)
 }

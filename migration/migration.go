@@ -3,6 +3,7 @@ package migration
 import (
 	"context"
 	"database/sql"
+	"github.com/BevisDev/godev/custom"
 	"os"
 
 	"github.com/pressly/goose/v3"
@@ -10,44 +11,29 @@ import (
 
 type Migration struct {
 	dir  string
-	kind KindDB
+	kind custom.KindDB
 	db   *sql.DB
 }
 
-type KindDB string
-
-const (
-	SQLServer KindDB = "sqlserver"
-	Postgres  KindDB = "postgres"
-)
-
-var dialectMap = map[KindDB]string{
-	SQLServer: "mssql",
-	Postgres:  "postgres",
-}
-
-func NewMigration(dir string, kind KindDB, db *sql.DB) (*Migration, error) {
+func NewMigration(dir string, kind custom.KindDB, db *sql.DB) (*Migration, error) {
 	m := Migration{
 		dir:  dir,
 		kind: kind,
 		db:   db,
 	}
-
 	if err := m.Init(); err != nil {
 		return nil, err
 	}
-
 	return &m, nil
 }
 
 func (m *Migration) Init() error {
-	if err := goose.SetDialect(dialectMap[m.kind]); err != nil {
+	if err := goose.SetDialect(string(custom.DialectMigration[m.kind])); err != nil {
 		return err
 	}
 	if _, err := os.Stat(m.dir); os.IsNotExist(err) {
 		return err
 	}
-
 	goose.SetTableName("db_version")
 	return nil
 }

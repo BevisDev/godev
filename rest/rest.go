@@ -56,9 +56,8 @@ func NewRestWithLogger(timeoutSec int, logger *logger.AppLogger) *RestClient {
 	}
 }
 
-func (r RestClient) Get(c context.Context, restReq *RestRequest) error {
+func (r *RestClient) Get(c context.Context, restReq *RestRequest) error {
 	urlStr := r.buildQuery(restReq.URL, restReq.Query)
-
 	// build params
 	params := r.buildParams(restReq.Params)
 	if params != "" {
@@ -73,27 +72,27 @@ func (r RestClient) Get(c context.Context, restReq *RestRequest) error {
 	return r.restTemplate(c, http.MethodGet, restReq)
 }
 
-func (r RestClient) Post(c context.Context, restReq *RestRequest) error {
+func (r *RestClient) Post(c context.Context, restReq *RestRequest) error {
 	return r.restTemplate(c, http.MethodPost, restReq)
 }
 
-func (r RestClient) PostForm(c context.Context, restReq *RestRequest) error {
+func (r *RestClient) PostForm(c context.Context, restReq *RestRequest) error {
 	return r.restTemplate(c, http.MethodPost, restReq)
 }
 
-func (r RestClient) Put(c context.Context, restReq *RestRequest) error {
+func (r *RestClient) Put(c context.Context, restReq *RestRequest) error {
 	return r.restTemplate(c, http.MethodPut, restReq)
 }
 
-func (r RestClient) Patch(c context.Context, restReq *RestRequest) error {
+func (r *RestClient) Patch(c context.Context, restReq *RestRequest) error {
 	return r.restTemplate(c, http.MethodPatch, restReq)
 }
 
-func (r RestClient) Delete(c context.Context, restReq *RestRequest) error {
+func (r *RestClient) Delete(c context.Context, restReq *RestRequest) error {
 	return r.restTemplate(c, http.MethodDelete, restReq)
 }
 
-func (r RestClient) restTemplate(c context.Context, method string, restReq *RestRequest) error {
+func (r *RestClient) restTemplate(c context.Context, method string, restReq *RestRequest) error {
 	var (
 		state      = utils.GetState(c)
 		reqBody    []byte
@@ -164,7 +163,7 @@ func (r RestClient) restTemplate(c context.Context, method string, restReq *Rest
 	return r.execute(request, restReq, startTime, state)
 }
 
-func (r RestClient) buildQuery(url string, queryParams map[string]string) string {
+func (r *RestClient) buildQuery(url string, queryParams map[string]string) string {
 	for key, value := range queryParams {
 		placeholder := ":" + key
 		url = strings.ReplaceAll(url, placeholder, value)
@@ -172,7 +171,7 @@ func (r RestClient) buildQuery(url string, queryParams map[string]string) string
 	return url
 }
 
-func (r RestClient) execute(request *http.Request, restReq *RestRequest,
+func (r *RestClient) execute(request *http.Request, restReq *RestRequest,
 	startTime time.Time, state string) error {
 	var (
 		respBodyBytes []byte
@@ -236,7 +235,7 @@ func (r RestClient) execute(request *http.Request, restReq *RestRequest,
 	return nil
 }
 
-func (r RestClient) buildParams(params map[string]string) string {
+func (r *RestClient) buildParams(params map[string]string) string {
 	if utils.IsNilOrEmpty(params) {
 		return ""
 	}
@@ -247,7 +246,7 @@ func (r RestClient) buildParams(params map[string]string) string {
 	return urlParams.Encode()
 }
 
-func (r RestClient) buildHeaders(rq *http.Request, headers map[string]string, contentType string) {
+func (r *RestClient) buildHeaders(rq *http.Request, headers map[string]string, contentType string) {
 	if utils.IsNilOrEmpty(headers) || headers[constants.ContentType] == "" {
 		rq.Header.Set(constants.ContentType, contentType)
 	}

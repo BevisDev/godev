@@ -122,7 +122,7 @@ func getFilename(dir, fileName string) string {
 	return filepath.Join(dir, now, fileName)
 }
 
-func (l AppLogger) logApp(level zapcore.Level, state string, msg string, args ...interface{}) {
+func (l *AppLogger) logApp(level zapcore.Level, state string, msg string, args ...interface{}) {
 	if l.Logger == nil {
 		return
 	}
@@ -150,7 +150,7 @@ func (l AppLogger) logApp(level zapcore.Level, state string, msg string, args ..
 	}
 }
 
-func (l AppLogger) formatMessage(msg string, args ...interface{}) string {
+func (l *AppLogger) formatMessage(msg string, args ...interface{}) string {
 	var message string
 	if len(args) == 0 {
 		return msg
@@ -172,23 +172,23 @@ func (l *AppLogger) Sync() {
 	}
 }
 
-func (l AppLogger) Info(state, msg string, args ...interface{}) {
+func (l *AppLogger) Info(state, msg string, args ...interface{}) {
 	l.logApp(zapcore.InfoLevel, state, msg, args...)
 }
 
-func (l AppLogger) Error(state, msg string, args ...interface{}) {
+func (l *AppLogger) Error(state, msg string, args ...interface{}) {
 	l.logApp(zapcore.ErrorLevel, state, msg, args...)
 }
 
-func (l AppLogger) Warn(state, msg string, args ...interface{}) {
+func (l *AppLogger) Warn(state, msg string, args ...interface{}) {
 	l.logApp(zapcore.WarnLevel, state, msg, args...)
 }
 
-func (l AppLogger) Fatal(state, msg string, args ...interface{}) {
+func (l *AppLogger) Fatal(state, msg string, args ...interface{}) {
 	l.logApp(zapcore.FatalLevel, state, msg, args...)
 }
 
-func (l AppLogger) LogRequest(req *RequestLogger) {
+func (l *AppLogger) LogRequest(req *RequestLogger) {
 	l.Logger.WithOptions(
 		zap.AddCallerSkip(1)).Info(
 		"[===== REQUEST INFO =====]",
@@ -202,7 +202,7 @@ func (l AppLogger) LogRequest(req *RequestLogger) {
 	)
 }
 
-func (l AppLogger) LogResponse(resp *ResponseLogger) {
+func (l *AppLogger) LogResponse(resp *ResponseLogger) {
 	l.Logger.WithOptions(
 		zap.AddCallerSkip(1)).Info(
 		"[===== RESPONSE INFO =====]",
@@ -214,7 +214,7 @@ func (l AppLogger) LogResponse(resp *ResponseLogger) {
 	)
 }
 
-func (l AppLogger) LogExtRequest(req *RequestLogger) {
+func (l *AppLogger) LogExtRequest(req *RequestLogger) {
 	l.Logger.WithOptions(
 		zap.AddCallerSkip(2)).Info(
 		"[===== REQUEST EXTERNAL INFO =====]",
@@ -227,7 +227,7 @@ func (l AppLogger) LogExtRequest(req *RequestLogger) {
 	)
 }
 
-func (l AppLogger) LogExtResponse(resp *ResponseLogger) {
+func (l *AppLogger) LogExtResponse(resp *ResponseLogger) {
 	l.Logger.WithOptions(
 		zap.AddCallerSkip(1)).Info(
 		"[===== RESPONSE EXTERNAL INFO =====]",

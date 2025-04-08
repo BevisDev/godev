@@ -40,7 +40,7 @@ func NewRabbitMQ(config *RabbitMQConfig) (*RabbitMQ, error) {
 	}, nil
 }
 
-func (r RabbitMQ) Close() {
+func (r *RabbitMQ) Close() {
 	if r.Channel != nil {
 		r.Channel.Close()
 	}
@@ -49,7 +49,7 @@ func (r RabbitMQ) Close() {
 	}
 }
 
-func (r RabbitMQ) DeclareQueue(queueName string) (amqp.Queue, error) {
+func (r *RabbitMQ) DeclareQueue(queueName string) (amqp.Queue, error) {
 	return r.Channel.QueueDeclare(
 		queueName,
 		true,
@@ -60,7 +60,7 @@ func (r RabbitMQ) DeclareQueue(queueName string) (amqp.Queue, error) {
 	)
 }
 
-func (r RabbitMQ) PutMessageToQueue(c context.Context, queueName string, message interface{}) error {
+func (r *RabbitMQ) PutMessageToQueue(c context.Context, queueName string, message interface{}) error {
 	json := utils.ToJSONBytes(message)
 	if len(json) > 50000 {
 		return fmt.Errorf("message is too large: %d", len(json))
@@ -91,7 +91,7 @@ func (r RabbitMQ) PutMessageToQueue(c context.Context, queueName string, message
 	return nil
 }
 
-func (r RabbitMQ) ConsumeMessage(queueName string, handler func(amqp.Delivery)) error {
+func (r *RabbitMQ) ConsumeMessage(queueName string, handler func(amqp.Delivery)) error {
 	q, err := r.DeclareQueue(queueName)
 	if err != nil {
 		return err
