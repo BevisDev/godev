@@ -49,22 +49,40 @@ func CreateCtxCancel(ctx context.Context) (context.Context, context.CancelFunc) 
 }
 
 func ToString(value any) string {
-	switch v := value.(type) {
-	case string:
-		return v
-	case int, int8, int16, int32, int64:
-		return strconv.FormatInt(reflect.ValueOf(v).Int(), 10)
-	case uint, uint8, uint16, uint32, uint64:
-		return strconv.FormatUint(reflect.ValueOf(v).Uint(), 10)
-	case float32, float64:
-		return strconv.FormatFloat(reflect.ValueOf(v).Float(), 'f', 2, 64)
-	case bool:
-		return strconv.FormatBool(v)
-	case []byte:
-		return string(v)
-	default:
-		return fmt.Sprintf("%+v", v)
+	if value == nil {
+		return ""
 	}
+	val := reflect.ValueOf(value)
+
+	// handle ptr
+	if val.Kind() == reflect.Ptr {
+		if val.IsNil() {
+			return ""
+		}
+		val = val.Elem()
+	}
+
+	switch val.Kind() {
+	case reflect.String:
+		return val.String()
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return strconv.FormatInt(val.Int(), 10)
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return strconv.FormatUint(val.Uint(), 10)
+	case reflect.Float32:
+		return strconv.FormatFloat(val.Float(), 'g', -1, 32)
+	case reflect.Float64:
+		return strconv.FormatFloat(val.Float(), 'g', -1, 64)
+	case reflect.Bool:
+		return strconv.FormatBool(val.Bool())
+	case reflect.Slice:
+		if val.Type().Elem().Kind() == reflect.Uint8 {
+			return string(val.Bytes()) // handle []byte
+		}
+	default:
+		return fmt.Sprintf("%+v", val.Interface())
+	}
+	return fmt.Sprintf("%+v", val.Interface())
 }
 
 func RemoveAccent(str string) string {
@@ -76,7 +94,10 @@ func RemoveAccent(str string) string {
 		}
 		output = append(output, r)
 	}
-	return string(output)
+	normalized := string(output)
+	normalized = strings.ReplaceAll(normalized, "Đ", "D")
+	normalized = strings.ReplaceAll(normalized, "đ", "d")
+	return normalized
 }
 
 func RemoveSpecialChars(str string) string {

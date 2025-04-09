@@ -60,25 +60,3 @@ func IsStruct(i interface{}) bool {
 func IsTimedOut(err error) bool {
 	return errors.Is(err, context.DeadlineExceeded)
 }
-
-func CompareStringWithAccent(str1, str2 string) bool {
-	return strings.EqualFold(str1, str2)
-}
-
-func CompareStringWithoutAccent(str1, str2 string) bool {
-	o1 := RemoveAccent(str1)
-	o2 := RemoveAccent(str2)
-	return strings.EqualFold(o1, o2)
-}
-
-func CompareStringWithoutWhitespace(str1, str2 string) bool {
-	o1 := RemoveWhiteSpace(str1)
-	o2 := RemoveWhiteSpace(str2)
-	return strings.EqualFold(o1, o2)
-}
-
-func CompareStringWithoutSpecialChars(str1, str2 string) bool {
-	o1 := RemoveSpecialChars(str1)
-	o2 := RemoveSpecialChars(str2)
-	return strings.EqualFold(o1, o2)
-}
