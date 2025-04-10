@@ -118,7 +118,7 @@ func writeSync(cf *ConfigLogger) zapcore.WriteSyncer {
 }
 
 func getFilename(dir, fileName string) string {
-	now := time.Now().Format(utils.YYYY_MM_DD)
+	now := time.Now().Format(utils.DateOnly)
 	return filepath.Join(dir, now, fileName)
 }
 

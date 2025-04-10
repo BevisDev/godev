@@ -85,7 +85,7 @@ func ToString(value any) string {
 	return fmt.Sprintf("%+v", val.Interface())
 }
 
-func RemoveAccent(str string) string {
+func NormalizeToASCII(str string) string {
 	result := norm.NFD.String(str)
 	var output []rune
 	for _, r := range result {
@@ -100,12 +100,20 @@ func RemoveAccent(str string) string {
 	return normalized
 }
 
-func RemoveSpecialChars(str string) string {
-	o := RemoveAccent(str)
+func CleanText(str string) string {
+	o := NormalizeToASCII(str)
 	re := regexp.MustCompile(`[^a-zA-Z0-9\s]+`)
 	return re.ReplaceAllString(o, "")
 }
 
 func RemoveWhiteSpace(str string) string {
 	return strings.ReplaceAll(str, " ", "")
+}
+
+func TruncateText(s string, maxLen int) string {
+	runes := []rune(s)
+	if len(runes) > maxLen {
+		return string(runes[:maxLen])
+	}
+	return s
 }

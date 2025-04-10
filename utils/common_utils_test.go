@@ -116,7 +116,7 @@ func TestToString(t *testing.T) {
 	}
 }
 
-func TestRemoveAccent(t *testing.T) {
+func TestNormalizeToASCII(t *testing.T) {
 	tests := []struct {
 		input    string
 		expected string
@@ -130,15 +130,15 @@ func TestRemoveAccent(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			result := RemoveAccent(tt.input)
+			result := NormalizeToASCII(tt.input)
 			if result != tt.expected {
-				t.Errorf("RemoveAccent(%q) = %q; want %q", tt.input, result, tt.expected)
+				t.Errorf("NormalizeToASCII(%q) = %q; want %q", tt.input, result, tt.expected)
 			}
 		})
 	}
 }
 
-func TestRemoveSpecialChars(t *testing.T) {
+func TestCleanText(t *testing.T) {
 	tests := []struct {
 		input    string
 		expected string
@@ -150,9 +150,9 @@ func TestRemoveSpecialChars(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			result := RemoveSpecialChars(tt.input)
+			result := CleanText(tt.input)
 			if result != tt.expected {
-				t.Errorf("RemoveSpecialChars(%q) = %q; want %q", tt.input, result, tt.expected)
+				t.Errorf("CleanText(%q) = %q; want %q", tt.input, result, tt.expected)
 			}
 		})
 	}
@@ -173,6 +173,55 @@ func TestRemoveWhiteSpace(t *testing.T) {
 			result := RemoveWhiteSpace(tt.input)
 			if result != tt.expected {
 				t.Errorf("RemoveWhiteSpace(%q) = %q; want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestTruncateText(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		max      int
+		expected string
+	}{
+		{
+			name:     "Short string",
+			input:    "Hello",
+			max:      10,
+			expected: "Hello",
+		},
+		{
+			name:     "Exact length",
+			input:    "HelloWorld",
+			max:      10,
+			expected: "HelloWorld",
+		},
+		{
+			name:     "Long string",
+			input:    "Hello, this is a long message",
+			max:      5,
+			expected: "Hello",
+		},
+		{
+			name:     "Empty string",
+			input:    "",
+			max:      10,
+			expected: "",
+		},
+		{
+			name:     "Zero max",
+			input:    "Hello",
+			max:      0,
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actual := TruncateText(tt.input, tt.max)
+			if actual != tt.expected {
+				t.Errorf("expected '%s', got '%s'", tt.expected, actual)
 			}
 		})
 	}

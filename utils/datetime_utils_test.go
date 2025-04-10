@@ -5,6 +5,38 @@ import (
 	"time"
 )
 
+func TestTimeToString(t *testing.T) {
+	tm := time.Date(2024, 4, 10, 12, 30, 45, 0, time.UTC)
+	expected := "2024-04-10 12:30:45"
+
+	result := TimeToString(tm, DateTime)
+	if result != expected {
+		t.Errorf("TimeToString failed, expected %s, got %s", expected, result)
+	}
+}
+
+func TestStringToTime(t *testing.T) {
+	input := "2024-04-10 12:30:45"
+	expected := time.Date(2024, 4, 10, 12, 30, 45, 0, time.UTC)
+
+	tm, err := StringToTime(input, DateTime)
+	if err != nil {
+		t.Fatalf("StringToTime returned unexpected error: %v", err)
+	}
+
+	if !tm.Equal(expected) {
+		t.Errorf("StringToTime failed, expected %v, got %v", expected, tm)
+	}
+}
+
+func TestStringToTime_InvalidFormat(t *testing.T) {
+	input := "invalid time"
+	_, err := StringToTime(input, DateTime)
+
+	if err == nil {
+		t.Error("expected error for invalid time string, got nil")
+	}
+}
 func TestBeginDay(t *testing.T) {
 	date := time.Date(2024, 4, 10, 14, 30, 45, 999999999, time.UTC)
 	begin := BeginDay(date)

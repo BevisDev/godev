@@ -8,22 +8,25 @@ import (
 type Layout = string
 
 const (
-	YYYY_MM_DD       Layout = "2006-01-02"
-	DD_MM_YYYY       Layout = "02-01-2006"
-	DD_MM_YYYY_SLASH Layout = "02-01-2006"
-	DD_MMM_YYYY      Layout = "02-Jan-2006"
-	YYYYMMDDHHMMSS   Layout = "20060102150405"
+	// format common
+	Date            Layout = "02-01-2006"
+	DateSlash       Layout = "02/01/2006"
+	DateVerbose     Layout = "02-Jan-2006"
+	DateTimeCompact Layout = "20060102150405"
 
-	// Date time ISO 8601
-	DATETIME_FULL      Layout = "2006-01-02T15:04:05Z07:00"
-	DATETIME_NO_OFFSET Layout = "2006-01-02T15:04:05Z"
-	DATETIME_NO_TZ     Layout = "2006-01-02 15:04:05.000"
+	// format ISO 8601 / RFC3339
+	DateOnly       Layout = "2006-01-02"
+	DateTime       Layout = "2006-01-02 15:04:05"
+	DateTimeOffset Layout = "2006-01-02T15:04:05Z07:00"
+	DatetimeUTC    Layout = "2006-01-02T15:04:05Z"
+	DateTimeSQL    Layout = "2006-01-02 15:04:05.000"
 
 	// format time
-	TIME_FULL   Layout = "150405"
-	TIME_NO_SEC Layout = "1504"
+	TimeOnly    Layout = "15:04:05"
+	TimeCompact Layout = "150405"
+	TimeNoSec   Layout = "1504"
 
-	// string time
+	// AddTime layout
 	Second Layout = "Second"
 	Minute Layout = "Minute"
 	Hour   Layout = "Hour"

@@ -3,6 +3,7 @@ package rest
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"github.com/BevisDev/godev/constants"
 	"io"
@@ -16,7 +17,7 @@ import (
 	"github.com/BevisDev/godev/utils"
 )
 
-type RestRequest struct {
+type Request struct {
 	URL      string
 	Query    map[string]string
 	Params   map[string]string
@@ -24,6 +25,30 @@ type RestRequest struct {
 	Header   map[string]string
 	Body     any
 	Result   any
+}
+
+type HttpError struct {
+	StatusCode int
+	Body       string
+}
+
+func (e *HttpError) Error() string {
+	return fmt.Sprintf("status %d: %s", e.StatusCode, e.Body)
+}
+
+func (e *HttpError) IsClientError() bool {
+	return e.StatusCode >= 400 && e.StatusCode < 500
+}
+
+func (e *HttpError) IsServerError() bool {
+	return e.StatusCode >= 500
+}
+
+// AsHttpError to check error http
+func AsHttpError(err error) (*HttpError, bool) {
+	var httpErr *HttpError
+	ok := errors.As(err, &httpErr)
+	return httpErr, ok
 }
 
 var defaultTimeoutSec = 30
@@ -56,56 +81,50 @@ func NewRestWithLogger(timeoutSec int, logger *logger.AppLogger) *RestClient {
 	}
 }
 
-func (r *RestClient) Get(c context.Context, restReq *RestRequest) error {
-	urlStr := r.buildQuery(restReq.URL, restReq.Query)
-	// build params
-	params := r.buildParams(restReq.Params)
-	if params != "" {
-		if strings.Contains(urlStr, "?") {
-			urlStr += "&" + params
-		} else {
-			urlStr += "?" + params
-		}
-	}
-
-	restReq.URL = urlStr
-	return r.restTemplate(c, http.MethodGet, restReq)
+func (r *RestClient) Get(c context.Context, req *Request) error {
+	return r.restTemplate(c, http.MethodGet, req)
 }
 
-func (r *RestClient) Post(c context.Context, restReq *RestRequest) error {
-	return r.restTemplate(c, http.MethodPost, restReq)
+func (r *RestClient) Post(c context.Context, req *Request) error {
+	return r.restTemplate(c, http.MethodPost, req)
 }
 
-func (r *RestClient) PostForm(c context.Context, restReq *RestRequest) error {
-	return r.restTemplate(c, http.MethodPost, restReq)
+func (r *RestClient) PostForm(c context.Context, req *Request) error {
+	return r.restTemplate(c, http.MethodPost, req)
 }
 
-func (r *RestClient) Put(c context.Context, restReq *RestRequest) error {
-	return r.restTemplate(c, http.MethodPut, restReq)
+func (r *RestClient) Put(c context.Context, req *Request) error {
+	return r.restTemplate(c, http.MethodPut, req)
 }
 
-func (r *RestClient) Patch(c context.Context, restReq *RestRequest) error {
-	return r.restTemplate(c, http.MethodPatch, restReq)
+func (r *RestClient) Patch(c context.Context, req *Request) error {
+	return r.restTemplate(c, http.MethodPatch, req)
 }
 
-func (r *RestClient) Delete(c context.Context, restReq *RestRequest) error {
-	return r.restTemplate(c, http.MethodDelete, restReq)
+func (r *RestClient) Delete(c context.Context, req *Request) error {
+	return r.restTemplate(c, http.MethodDelete, req)
 }
 
-func (r *RestClient) restTemplate(c context.Context, method string, restReq *RestRequest) error {
+func (r *RestClient) restTemplate(c context.Context, method string, req *Request) error {
 	var (
 		state      = utils.GetState(c)
 		reqBody    []byte
 		bodyStr    string
 		isLog      = !utils.IsNilOrEmpty(r.logger)
-		isFormData = !utils.IsNilOrEmpty(restReq.BodyForm)
+		isFormData = !utils.IsNilOrEmpty(req.BodyForm)
 	)
+	// build URL
+	urlStr := r.buildURL(req.URL, req.Query, req.Params)
 
 	// serialize body
 	if isFormData {
-		bodyStr = r.buildParams(restReq.BodyForm)
-	} else if !utils.IsNilOrEmpty(restReq.Body) {
-		reqBody = utils.ToJSONBytes(restReq.Body)
+		formValues := url.Values{}
+		for k, v := range req.BodyForm {
+			formValues.Add(k, v)
+		}
+		bodyStr = formValues.Encode()
+	} else if !utils.IsNilOrEmpty(req.Body) {
+		reqBody = utils.ToJSONBytes(req.Body)
 		bodyStr = utils.ToString(reqBody)
 	}
 
@@ -114,18 +133,18 @@ func (r *RestClient) restTemplate(c context.Context, method string, restReq *Res
 	if isLog {
 		r.logger.LogExtRequest(&logger.RequestLogger{
 			State:  state,
-			URL:    restReq.URL,
+			URL:    req.URL,
 			Method: method,
 			Body:   bodyStr,
 			Time:   startTime,
 		})
 	} else {
 		var sb strings.Builder
-		sb.WriteString("===== REQUEST EXTERNAL INFO =====\n")
+		sb.WriteString("========== REST REQUEST INFO ==========\n")
 		sb.WriteString(fmt.Sprintf("State: %s\n", state))
-		sb.WriteString(fmt.Sprintf("URL: %s\n", restReq.URL))
+		sb.WriteString(fmt.Sprintf("URL: %s\n", req.URL))
 		sb.WriteString(fmt.Sprintf("Method: %s\n", method))
-		sb.WriteString(fmt.Sprintf("Time: %s\n", utils.TimeToString(startTime, utils.DATETIME_FULL)))
+		sb.WriteString(fmt.Sprintf("Time: %s\n", utils.TimeToString(startTime, utils.DateTimeOffset)))
 		if bodyStr != "" {
 			sb.WriteString(fmt.Sprintf("Body: %s\n", bodyStr))
 		}
@@ -142,11 +161,11 @@ func (r *RestClient) restTemplate(c context.Context, method string, restReq *Res
 		err     error
 	)
 	if isFormData {
-		request, err = http.NewRequestWithContext(ctx, method, restReq.URL, bytes.NewBufferString(bodyStr))
+		request, err = http.NewRequestWithContext(ctx, method, urlStr, bytes.NewBufferString(bodyStr))
 	} else if utils.IsNilOrEmpty(reqBody) {
-		request, err = http.NewRequestWithContext(ctx, method, restReq.URL, nil)
+		request, err = http.NewRequestWithContext(ctx, method, urlStr, nil)
 	} else {
-		request, err = http.NewRequestWithContext(ctx, method, restReq.URL, bytes.NewBuffer(reqBody))
+		request, err = http.NewRequestWithContext(ctx, method, urlStr, bytes.NewBuffer(reqBody))
 	}
 	if err != nil {
 		return err
@@ -154,96 +173,101 @@ func (r *RestClient) restTemplate(c context.Context, method string, restReq *Res
 
 	// build header
 	if isFormData {
-		r.buildHeaders(request, restReq.Header, constants.ApplicationFormData)
+		r.buildHeaders(request, req.Header, constants.ApplicationFormData)
 	} else {
-		r.buildHeaders(request, restReq.Header, constants.ApplicationJSON)
+		r.buildHeaders(request, req.Header, constants.ApplicationJSON)
 	}
 
 	// execute request
-	return r.execute(request, restReq, startTime, state)
+	return r.execute(request, req, startTime, state)
 }
 
-func (r *RestClient) buildQuery(url string, queryParams map[string]string) string {
-	for key, value := range queryParams {
-		placeholder := ":" + key
-		url = strings.ReplaceAll(url, placeholder, value)
-	}
-	return url
-}
-
-func (r *RestClient) execute(request *http.Request, restReq *RestRequest,
-	startTime time.Time, state string) error {
-	var (
-		respBodyBytes []byte
-		isLog         = r.logger != nil
-	)
+func (r *RestClient) execute(request *http.Request, req *Request, startTime time.Time, state string) error {
 	response, err := r.Client.Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+
+	// read body
+	var (
+		isLog         = r.logger != nil
+		respBodyBytes []byte
+		respBodyStr   string
+	)
+	respBodyBytes, err = io.ReadAll(response.Body)
 	if err != nil {
 		return err
 	}
 
 	// log response
 	var (
-		responseLogger *logger.ResponseLogger
-		sb             strings.Builder
+		respLogger logger.ResponseLogger
+		sb         strings.Builder
 	)
+	if isLog {
+		respLogger = logger.ResponseLogger{
+			State:       state,
+			Status:      response.StatusCode,
+			DurationSec: time.Since(startTime),
+		}
+	} else {
+		sb.WriteString("========== REST RESPONSE INFO ==========\n")
+		sb.WriteString(fmt.Sprintf("State: %s\n", state))
+		sb.WriteString(fmt.Sprintf("Status: %d\n", response.StatusCode))
+		sb.WriteString(fmt.Sprintf("Duration: %s\n", time.Since(startTime)))
+	}
 	defer func() {
-		response.Body.Close()
 		if isLog {
-			r.logger.LogExtResponse(responseLogger)
+			r.logger.LogExtResponse(&respLogger)
 		} else {
 			sb.WriteString("==================================\n")
 			log.Println(sb.String())
 		}
 	}()
 
-	if isLog {
-		responseLogger = &logger.ResponseLogger{
-			State:       state,
-			Status:      response.StatusCode,
-			DurationSec: time.Since(startTime),
-		}
-	} else {
-		sb.WriteString("===== RESPONSE EXTERNAL INFO =====\n")
-		sb.WriteString(fmt.Sprintf("State: %s\n", state))
-		sb.WriteString(fmt.Sprintf("Status: %d\n", response.StatusCode))
-		sb.WriteString(fmt.Sprintf("Duration: %s\n", time.Since(startTime)))
-	}
-
-	// read body
-	respBodyBytes, err = io.ReadAll(response.Body)
-	if err != nil {
-		return err
-	}
-
 	// check body
 	hasBody := !utils.IsNilOrEmpty(respBodyBytes)
 	if hasBody {
-		respBodyStr := utils.ToString(respBodyBytes)
+		respBodyStr = utils.ToString(respBodyBytes)
 		if isLog {
-			responseLogger.Body = respBodyStr
+			respLogger.Body = respBodyStr
 		} else {
 			sb.WriteString(fmt.Sprintf("Body: %s\n", respBodyStr))
 		}
+	}
 
-		err = utils.JSONBytesToStruct(respBodyBytes, restReq.Result)
-		if err != nil {
-			return err
+	if response.StatusCode >= 400 {
+		return &HttpError{
+			StatusCode: response.StatusCode,
+			Body:       respBodyStr,
 		}
 	}
 
-	return nil
+	if req.Result == nil || !hasBody {
+		return nil
+	}
+
+	return utils.JSONBytesToStruct(respBodyBytes, req.Result)
 }
 
-func (r *RestClient) buildParams(params map[string]string) string {
-	if utils.IsNilOrEmpty(params) {
-		return ""
+func (r *RestClient) buildURL(urlStr string, query map[string]string, params map[string]string) string {
+	for key, val := range query {
+		urlStr = strings.ReplaceAll(urlStr, ":"+key, val)
 	}
-	urlParams := url.Values{}
-	for k, v := range params {
-		urlParams.Add(k, v)
+
+	if !utils.IsNilOrEmpty(params) {
+		q := url.Values{}
+		for k, v := range params {
+			q.Add(k, v)
+		}
+		if strings.Contains(urlStr, "?") {
+			urlStr += "&" + q.Encode()
+		} else {
+			urlStr += "?" + q.Encode()
+		}
 	}
-	return urlParams.Encode()
+	return urlStr
 }
 
 func (r *RestClient) buildHeaders(rq *http.Request, headers map[string]string, contentType string) {
