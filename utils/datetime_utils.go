@@ -9,10 +9,11 @@ type Layout = string
 
 const (
 	// format common
-	Date            Layout = "02-01-2006"
-	DateSlash       Layout = "02/01/2006"
-	DateVerbose     Layout = "02-Jan-2006"
-	DateTimeCompact Layout = "20060102150405"
+	DD_MM_YYYYY       Layout = "02-01-2006"
+	DD_MM_YYYYY_FLASH Layout = "02/01/2006"
+	DD_MMM_YYYY       Layout = "02-Jan-2006"
+	YYYYMMDDHHMMSS    Layout = "20060102150405"
+	YYYYMMDD          Layout = "20060102"
 
 	// format ISO 8601 / RFC3339
 	DateOnly       Layout = "2006-01-02"
