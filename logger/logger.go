@@ -3,7 +3,7 @@ package logger
 import (
 	"fmt"
 	"github.com/BevisDev/godev/constants"
-	"github.com/BevisDev/godev/utils"
+	"github.com/BevisDev/godev/utils/datetime"
 	"os"
 	"path/filepath"
 	"strings"
@@ -118,7 +118,7 @@ func writeSync(cf *ConfigLogger) zapcore.WriteSyncer {
 }
 
 func getFilename(dir, fileName string) string {
-	now := time.Now().Format(utils.DateOnly)
+	now := time.Now().Format(datetime.DateOnly)
 	return filepath.Join(dir, now, fileName)
 }
 
@@ -135,32 +135,32 @@ func (l *AppLogger) logApp(level zapcore.Level, state string, msg string, args .
 	switch level {
 	case zapcore.InfoLevel:
 		logging.Info(message, zap.String(constants.State, state))
-		break
 	case zapcore.WarnLevel:
 		logging.Warn(message, zap.String(constants.State, state))
-		break
 	case zapcore.ErrorLevel:
 		logging.Error(message, zap.String(constants.State, state))
-		break
+	case zapcore.PanicLevel:
+		logging.Panic(message, zap.String(constants.State, state))
 	case zapcore.FatalLevel:
 		logging.Fatal(message, zap.String(constants.State, state))
-		break
 	default:
 		logging.Info(message, zap.String(constants.State, state))
 	}
 }
 
 func (l *AppLogger) formatMessage(msg string, args ...interface{}) string {
-	var message string
 	if len(args) == 0 {
 		return msg
 	}
 
+	var message string
 	if strings.Contains(msg, "{}") {
 		message = strings.ReplaceAll(msg, "{}", "%+v")
-	}
-	if !strings.Contains(msg, "%") {
-		msg += strings.Repeat(" :%+v", len(args))
+	} else if strings.Contains(msg, "%") {
+		message = msg
+	} else {
+		msg += strings.Repeat(":%+v", len(args))
+		message = msg
 	}
 
 	return fmt.Sprintf(message, args...)
@@ -184,6 +184,10 @@ func (l *AppLogger) Warn(state, msg string, args ...interface{}) {
 	l.logApp(zapcore.WarnLevel, state, msg, args...)
 }
 
+func (l *AppLogger) Panic(state, msg string, args ...interface{}) {
+	l.logApp(zapcore.PanicLevel, state, msg, args...)
+}
+
 func (l *AppLogger) Fatal(state, msg string, args ...interface{}) {
 	l.logApp(zapcore.FatalLevel, state, msg, args...)
 }
@@ -192,13 +196,13 @@ func (l *AppLogger) LogRequest(req *RequestLogger) {
 	l.Logger.WithOptions(
 		zap.AddCallerSkip(1)).Info(
 		"[===== REQUEST INFO =====]",
-		zap.String(constants.State, req.State),
-		zap.String("url", req.URL),
-		zap.Time("time", req.Time),
-		zap.String("method", req.Method),
-		zap.String("query", req.Query),
-		zap.Any("header", req.Header),
-		zap.Any("body", req.Body),
+		zap.String("State", req.State),
+		zap.String("URL", req.URL),
+		zap.Time("Time", req.Time),
+		zap.String("Method", req.Method),
+		zap.String("Query", req.Query),
+		zap.Any("Header", req.Header),
+		zap.Any("Body", req.Body),
 	)
 }
 
@@ -206,11 +210,11 @@ func (l *AppLogger) LogResponse(resp *ResponseLogger) {
 	l.Logger.WithOptions(
 		zap.AddCallerSkip(1)).Info(
 		"[===== RESPONSE INFO =====]",
-		zap.String("state", resp.State),
-		zap.Int("status", resp.Status),
-		zap.Float64("durationSec", resp.DurationSec.Seconds()),
-		zap.Any("header", resp.Header),
-		zap.Any("body", resp.Body),
+		zap.String("State", resp.State),
+		zap.Int("Status", resp.Status),
+		zap.Float64("DurationSec", resp.DurationSec.Seconds()),
+		zap.Any("Header", resp.Header),
+		zap.Any("Body", resp.Body),
 	)
 }
 
@@ -218,12 +222,13 @@ func (l *AppLogger) LogExtRequest(req *RequestLogger) {
 	l.Logger.WithOptions(
 		zap.AddCallerSkip(2)).Info(
 		"[===== REQUEST EXTERNAL INFO =====]",
-		zap.String(constants.State, req.State),
-		zap.String("url", req.URL),
-		zap.Time("time", req.Time),
-		zap.String("method", req.Method),
-		zap.String("query", req.Query),
-		zap.Any("body", req.Body),
+		zap.String("State", req.State),
+		zap.String("URL", req.URL),
+		zap.Time("Time", req.Time),
+		zap.String("Method", req.Method),
+		zap.String("Query", req.Query),
+		zap.Any("Header", req.Header),
+		zap.Any("Body", req.Body),
 	)
 }
 
@@ -231,9 +236,10 @@ func (l *AppLogger) LogExtResponse(resp *ResponseLogger) {
 	l.Logger.WithOptions(
 		zap.AddCallerSkip(1)).Info(
 		"[===== RESPONSE EXTERNAL INFO =====]",
-		zap.String(constants.State, resp.State),
-		zap.Int("status", resp.Status),
-		zap.Float64("durationSec", resp.DurationSec.Seconds()),
-		zap.Any("body", resp.Body),
+		zap.String("State", resp.State),
+		zap.Int("Status", resp.Status),
+		zap.Float64("DurationSec", resp.DurationSec.Seconds()),
+		zap.Any("Header", resp.Header),
+		zap.Any("Body", resp.Body),
 	)
 }

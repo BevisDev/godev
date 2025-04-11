@@ -28,7 +28,7 @@ func NewMigration(dir string, kind custom.KindDB, db *sql.DB) (*Migration, error
 }
 
 func (m *Migration) Init() error {
-	if err := goose.SetDialect(string(custom.DialectMigration[m.kind])); err != nil {
+	if err := goose.SetDialect(custom.DialectMigration[m.kind].String()); err != nil {
 		return err
 	}
 	if _, err := os.Stat(m.dir); os.IsNotExist(err) {

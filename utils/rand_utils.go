@@ -52,3 +52,11 @@ func randStr(length int, layout string) string {
 	}
 	return string(result)
 }
+
+func RandPick[T any](slice []T) T {
+	if len(slice) == 0 {
+		var zero T
+		return zero
+	}
+	return slice[rand.Intn(len(slice))]
+}

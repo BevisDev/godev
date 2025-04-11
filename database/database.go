@@ -79,7 +79,7 @@ func (d *Database) newConnection(cf *ConfigDB) (*sqlx.DB, error) {
 	}
 
 	// connect
-	db, err = sqlx.Connect(string(custom.SQLDriver[cf.Kind]), connStr)
+	db, err = sqlx.Connect(custom.SQLDriver[cf.Kind].String(), connStr)
 	if err != nil {
 		return nil, err
 	}

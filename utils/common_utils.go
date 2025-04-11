@@ -117,3 +117,10 @@ func TruncateText(s string, maxLen int) string {
 	}
 	return s
 }
+
+func ContainsIgnoreCase(s, substr string) bool {
+	return strings.Contains(
+		strings.ToLower(s),
+		strings.ToLower(substr),
+	)
+}

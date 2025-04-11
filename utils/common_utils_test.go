@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/BevisDev/godev/constants"
+	"github.com/stretchr/testify/assert"
 	"regexp"
 	"testing"
 	"time"
@@ -225,4 +226,12 @@ func TestTruncateText(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestContainsIgnoreCase(t *testing.T) {
+	assert.True(t, ContainsIgnoreCase("Hello World", "hello"))
+	assert.True(t, ContainsIgnoreCase("GoLang Is Fun", "IS"))
+	assert.True(t, ContainsIgnoreCase("ABC", "abc"))
+	assert.False(t, ContainsIgnoreCase("ABC", "xyz"))
+	assert.False(t, ContainsIgnoreCase("hello", "world"))
 }

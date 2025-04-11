@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/BevisDev/godev/constants"
+	"github.com/BevisDev/godev/utils/datetime"
 	"io"
 	"log"
 	"net/http"
@@ -144,7 +145,7 @@ func (r *RestClient) restTemplate(c context.Context, method string, req *Request
 		sb.WriteString(fmt.Sprintf("State: %s\n", state))
 		sb.WriteString(fmt.Sprintf("URL: %s\n", req.URL))
 		sb.WriteString(fmt.Sprintf("Method: %s\n", method))
-		sb.WriteString(fmt.Sprintf("Time: %s\n", utils.TimeToString(startTime, utils.DateTimeOffset)))
+		sb.WriteString(fmt.Sprintf("Time: %s\n", datetime.TimeToString(startTime, datetime.DateTimeOffset)))
 		if bodyStr != "" {
 			sb.WriteString(fmt.Sprintf("Body: %s\n", bodyStr))
 		}
