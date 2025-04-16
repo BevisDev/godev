@@ -3,7 +3,8 @@ package rabbitmq
 import (
 	"context"
 	"fmt"
-	"github.com/BevisDev/godev/constants"
+	"github.com/BevisDev/godev/consts"
+	"github.com/BevisDev/godev/utils/jsonx"
 
 	"github.com/BevisDev/godev/utils"
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -61,7 +62,7 @@ func (r *RabbitMQ) DeclareQueue(queueName string) (amqp.Queue, error) {
 }
 
 func (r *RabbitMQ) PutMessageToQueue(c context.Context, queueName string, message interface{}) error {
-	json := utils.ToJSONBytes(message)
+	json := jsonx.ToJSONBytes(message)
 	if len(json) > 50000 {
 		return fmt.Errorf("message is too large: %d", len(json))
 	}
@@ -81,7 +82,7 @@ func (r *RabbitMQ) PutMessageToQueue(c context.Context, queueName string, messag
 		false,
 		false,
 		amqp.Publishing{
-			ContentType: constants.ApplicationJSON,
+			ContentType: consts.ApplicationJSON,
 			Body:        json,
 		},
 	)

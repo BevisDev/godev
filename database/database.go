@@ -5,7 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/BevisDev/godev/custom"
+	"github.com/BevisDev/godev/types"
+	"github.com/BevisDev/godev/utils/validate"
 	"log"
 	"strings"
 	"time"
@@ -15,7 +16,7 @@ import (
 )
 
 type ConfigDB struct {
-	Kind           custom.KindDB
+	Kind           types.KindDB
 	Schema         string
 	TimeoutSec     int
 	Host           string
@@ -36,7 +37,7 @@ type Database struct {
 	DB         *sqlx.DB
 	showQuery  bool
 	TimeoutSec int
-	kindDB     custom.KindDB
+	kindDB     types.KindDB
 }
 
 func NewDB(cf *ConfigDB) (*Database, error) {
@@ -62,16 +63,16 @@ func (d *Database) newConnection(cf *ConfigDB) (*sqlx.DB, error) {
 
 	// build connectionString
 	switch cf.Kind {
-	case custom.SqlServer:
+	case types.SqlServer:
 		connStr = fmt.Sprintf("sqlserver://%s:%s@%s:%d?database=%s",
 			cf.Username, cf.Password, cf.Host, cf.Port, cf.Schema)
-	case custom.Postgres:
+	case types.Postgres:
 		connStr = fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
 			cf.Username, cf.Password, cf.Host, cf.Port, cf.Schema)
-	case custom.Oracle:
+	case types.Oracle:
 		connStr = fmt.Sprintf("%s/%s@%s:%d/%s",
 			cf.Username, cf.Password, cf.Host, cf.Port, cf.Schema)
-	case custom.MySQL:
+	case types.MySQL:
 		connStr = fmt.Sprintf("%s:%s@tcp(%s:%d)/%s",
 			cf.Username, cf.Password, cf.Host, cf.Port, cf.Schema)
 	default:
@@ -79,7 +80,7 @@ func (d *Database) newConnection(cf *ConfigDB) (*sqlx.DB, error) {
 	}
 
 	// connect
-	db, err = sqlx.Connect(custom.SQLDriver[cf.Kind].String(), connStr)
+	db, err = sqlx.Connect(types.SQLDriver[cf.Kind].String(), connStr)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +122,7 @@ func (d *Database) BeginTrans(ctx context.Context) (*sqlx.Tx, error) {
 }
 
 func (d *Database) mustBePtr(dest interface{}) error {
-	if !utils.IsPtr(dest) {
+	if !validate.IsPtr(dest) {
 		return errors.New("must be a pointer")
 	}
 	return nil
@@ -153,7 +154,7 @@ func (d *Database) GetList(c context.Context, dest interface{}, query string, ar
 	ctx, cancel := utils.CreateCtxTimeout(c, d.TimeoutSec)
 	defer cancel()
 
-	if utils.IsNilOrEmpty(args) {
+	if validate.IsNilOrEmpty(args) {
 		return d.DB.SelectContext(ctx, dest, query)
 	}
 
@@ -178,7 +179,7 @@ func (d *Database) GetAny(c context.Context, dest interface{}, query string, arg
 	ctx, cancel := utils.CreateCtxTimeout(c, d.TimeoutSec)
 	defer cancel()
 
-	if utils.IsNilOrEmpty(args) {
+	if validate.IsNilOrEmpty(args) {
 		return d.DB.GetContext(ctx, dest, query)
 	}
 

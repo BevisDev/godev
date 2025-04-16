@@ -1,52 +1,14 @@
-package utils
+package str
 
 import (
-	"context"
 	"fmt"
-	"github.com/BevisDev/godev/constants"
+	"golang.org/x/text/unicode/norm"
 	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 	"unicode"
-
-	"github.com/google/uuid"
-	"golang.org/x/text/unicode/norm"
 )
-
-func GenUUID() string {
-	return uuid.NewString()
-}
-
-func GetState(ctx context.Context) string {
-	if ctx == nil {
-		return GenUUID()
-	}
-	state, ok := ctx.Value(constants.State).(string)
-	if !ok {
-		state = GenUUID()
-	}
-	return state
-}
-
-func CreateCtx() context.Context {
-	return context.WithValue(context.Background(), constants.State, GenUUID())
-}
-
-func CreateCtxTimeout(ctx context.Context, timeoutSec int) (context.Context, context.CancelFunc) {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	return context.WithTimeout(ctx, time.Duration(timeoutSec)*time.Second)
-}
-
-func CreateCtxCancel(ctx context.Context) (context.Context, context.CancelFunc) {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	return context.WithCancel(ctx)
-}
 
 func ToString(value any) string {
 	if value == nil {
@@ -85,6 +47,22 @@ func ToString(value any) string {
 	return fmt.Sprintf("%+v", val.Interface())
 }
 
+func ToInt(str string) int {
+	i, err := strconv.Atoi(str)
+	if err != nil {
+		return 0
+	}
+	return i
+}
+
+func ToFloat(str string) float64 {
+	f, err := strconv.ParseFloat(str, 64)
+	if err != nil {
+		return 0.0
+	}
+	return f
+}
+
 func NormalizeToASCII(str string) string {
 	result := norm.NFD.String(str)
 	var output []rune
@@ -116,11 +94,4 @@ func TruncateText(s string, maxLen int) string {
 		return string(runes[:maxLen])
 	}
 	return s
-}
-
-func ContainsIgnoreCase(s, substr string) bool {
-	return strings.Contains(
-		strings.ToLower(s),
-		strings.ToLower(substr),
-	)
 }

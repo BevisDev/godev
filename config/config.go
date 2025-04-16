@@ -2,7 +2,7 @@ package config
 
 import (
 	"errors"
-	"github.com/BevisDev/godev/utils"
+	"github.com/BevisDev/godev/utils/validate"
 	"github.com/spf13/viper"
 	"os"
 )
@@ -20,7 +20,7 @@ func NewConfig(config *Config) error {
 		err     error
 		profile = config.Profile
 	)
-	if !utils.IsPtr(config.Dest) {
+	if !validate.IsPtr(config.Dest) {
 		return errors.New("must be a pointer")
 	}
 	if profile == "" {

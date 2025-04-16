@@ -1,86 +1,9 @@
-package utils
+package str
 
 import (
-	"context"
-	"errors"
-	"github.com/BevisDev/godev/constants"
 	"github.com/stretchr/testify/assert"
-	"regexp"
 	"testing"
-	"time"
 )
-
-func TestGetState_WhenCtxNil(t *testing.T) {
-	state := GetState(nil)
-	if state == "" {
-		t.Error("Expected non-empty state")
-	}
-}
-
-func TestGetState_WhenCtxHasNoState(t *testing.T) {
-	ctx := context.Background()
-	state := GetState(ctx)
-	if state == "" {
-		t.Error("Expected generated state")
-	}
-}
-
-func TestGetState_WhenCtxHasState(t *testing.T) {
-	expected := "fixed-state"
-	ctx := context.WithValue(context.Background(), constants.State, expected)
-	state := GetState(ctx)
-	if state != expected {
-		t.Errorf("GetState() = %q; want %q", state, expected)
-	}
-}
-
-func TestCreateCtx_ShouldReturnContextWithState(t *testing.T) {
-	ctx := CreateCtx()
-	state := ctx.Value(constants.State)
-
-	if state == nil || state == "" {
-		t.Error("Expected state in context")
-	}
-}
-
-func TestCreateCtxTimeout(t *testing.T) {
-	ctx, cancel := CreateCtxTimeout(nil, 1)
-	defer cancel()
-
-	select {
-	case <-ctx.Done():
-		if !errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			t.Errorf("Expected DeadlineExceeded, got %v", ctx.Err())
-		}
-	case <-time.After(2 * time.Second):
-		t.Error("Timeout context did not expire")
-	}
-}
-
-func TestCreateCtxCancel(t *testing.T) {
-	ctx, cancel := CreateCtxCancel(nil)
-	cancel()
-
-	select {
-	case <-ctx.Done():
-		if !errors.Is(ctx.Err(), context.Canceled) {
-			t.Errorf("Expected context.Canceled, got %v", ctx.Err())
-		}
-	case <-time.After(1 * time.Second):
-		t.Error("Cancel context did not close")
-	}
-}
-
-func TestGenUUID(t *testing.T) {
-	uuid := GenUUID()
-	if uuid == "" {
-		t.Errorf("GenUUID() = empty string")
-	}
-	r := regexp.MustCompile(`^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$`)
-	if !r.MatchString(uuid) {
-		t.Errorf("GenUUID() = %q, not a valid UUID v4", uuid)
-	}
-}
 
 func TestToString(t *testing.T) {
 	tests := []struct {
@@ -114,6 +37,44 @@ func TestToString(t *testing.T) {
 				t.Errorf("ToString(%v) = %v, want %v", tt.input, result, tt.expected)
 			}
 		})
+	}
+}
+
+func TestToInt(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected int
+	}{
+		{"42", 42},
+		{"0", 0},
+		{"-123", -123},
+		{"abc", 0},
+		{"", 0},
+		{"9999999999", 9999999999},
+	}
+
+	for _, tt := range tests {
+		result := ToInt(tt.input)
+		assert.Equal(t, tt.expected, result, "ToInt(%s) should be %d", tt.input, tt.expected)
+	}
+}
+
+func TestToFloat(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected float64
+	}{
+		{"3.14", 3.14},
+		{"0", 0},
+		{"-2.718", -2.718},
+		{"abc", 0.0},
+		{"", 0.0},
+		{"1e10", 1e10},
+	}
+
+	for _, tt := range tests {
+		result := ToFloat(tt.input)
+		assert.InDelta(t, tt.expected, result, 0.0001, "ToFloat(%s) should be approx %.4f", tt.input, tt.expected)
 	}
 }
 
@@ -226,12 +187,4 @@ func TestTruncateText(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestContainsIgnoreCase(t *testing.T) {
-	assert.True(t, ContainsIgnoreCase("Hello World", "hello"))
-	assert.True(t, ContainsIgnoreCase("GoLang Is Fun", "IS"))
-	assert.True(t, ContainsIgnoreCase("ABC", "abc"))
-	assert.False(t, ContainsIgnoreCase("ABC", "xyz"))
-	assert.False(t, ContainsIgnoreCase("hello", "world"))
 }

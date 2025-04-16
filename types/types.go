@@ -1,4 +1,9 @@
-package custom
+package types
+
+import "github.com/shopspring/decimal"
+
+// Money type
+type Money = decimal.Decimal
 
 // KindDB type
 type KindDB string

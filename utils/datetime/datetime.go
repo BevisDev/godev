@@ -36,11 +36,11 @@ const (
 	Year   Layout = "Year"
 )
 
-func TimeToString(time time.Time, format Layout) string {
+func ToString(time time.Time, format Layout) string {
 	return time.Format(format)
 }
 
-func StringToTime(timeStr string, format Layout) (*time.Time, error) {
+func ToTime(timeStr string, format Layout) (*time.Time, error) {
 	parsedTime, err := time.Parse(format, timeStr)
 	if err != nil {
 		return nil, err

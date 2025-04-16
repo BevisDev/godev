@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/BevisDev/godev/utils/jsonx"
+	"github.com/BevisDev/godev/utils/validate"
 	"log"
 	"reflect"
 	"time"
@@ -79,13 +81,13 @@ func convertValue(value interface{}) interface{} {
 		v.Kind() == reflect.Map ||
 		v.Kind() == reflect.Slice ||
 		v.Kind() == reflect.Array {
-		return utils.ToJSONBytes(value)
+		return jsonx.ToJSONBytes(value)
 	}
 	return value
 }
 
 func (r *RedisCache) Get(c context.Context, key string, result interface{}) error {
-	if !utils.IsPtr(result) {
+	if !validate.IsPtr(result) {
 		return errors.New("must be a pointer")
 	}
 	ctx, cancel := utils.CreateCtxTimeout(c, r.TimeoutSec)
@@ -94,7 +96,7 @@ func (r *RedisCache) Get(c context.Context, key string, result interface{}) erro
 	if err != nil {
 		return err
 	}
-	err = utils.JSONToStruct(val, result)
+	err = jsonx.ToStruct(val, result)
 	return err
 }
 
@@ -136,15 +138,12 @@ func (r *RedisCache) GetBatch(c context.Context, keys []string) ([]interface{}, 
 	defer cancel()
 	vals, err := r.Client.MGet(ctx, keys...).Result()
 	if err != nil {
-		if r.IsNil(err) {
-			return nil, nil
-		}
 		return nil, err
 	}
 	return vals, nil
 }
 
-func (r *RedisCache) GetListValueByPrefixKey(c context.Context, prefix string) ([]string, error) {
+func (r *RedisCache) GetByPrefix(c context.Context, prefix string) ([]string, error) {
 	ctx, cancel := utils.CreateCtxTimeout(c, r.TimeoutSec)
 	defer cancel()
 	var (
@@ -159,7 +158,7 @@ func (r *RedisCache) GetListValueByPrefixKey(c context.Context, prefix string) (
 		for _, key := range keys {
 			val, err := r.GetString(ctx, key)
 			if err != nil {
-				continue
+				return nil, err
 			}
 			result = append(result, val)
 		}

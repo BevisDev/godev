@@ -1,10 +1,9 @@
-package utils
+package validate
 
 import (
 	"context"
 	"errors"
 	"reflect"
-	"slices"
 	"strings"
 )
 
@@ -36,10 +35,6 @@ func IsErrorOrEmpty(err error, i interface{}) bool {
 		return true
 	}
 	return false
-}
-
-func IsContains[T comparable](arr []T, value T) bool {
-	return slices.Contains(arr, value)
 }
 
 func IsPtr(i interface{}) bool {

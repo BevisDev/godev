@@ -1,4 +1,4 @@
-package utils
+package jsonx
 
 import (
 	"testing"
@@ -59,10 +59,10 @@ func TestJSONToStruct(t *testing.T) {
 	jsonStr := `{"name":"Carol","age":40}`
 
 	var p Person
-	err := JSONToStruct(jsonStr, &p)
+	err := ToStruct(jsonStr, &p)
 
 	if err != nil {
-		t.Fatalf("JSONToStruct failed: %v", err)
+		t.Fatalf("ToStruct failed: %v", err)
 	}
 	if p.Name != "Carol" || p.Age != 40 {
 		t.Errorf("Got %+v; want {Name:Carol Age:40}", p)
@@ -73,7 +73,7 @@ func TestJSONToStruct_NotPointer(t *testing.T) {
 	jsonStr := `{"name":"Carol","age":40}`
 
 	var p Person
-	err := JSONToStruct(jsonStr, p)
+	err := ToStruct(jsonStr, p)
 
 	if err == nil || err.Error() != "must be a pointer" {
 		t.Errorf("Expected 'must be a pointer' error, got %v", err)

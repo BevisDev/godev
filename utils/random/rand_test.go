@@ -1,10 +1,22 @@
-package utils
+package random
 
 import (
 	"github.com/stretchr/testify/assert"
+	"regexp"
 	"testing"
 	"unicode"
 )
+
+func TestGenUUID(t *testing.T) {
+	uuid := RandUUID()
+	if uuid == "" {
+		t.Errorf("RandUUID() = empty string")
+	}
+	r := regexp.MustCompile(`^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$`)
+	if !r.MatchString(uuid) {
+		t.Errorf("RandUUID() = %q, not a valid UUID v4", uuid)
+	}
+}
 
 func TestRandIntInRange(t *testing.T) {
 	for i := 0; i < 100; i++ {
@@ -16,7 +28,7 @@ func TestRandIntInRange(t *testing.T) {
 
 func TestRandomFloatInRange(t *testing.T) {
 	for i := 0; i < 100; i++ {
-		val := RandomFloatInRange(1.5, 3.0)
+		val := RandFloat(1.5, 3.0)
 		assert.GreaterOrEqual(t, val, 1.5)
 		assert.Less(t, val, 3.0)
 	}

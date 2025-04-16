@@ -3,7 +3,7 @@ package migration
 import (
 	"context"
 	"database/sql"
-	"github.com/BevisDev/godev/custom"
+	"github.com/BevisDev/godev/types"
 	"os"
 
 	"github.com/pressly/goose/v3"
@@ -11,11 +11,11 @@ import (
 
 type Migration struct {
 	dir  string
-	kind custom.KindDB
+	kind types.KindDB
 	db   *sql.DB
 }
 
-func NewMigration(dir string, kind custom.KindDB, db *sql.DB) (*Migration, error) {
+func NewMigration(dir string, kind types.KindDB, db *sql.DB) (*Migration, error) {
 	m := Migration{
 		dir:  dir,
 		kind: kind,
@@ -28,7 +28,7 @@ func NewMigration(dir string, kind custom.KindDB, db *sql.DB) (*Migration, error
 }
 
 func (m *Migration) Init() error {
-	if err := goose.SetDialect(custom.DialectMigration[m.kind].String()); err != nil {
+	if err := goose.SetDialect(types.DialectMigration[m.kind].String()); err != nil {
 		return err
 	}
 	if _, err := os.Stat(m.dir); os.IsNotExist(err) {

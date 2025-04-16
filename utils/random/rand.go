@@ -1,6 +1,7 @@
-package utils
+package random
 
 import (
+	"github.com/google/uuid"
 	"math/rand"
 )
 
@@ -13,11 +14,15 @@ const (
 	charset       = "AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz" + numeric
 )
 
+func RandUUID() string {
+	return uuid.NewString()
+}
+
 func RandInt(min, max int) int {
 	return min + rand.Intn(max-min)
 }
 
-func RandomFloatInRange(min, max float64) float64 {
+func RandFloat(min, max float64) float64 {
 	return min + rand.Float64()*(max-min)
 }
 
@@ -48,7 +53,7 @@ func RandStringLowerNumeric(length int) string {
 func randStr(length int, layout string) string {
 	result := make([]byte, length)
 	for i := range result {
-		result[i] = layout[RandInt(0, len(layout)-1)]
+		result[i] = layout[RandInt(0, len(layout))]
 	}
 	return string(result)
 }
@@ -58,5 +63,5 @@ func RandPick[T any](slice []T) T {
 		var zero T
 		return zero
 	}
-	return slice[rand.Intn(len(slice))]
+	return slice[RandInt(0, len(slice))]
 }

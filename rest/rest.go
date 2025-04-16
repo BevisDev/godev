@@ -5,8 +5,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/BevisDev/godev/constants"
+	"github.com/BevisDev/godev/consts"
 	"github.com/BevisDev/godev/utils/datetime"
+	"github.com/BevisDev/godev/utils/jsonx"
+	"github.com/BevisDev/godev/utils/validate"
 	"io"
 	"log"
 	"net/http"
@@ -111,8 +113,8 @@ func (r *RestClient) restTemplate(c context.Context, method string, req *Request
 		state      = utils.GetState(c)
 		reqBody    []byte
 		bodyStr    string
-		isLog      = !utils.IsNilOrEmpty(r.logger)
-		isFormData = !utils.IsNilOrEmpty(req.BodyForm)
+		isLog      = !validate.IsNilOrEmpty(r.logger)
+		isFormData = !validate.IsNilOrEmpty(req.BodyForm)
 	)
 	// build URL
 	urlStr := r.buildURL(req.URL, req.Query, req.Params)
@@ -124,8 +126,8 @@ func (r *RestClient) restTemplate(c context.Context, method string, req *Request
 			formValues.Add(k, v)
 		}
 		bodyStr = formValues.Encode()
-	} else if !utils.IsNilOrEmpty(req.Body) {
-		reqBody = utils.ToJSONBytes(req.Body)
+	} else if !validate.IsNilOrEmpty(req.Body) {
+		reqBody = jsonx.ToJSONBytes(req.Body)
 		bodyStr = utils.ToString(reqBody)
 	}
 
@@ -145,7 +147,7 @@ func (r *RestClient) restTemplate(c context.Context, method string, req *Request
 		sb.WriteString(fmt.Sprintf("State: %s\n", state))
 		sb.WriteString(fmt.Sprintf("URL: %s\n", req.URL))
 		sb.WriteString(fmt.Sprintf("Method: %s\n", method))
-		sb.WriteString(fmt.Sprintf("Time: %s\n", datetime.TimeToString(startTime, datetime.DateTimeOffset)))
+		sb.WriteString(fmt.Sprintf("Time: %s\n", datetime.ToString(startTime, datetime.DateTimeOffset)))
 		if bodyStr != "" {
 			sb.WriteString(fmt.Sprintf("Body: %s\n", bodyStr))
 		}
@@ -163,7 +165,7 @@ func (r *RestClient) restTemplate(c context.Context, method string, req *Request
 	)
 	if isFormData {
 		request, err = http.NewRequestWithContext(ctx, method, urlStr, bytes.NewBufferString(bodyStr))
-	} else if utils.IsNilOrEmpty(reqBody) {
+	} else if validate.IsNilOrEmpty(reqBody) {
 		request, err = http.NewRequestWithContext(ctx, method, urlStr, nil)
 	} else {
 		request, err = http.NewRequestWithContext(ctx, method, urlStr, bytes.NewBuffer(reqBody))
@@ -174,9 +176,9 @@ func (r *RestClient) restTemplate(c context.Context, method string, req *Request
 
 	// build header
 	if isFormData {
-		r.buildHeaders(request, req.Header, constants.ApplicationFormData)
+		r.buildHeaders(request, req.Header, consts.ApplicationFormData)
 	} else {
-		r.buildHeaders(request, req.Header, constants.ApplicationJSON)
+		r.buildHeaders(request, req.Header, consts.ApplicationJSON)
 	}
 
 	// execute request
@@ -228,7 +230,7 @@ func (r *RestClient) execute(request *http.Request, req *Request, startTime time
 	}()
 
 	// check body
-	hasBody := !utils.IsNilOrEmpty(respBodyBytes)
+	hasBody := !validate.IsNilOrEmpty(respBodyBytes)
 	if hasBody {
 		respBodyStr = utils.ToString(respBodyBytes)
 		if isLog {
@@ -249,7 +251,7 @@ func (r *RestClient) execute(request *http.Request, req *Request, startTime time
 		return nil
 	}
 
-	return utils.JSONBytesToStruct(respBodyBytes, req.Result)
+	return jsonx.JSONBytesToStruct(respBodyBytes, req.Result)
 }
 
 func (r *RestClient) buildURL(urlStr string, query map[string]string, params map[string]string) string {
@@ -257,7 +259,7 @@ func (r *RestClient) buildURL(urlStr string, query map[string]string, params map
 		urlStr = strings.ReplaceAll(urlStr, ":"+key, val)
 	}
 
-	if !utils.IsNilOrEmpty(params) {
+	if !validate.IsNilOrEmpty(params) {
 		q := url.Values{}
 		for k, v := range params {
 			q.Add(k, v)
@@ -272,8 +274,8 @@ func (r *RestClient) buildURL(urlStr string, query map[string]string, params map
 }
 
 func (r *RestClient) buildHeaders(rq *http.Request, headers map[string]string, contentType string) {
-	if utils.IsNilOrEmpty(headers) || headers[constants.ContentType] == "" {
-		rq.Header.Set(constants.ContentType, contentType)
+	if validate.IsNilOrEmpty(headers) || headers[consts.ContentType] == "" {
+		rq.Header.Set(consts.ContentType, contentType)
 	}
 	for key, value := range headers {
 		rq.Header.Add(key, value)

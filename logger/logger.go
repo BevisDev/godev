@@ -2,7 +2,7 @@ package logger
 
 import (
 	"fmt"
-	"github.com/BevisDev/godev/constants"
+	"github.com/BevisDev/godev/consts"
 	"github.com/BevisDev/godev/utils/datetime"
 	"os"
 	"path/filepath"
@@ -134,17 +134,17 @@ func (l *AppLogger) logApp(level zapcore.Level, state string, msg string, args .
 	logging := l.Logger.WithOptions(zap.AddCallerSkip(2))
 	switch level {
 	case zapcore.InfoLevel:
-		logging.Info(message, zap.String(constants.State, state))
+		logging.Info(message, zap.String(consts.State, state))
 	case zapcore.WarnLevel:
-		logging.Warn(message, zap.String(constants.State, state))
+		logging.Warn(message, zap.String(consts.State, state))
 	case zapcore.ErrorLevel:
-		logging.Error(message, zap.String(constants.State, state))
+		logging.Error(message, zap.String(consts.State, state))
 	case zapcore.PanicLevel:
-		logging.Panic(message, zap.String(constants.State, state))
+		logging.Panic(message, zap.String(consts.State, state))
 	case zapcore.FatalLevel:
-		logging.Fatal(message, zap.String(constants.State, state))
+		logging.Fatal(message, zap.String(consts.State, state))
 	default:
-		logging.Info(message, zap.String(constants.State, state))
+		logging.Info(message, zap.String(consts.State, state))
 	}
 }
 
