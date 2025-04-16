@@ -8,6 +8,7 @@ import (
 	"github.com/BevisDev/godev/consts"
 	"github.com/BevisDev/godev/utils/datetime"
 	"github.com/BevisDev/godev/utils/jsonx"
+	"github.com/BevisDev/godev/utils/str"
 	"github.com/BevisDev/godev/utils/validate"
 	"io"
 	"log"
@@ -128,7 +129,7 @@ func (r *RestClient) restTemplate(c context.Context, method string, req *Request
 		bodyStr = formValues.Encode()
 	} else if !validate.IsNilOrEmpty(req.Body) {
 		reqBody = jsonx.ToJSONBytes(req.Body)
-		bodyStr = utils.ToString(reqBody)
+		bodyStr = str.ToString(reqBody)
 	}
 
 	// log request
@@ -232,7 +233,7 @@ func (r *RestClient) execute(request *http.Request, req *Request, startTime time
 	// check body
 	hasBody := !validate.IsNilOrEmpty(respBodyBytes)
 	if hasBody {
-		respBodyStr = utils.ToString(respBodyBytes)
+		respBodyStr = str.ToString(respBodyBytes)
 		if isLog {
 			respLogger.Body = respBodyStr
 		} else {
