@@ -94,3 +94,13 @@ func TestDateSQL_Scan_InvalidType(t *testing.T) {
 		t.Errorf("Expected error for invalid Scan type, got nil")
 	}
 }
+
+func TestDateSQL_ToString(t *testing.T) {
+	d := DateSQL{}
+	_ = d.Scan("2024-04-21 00:00:00.000")
+
+	str := d.ToString()
+	if str != "2024-04-21 00:00:00.000" {
+		t.Errorf("Expected 2024-04-21 00:00:00.000, got %s", str)
+	}
+}

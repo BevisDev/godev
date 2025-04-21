@@ -33,8 +33,19 @@ func (d *Date) MarshalJSON() ([]byte, error) {
 	return json.Marshal(d.Format(datetime.DateOnly))
 }
 
-func (d *Date) ToTime() time.Time {
-	return d.Time
+func (d *Date) ToTime() *time.Time {
+	if d == nil || d.Time.IsZero() {
+		return nil
+	}
+	t := d.Time
+	return &t
+}
+
+func (d *Date) ToString() string {
+	if d == nil || d.Time.IsZero() {
+		return ""
+	}
+	return datetime.ToString(d.Time, datetime.DateOnly)
 }
 
 func (d *Date) Scan(value interface{}) error {

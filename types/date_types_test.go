@@ -130,3 +130,13 @@ func TestDate_Scan_InvalidType(t *testing.T) {
 		t.Errorf("Expected error for invalid Scan type, got nil")
 	}
 }
+
+func TestDate_ToString(t *testing.T) {
+	d := Date{}
+	_ = d.Scan("2024-04-21")
+
+	str := d.ToString()
+	if str != "2024-04-21" {
+		t.Errorf("Expected 2024-04-21, got %s", str)
+	}
+}
