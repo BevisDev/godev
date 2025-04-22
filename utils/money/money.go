@@ -38,6 +38,14 @@ func ToInt(m types.Money) int {
 	return int(m.IntPart())
 }
 
+func FromInt64(i int64) types.Money {
+	return decimal.NewFromInt(i)
+}
+
+func ToInt64(m types.Money) int64 {
+	return m.IntPart()
+}
+
 func GreaterThanInt(m types.Money, i int) bool {
 	return m.GreaterThan(FromInt(i))
 }
