@@ -15,7 +15,6 @@ func ToString(value any) string {
 		return ""
 	}
 	val := reflect.ValueOf(value)
-
 	// handle ptr
 	if val.Kind() == reflect.Ptr {
 		if val.IsNil() {
