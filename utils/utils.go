@@ -43,3 +43,11 @@ func ContainsIgnoreCase(s, substr string) bool {
 		strings.ToLower(substr),
 	)
 }
+
+func CalcAgeAt(dob, t time.Time) int {
+	age := t.Year() - dob.Year()
+	if t.Month() < dob.Month() || (t.Month() == dob.Month() && t.Day() < dob.Day()) {
+		age--
+	}
+	return age
+}

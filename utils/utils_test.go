@@ -77,3 +77,37 @@ func TestContainsIgnoreCase(t *testing.T) {
 	assert.False(t, ContainsIgnoreCase("ABC", "xyz"))
 	assert.False(t, ContainsIgnoreCase("hello", "world"))
 }
+
+func mustParse(date string) time.Time {
+	t, err := time.Parse("2006-01-02", date)
+	if err != nil {
+		panic(err)
+	}
+	return t
+}
+
+func TestCalcAgeAt(t *testing.T) {
+	tests := []struct {
+		dob      string
+		now      string
+		expected int
+		name     string
+	}{
+		{"2000-04-20", "2025-04-21", 25, "Birthday passed this year"},
+		{"2000-05-10", "2025-04-21", 24, "Birthday not yet this year"},
+		{"2000-04-21", "2025-04-21", 25, "Birthday is today"},
+		{"2025-04-21", "2025-04-21", 0, "Born today"},
+		{"2026-01-01", "2025-04-21", -1, "Future date"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dob := mustParse(tc.dob)
+			now := mustParse(tc.now)
+			age := CalcAgeAt(dob, now)
+			if age != tc.expected {
+				t.Errorf("Expected age %d, got %d", tc.expected, age)
+			}
+		})
+	}
+}
