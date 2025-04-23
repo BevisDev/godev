@@ -205,7 +205,7 @@ func (d *Database) ExecQuery(c context.Context, query string, args ...interface{
 		return err
 	}
 
-	_, err = d.DB.ExecContext(ctx, query, args...)
+	_, err = tx.ExecContext(ctx, query, args...)
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -230,7 +230,7 @@ func (d *Database) Save(c context.Context, query string, args interface{}) error
 		return err
 	}
 
-	_, err = d.DB.NamedExecContext(ctx, query, args)
+	_, err = tx.NamedExecContext(ctx, query, args)
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -255,7 +255,7 @@ func (d *Database) InsertedId(c context.Context, query string, args ...interface
 		return id, err
 	}
 
-	err = d.DB.QueryRowContext(ctx, query, args...).Scan(&id)
+	err = tx.QueryRowContext(ctx, query, args...).Scan(&id)
 	if err != nil {
 		tx.Rollback()
 		return id, err
@@ -288,7 +288,7 @@ func (d *Database) Delete(c context.Context, query string, args interface{}) err
 		return err
 	}
 
-	_, err = d.DB.NamedExecContext(ctx, query, args)
+	_, err = tx.NamedExecContext(ctx, query, args)
 	if err != nil {
 		tx.Rollback()
 		return err
