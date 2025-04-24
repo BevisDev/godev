@@ -64,14 +64,10 @@ func (r *RedisCache) Setx(c context.Context, key string, value interface{}) erro
 	return r.Set(c, key, value, -1)
 }
 
-func (r *RedisCache) Set(c context.Context, key string, value interface{}, expiredTimeSec int) error {
+func (r *RedisCache) Set(c context.Context, key string, value interface{}, expiredTimeSec int) (err error) {
 	ctx, cancel := utils.CreateCtxTimeout(c, r.TimeoutSec)
 	defer cancel()
-	err := r.Client.Set(ctx, key, convertValue(value), time.Duration(expiredTimeSec)*time.Second).Err()
-	if err != nil {
-		return err
-	}
-	return nil
+	return r.Client.Set(ctx, key, convertValue(value), time.Duration(expiredTimeSec)*time.Second).Err()
 }
 
 func convertValue(value interface{}) interface{} {
@@ -86,7 +82,7 @@ func convertValue(value interface{}) interface{} {
 	return value
 }
 
-func (r *RedisCache) Get(c context.Context, key string, result interface{}) error {
+func (r *RedisCache) Get(c context.Context, key string, result interface{}) (err error) {
 	if !validate.IsPtr(result) {
 		return errors.New("must be a pointer")
 	}
@@ -94,10 +90,9 @@ func (r *RedisCache) Get(c context.Context, key string, result interface{}) erro
 	defer cancel()
 	val, err := r.Client.Get(ctx, key).Result()
 	if err != nil {
-		return err
+		return
 	}
-	err = jsonx.ToStruct(val, result)
-	return err
+	return jsonx.ToStruct(val, result)
 }
 
 func (r *RedisCache) GetString(c context.Context, key string) (string, error) {
@@ -113,24 +108,16 @@ func (r *RedisCache) GetString(c context.Context, key string) (string, error) {
 	return val, nil
 }
 
-func (r *RedisCache) Delete(c context.Context, key string) error {
+func (r *RedisCache) Delete(c context.Context, key string) (err error) {
 	ctx, cancel := utils.CreateCtxTimeout(c, r.TimeoutSec)
 	defer cancel()
-	err := r.Client.Del(ctx, key).Err()
-	if err != nil {
-		return err
-	}
-	return nil
+	return r.Client.Del(ctx, key).Err()
 }
 
-func (r *RedisCache) SetBatch(c context.Context, args map[string]string) error {
+func (r *RedisCache) SetBatch(c context.Context, args map[string]string) (err error) {
 	ctx, cancel := utils.CreateCtxTimeout(c, r.TimeoutSec)
 	defer cancel()
-	err := r.Client.MSet(ctx, args).Err()
-	if err != nil {
-		return err
-	}
-	return nil
+	return r.Client.MSet(ctx, args).Err()
 }
 
 func (r *RedisCache) GetBatch(c context.Context, keys []string) ([]interface{}, error) {
