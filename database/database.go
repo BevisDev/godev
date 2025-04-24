@@ -117,15 +117,26 @@ func (d *Database) viewQuery(query string) {
 	}
 }
 
+func (d *Database) GetParam() string {
+	switch d.kindDB {
+	case types.SqlServer:
+		return "@p"
+	case types.Postgres:
+		return "$"
+	default: // mysql
+		return "?"
+	}
+}
+
 func (d *Database) BeginTrans(ctx context.Context) (*sqlx.Tx, error) {
 	return d.DB.BeginTxx(ctx, nil)
 }
 
-func (d *Database) mustBePtr(dest interface{}) error {
+func (d *Database) mustBePtr(dest interface{}) (err error) {
 	if !validate.IsPtr(dest) {
 		return errors.New("must be a pointer")
 	}
-	return nil
+	return
 }
 
 func (d *Database) IsNoResult(err error) bool {
@@ -136,16 +147,16 @@ func (d *Database) isIn(query string) bool {
 	return strings.Contains(query, "IN") || strings.Contains(query, "in")
 }
 
-func (d *Database) GetList(c context.Context, dest interface{}, query string, args ...interface{}) error {
-	err := d.mustBePtr(dest)
+func (d *Database) GetList(c context.Context, dest interface{}, query string, args ...interface{}) (err error) {
+	err = d.mustBePtr(dest)
 	if err != nil {
-		return err
+		return
 	}
 
 	if d.isIn(query) {
 		query, args, err = sqlx.In(query, args...)
 		if err != nil {
-			return err
+			return
 		}
 	}
 	query = d.DB.Rebind(query)
@@ -157,12 +168,11 @@ func (d *Database) GetList(c context.Context, dest interface{}, query string, ar
 	if validate.IsNilOrEmpty(args) {
 		return d.DB.SelectContext(ctx, dest, query)
 	}
-
 	return d.DB.SelectContext(ctx, dest, query, args...)
 }
 
-func (d *Database) GetAny(c context.Context, dest interface{}, query string, args ...interface{}) error {
-	err := d.mustBePtr(dest)
+func (d *Database) GetAny(c context.Context, dest interface{}, query string, args ...interface{}) (err error) {
+	err = d.mustBePtr(dest)
 	if err != nil {
 		return err
 	}
@@ -170,7 +180,7 @@ func (d *Database) GetAny(c context.Context, dest interface{}, query string, arg
 	if d.isIn(query) {
 		query, args, err = sqlx.In(query, args...)
 		if err != nil {
-			return err
+			return
 		}
 	}
 	query = d.DB.Rebind(query)
@@ -182,36 +192,39 @@ func (d *Database) GetAny(c context.Context, dest interface{}, query string, arg
 	if validate.IsNilOrEmpty(args) {
 		return d.DB.GetContext(ctx, dest, query)
 	}
-
 	return d.DB.GetContext(ctx, dest, query, args...)
 }
 
-func (d *Database) ExecQuery(c context.Context, query string, args ...interface{}) error {
-	var err error
+func (d *Database) ExecQuery(c context.Context, query string, args ...interface{}) (err error) {
 	if d.isIn(query) {
 		query, args, err = sqlx.In(query, args...)
 		if err != nil {
-			return err
+			return
 		}
 	}
 	query = d.DB.Rebind(query)
 	d.viewQuery(query)
-
 	ctx, cancel := utils.CreateCtxTimeout(c, d.TimeoutSec)
 	defer cancel()
 
 	tx, err := d.BeginTrans(ctx)
 	if err != nil {
-		return err
+		return
 	}
+
+	defer func() {
+		if err != nil {
+			tx.Rollback()
+			return
+		}
+		err = tx.Commit()
+	}()
 
 	_, err = tx.ExecContext(ctx, query, args...)
 	if err != nil {
-		tx.Rollback()
-		return err
+		return
 	}
-	err = tx.Commit()
-	return err
+	return
 }
 
 // Save using for Insert Or Update query
@@ -219,58 +232,74 @@ func (d *Database) ExecQuery(c context.Context, query string, args ...interface{
 // Example query: INSERT INTO person (first_name,last_name,email) VALUES (:first,:last,:email)
 // args: map[string]interface{}{ "first": "Bin","last": "Smuth", "email": "bensmith@allblacks.nz"}
 // or struct with the `db` tag
-func (d *Database) Save(c context.Context, query string, args interface{}) error {
+func (d *Database) Save(c context.Context, query string, args interface{}) (err error) {
 	d.viewQuery(query)
-
 	ctx, cancel := utils.CreateCtxTimeout(c, d.TimeoutSec)
 	defer cancel()
 
 	tx, err := d.BeginTrans(ctx)
 	if err != nil {
-		return err
+		return
 	}
+	defer func() {
+		if err != nil {
+			tx.Rollback()
+			return
+		}
+		err = tx.Commit()
+	}()
 
 	_, err = tx.NamedExecContext(ctx, query, args)
 	if err != nil {
-		tx.Rollback()
-		return err
+		return
 	}
-
-	tx.Commit()
-	return err
+	return
 }
 
 // InsertedId inserts record and returns id
 // LastInsertId function should not be used with this SQL Server driver
 // Please use OUTPUT clause or SCOPE_IDENTITY() to the end of your query
-func (d *Database) InsertedId(c context.Context, query string, args ...interface{}) (int, error) {
-	var id int
+func (d *Database) InsertedId(c context.Context, query string, args ...interface{}) (id int, err error) {
 	d.viewQuery(query)
-
 	ctx, cancel := utils.CreateCtxTimeout(c, d.TimeoutSec)
 	defer cancel()
 
 	tx, err := d.BeginTrans(ctx)
 	if err != nil {
-		return id, err
+		return
 	}
+	defer func() {
+		if err != nil {
+			tx.Rollback()
+			return
+		}
+		err = tx.Commit()
+	}()
 
 	err = tx.QueryRowContext(ctx, query, args...).Scan(&id)
 	if err != nil {
-		tx.Rollback()
-		return id, err
+		return
 	}
-
-	tx.Commit()
-	return id, err
+	return
 }
 
-func (d *Database) InsertBatch(c context.Context, query string, size, col int, args ...interface{}) error {
+func (d *Database) formatRow(idx int) string {
+	var p = d.GetParam()
+	if types.MySQL == d.kindDB {
+		return p
+	}
+	return fmt.Sprintf("%s%d", p, idx)
+}
+
+func (d *Database) InsertMany(c context.Context, query string, size, col int, args ...interface{}) error {
+	if size <= 0 {
+		return errors.New("size must be greater than 0")
+	}
 	var placeholders []string
 	for i := 0; i < size; i++ {
 		var row []string
 		for j := 1; j <= col; j++ {
-			row = append(row, fmt.Sprintf("@p%d", i*col+j))
+			row = append(row, d.formatRow(i*col+j))
 		}
 		placeholders = append(placeholders, "("+strings.Join(row, ", ")+")")
 	}
@@ -278,22 +307,52 @@ func (d *Database) InsertBatch(c context.Context, query string, size, col int, a
 	return d.ExecQuery(c, query, args...)
 }
 
-func (d *Database) Delete(c context.Context, query string, args interface{}) error {
+func (d *Database) UpdateMany(c context.Context, query string, entities []interface{}) (err error) {
 	d.viewQuery(query)
 	ctx, cancel := utils.CreateCtxTimeout(c, d.TimeoutSec)
 	defer cancel()
 
 	tx, err := d.BeginTrans(ctx)
 	if err != nil {
-		return err
+		return
 	}
+	defer func() {
+		if err != nil {
+			tx.Rollback()
+			return
+		}
+		err = tx.Commit()
+	}()
+
+	for _, e := range entities {
+		_, err = tx.NamedExecContext(ctx, query, e)
+		if err != nil {
+			return
+		}
+	}
+	return
+}
+
+func (d *Database) Delete(c context.Context, query string, args interface{}) (err error) {
+	d.viewQuery(query)
+	ctx, cancel := utils.CreateCtxTimeout(c, d.TimeoutSec)
+	defer cancel()
+
+	tx, err := d.BeginTrans(ctx)
+	if err != nil {
+		return
+	}
+	defer func() {
+		if err != nil {
+			tx.Rollback()
+			return
+		}
+		err = tx.Commit()
+	}()
 
 	_, err = tx.NamedExecContext(ctx, query, args)
 	if err != nil {
-		tx.Rollback()
-		return err
+		return
 	}
-
-	tx.Commit()
-	return err
+	return
 }
