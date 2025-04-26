@@ -114,7 +114,7 @@ func (d *Database) Close() {
 	d.DB.Close()
 }
 
-func (d *Database) viewQuery(query string) {
+func (d *Database) ViewQuery(query string) {
 	if d.showQuery {
 		log.Printf("Query: %s\n", query)
 	}
@@ -142,7 +142,7 @@ func (d *Database) RebindQuery(query string, args ...interface{}) (string, []int
 	}
 	query = d.DB.Rebind(query)
 
-	d.viewQuery(query)
+	d.ViewQuery(query)
 	return query, args, err
 }
 
@@ -221,7 +221,7 @@ func (d *Database) GetAny(c context.Context, dest interface{}, query string, arg
 }
 
 func (d *Database) Execute(ctx context.Context, query string, tx *sqlx.Tx, args ...interface{}) (err error) {
-	d.viewQuery(query)
+	d.ViewQuery(query)
 	if tx == nil {
 		_, err = d.DB.ExecContext(ctx, query, args...)
 	} else {
@@ -243,7 +243,7 @@ func (d *Database) ExecuteSafe(ctx context.Context, query string, args ...interf
 }
 
 func (d *Database) Save(ctx context.Context, tx *sqlx.Tx, query string, args interface{}) (err error) {
-	d.viewQuery(query)
+	d.ViewQuery(query)
 	if tx == nil {
 		_, err = d.DB.NamedExecContext(ctx, query, args)
 	} else {
@@ -270,7 +270,7 @@ func (d *Database) SaveSafe(ctx context.Context, query string, args interface{})
 }
 
 func (d *Database) SaveGettingId(ctx context.Context, query string, tx *sqlx.Tx, args ...interface{}) (id int, err error) {
-	d.viewQuery(query)
+	d.ViewQuery(query)
 	if tx == nil {
 		err = d.DB.QueryRowContext(ctx, query, args...).Scan(&id)
 	} else {
@@ -314,7 +314,7 @@ func (d *Database) Delete(ctx context.Context, query string, args interface{}) (
 
 func (d *Database) UpdateMany(ctx context.Context, query string, entities []interface{}) (err error) {
 	return d.RunTx(ctx, sql.LevelDefault, func(ctx context.Context, tx *sqlx.Tx) error {
-		d.viewQuery(query)
+		d.ViewQuery(query)
 		for _, e := range entities {
 			_, err = tx.NamedExecContext(ctx, query, e)
 			if err != nil {
@@ -327,7 +327,7 @@ func (d *Database) UpdateMany(ctx context.Context, query string, entities []inte
 
 func (d *Database) UpdateManySafe(ctx context.Context, query string, entities []interface{}) (err error) {
 	return d.RunTx(ctx, sql.LevelSerializable, func(ctx context.Context, tx *sqlx.Tx) error {
-		d.viewQuery(query)
+		d.ViewQuery(query)
 		for _, e := range entities {
 			_, err = tx.NamedExecContext(ctx, query, e)
 			if err != nil {
