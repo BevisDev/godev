@@ -3,6 +3,7 @@ module github.com/BevisDev/godev
 go 1.23.4
 
 require (
+	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/Nerzal/gocloak/v13 v13.9.0
 	github.com/google/uuid v1.6.0
 	github.com/jmoiron/sqlx v1.4.0
