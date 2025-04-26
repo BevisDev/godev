@@ -143,18 +143,19 @@ func (d *Database) mustBePtr(dest interface{}) (err error) {
 	return
 }
 
-func (d *Database) RebindQuery(query string, args ...interface{}) (string, error) {
+func (d *Database) RebindQuery(query string, args ...interface{}) (string, []interface{}, error) {
 	var err error
-	if strings.Contains(query, "IN") || strings.Contains(query, "in") {
+
+	if strings.Contains(strings.ToUpper(query), "IN") {
 		query, args, err = sqlx.In(query, args...)
 		if err != nil {
-			return query, err
+			return query, args, err
 		}
-		query = d.DB.Rebind(query)
 	}
+	query = d.DB.Rebind(query)
 
 	d.viewQuery(query)
-	return query, nil
+	return query, args, err
 }
 
 func (d *Database) formatRow(idx int) string {
@@ -199,37 +200,42 @@ func (d *Database) RunTx(c context.Context, level sql.IsolationLevel, fn func(ct
 	return
 }
 
-// Get is template transaction with callback func
-func (d *Database) Get(c context.Context, dest interface{}, query string, fn func(ctx context.Context) error, args ...interface{}) (err error) {
-	err = d.mustBePtr(dest)
-	if err != nil {
-		return
+func (d *Database) GetList(c context.Context, dest interface{}, query string, args ...interface{}) error {
+	if err := d.mustBePtr(dest); err != nil {
+		return err
 	}
 
-	query, err = d.RebindQuery(query, args...)
+	query, newArgs, err := d.RebindQuery(query, args...)
+	if err != nil {
+		return err
+	}
+
 	ctx, cancel := utils.CreateCtxTimeout(c, d.TimeoutSec)
 	defer cancel()
 
-	err = fn(ctx)
-	return
+	if validate.IsNilOrEmpty(newArgs) {
+		return d.DB.SelectContext(ctx, dest, query)
+	}
+	return d.DB.SelectContext(ctx, dest, query, newArgs...)
 }
 
-func (d *Database) GetList(c context.Context, dest interface{}, query string, args ...interface{}) (err error) {
-	return d.Get(c, dest, query, func(ctx context.Context) (err error) {
-		if validate.IsNilOrEmpty(args) {
-			return d.DB.SelectContext(ctx, dest, query)
-		}
-		return d.DB.SelectContext(ctx, dest, query, args...)
-	})
-}
+func (d *Database) GetAny(c context.Context, dest interface{}, query string, args ...interface{}) error {
+	if err := d.mustBePtr(dest); err != nil {
+		return err
+	}
 
-func (d *Database) GetAny(c context.Context, dest interface{}, query string, args ...interface{}) (err error) {
-	return d.Get(c, dest, query, func(ctx context.Context) (err error) {
-		if validate.IsNilOrEmpty(args) {
-			return d.DB.GetContext(ctx, dest, query)
-		}
-		return d.DB.GetContext(ctx, dest, query, args...)
-	})
+	query, newArgs, err := d.RebindQuery(query, args...)
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := utils.CreateCtxTimeout(c, d.TimeoutSec)
+	defer cancel()
+
+	if validate.IsNilOrEmpty(newArgs) {
+		return d.DB.GetContext(ctx, dest, query)
+	}
+	return d.DB.GetContext(ctx, dest, query, newArgs...)
 }
 
 func (d *Database) Execute(ctx context.Context, query string, args ...interface{}) (err error) {
