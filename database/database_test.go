@@ -33,7 +33,7 @@ func TestDatabase_Execute(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
 
-	err := db.Execute(ctx, "UPDATE users SET name = ? WHERE id = ?", "Alice", 1)
+	err := db.ExecuteTx(ctx, "UPDATE users SET name = ? WHERE id = ?", "Alice", 1)
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }

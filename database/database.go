@@ -60,26 +60,11 @@ func NewDB(cf *ConfigDB) (*Database, error) {
 
 func newConnection(cf *ConfigDB) (*sqlx.DB, error) {
 	var (
-		connStr string
-		db      *sqlx.DB
-		err     error
+		db  *sqlx.DB
+		err error
 	)
-
-	// build connectionString
-	switch cf.Kind {
-	case types.SqlServer:
-		connStr = fmt.Sprintf("sqlserver://%s:%s@%s:%d?database=%s",
-			cf.Username, cf.Password, cf.Host, cf.Port, cf.Schema)
-	case types.Postgres:
-		connStr = fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
-			cf.Username, cf.Password, cf.Host, cf.Port, cf.Schema)
-	case types.Oracle:
-		connStr = fmt.Sprintf("%s/%s@%s:%d/%s",
-			cf.Username, cf.Password, cf.Host, cf.Port, cf.Schema)
-	case types.MySQL:
-		connStr = fmt.Sprintf("%s:%s@tcp(%s:%d)/%s",
-			cf.Username, cf.Password, cf.Host, cf.Port, cf.Schema)
-	default:
+	var connStr = cf.Kind.GetConnectionString()
+	if connStr == "" {
 		return nil, errors.New("unsupported database kind " + cf.Kind.String())
 	}
 
@@ -115,17 +100,6 @@ func (d *Database) Close() {
 	d.DB.Close()
 }
 
-func (d *Database) GetParam() string {
-	switch d.kindDB {
-	case types.SqlServer:
-		return "@p"
-	case types.Postgres:
-		return "$"
-	default: // mysql
-		return "?"
-	}
-}
-
 func (d *Database) viewQuery(query string) {
 	if d.showQuery {
 		log.Printf("Query: %s\n", query)
@@ -159,17 +133,11 @@ func (d *Database) RebindQuery(query string, args ...interface{}) (string, []int
 }
 
 func (d *Database) formatRow(idx int) string {
-	var p = d.GetParam()
+	var p = d.kindDB.GetPlaceHolder()
 	if types.MySQL == d.kindDB {
 		return p
 	}
 	return fmt.Sprintf("%s%d", p, idx)
-}
-
-func (d *Database) BeginTrans(ctx context.Context, level sql.IsolationLevel) (*sqlx.Tx, error) {
-	return d.DB.BeginTxx(ctx, &sql.TxOptions{
-		Isolation: level,
-	})
 }
 
 // RunTx is template transaction with callback func
@@ -238,77 +206,72 @@ func (d *Database) GetAny(c context.Context, dest interface{}, query string, arg
 	return d.DB.GetContext(ctx, dest, query, newArgs...)
 }
 
-func (d *Database) Execute(ctx context.Context, query string, args ...interface{}) (err error) {
-	return d.RunTx(ctx, sql.LevelDefault, func(ctx context.Context, tx *sqlx.Tx) error {
-		d.viewQuery(query)
+func (d *Database) Execute(ctx context.Context, query string, tx *sqlx.Tx, args ...interface{}) (err error) {
+	d.viewQuery(query)
+	if tx == nil {
+		_, err = d.DB.ExecContext(ctx, query, args...)
+	} else {
 		_, err = tx.ExecContext(ctx, query, args...)
-		if err != nil {
-			return err
-		}
-		return nil
+	}
+	return
+}
+
+func (d *Database) ExecuteTx(ctx context.Context, query string, args ...interface{}) (err error) {
+	return d.RunTx(ctx, sql.LevelDefault, func(ctx context.Context, tx *sqlx.Tx) error {
+		return d.Execute(ctx, query, tx, args...)
 	})
 }
 
 func (d *Database) ExecuteSafe(ctx context.Context, query string, args ...interface{}) (err error) {
 	return d.RunTx(ctx, sql.LevelSerializable, func(ctx context.Context, tx *sqlx.Tx) error {
-		d.viewQuery(query)
-		_, err = tx.ExecContext(ctx, query, args...)
-		if err != nil {
-			return err
-		}
-		return nil
+		return d.Execute(ctx, query, tx, args...)
 	})
 }
 
-func (d *Database) Delete(ctx context.Context, query string, args interface{}) (err error) {
-	return d.RunTx(ctx, sql.LevelDefault, func(ctx context.Context, tx *sqlx.Tx) error {
-		d.viewQuery(query)
+func (d *Database) Save(ctx context.Context, tx *sqlx.Tx, query string, args interface{}) (err error) {
+	d.viewQuery(query)
+	if tx == nil {
+		_, err = d.DB.NamedExecContext(ctx, query, args)
+	} else {
 		_, err = tx.NamedExecContext(ctx, query, args)
-		if err != nil {
-			return err
-		}
-		return nil
-	})
+	}
+	return
 }
 
-// Save using for Insert Or Update query
+// SaveTx using for Insert Or Update query with Transaction
 // Any named placeholder parameters are replaced with fields from arg.
 // Example query: INSERT INTO person (first_name,last_name,email) VALUES (:first,:last,:email)
-// args: map[string]interface{}{ "first": "Bin","last": "Smuth", "email": "bensmith@allblacks.nz"}
+// args: map[string]interface{}{ "first": "Bin","last": "Smith", "email": "bensmith@allblacks.nz"}
 // or struct with the `db` tag
-func (d *Database) Save(ctx context.Context, query string, args interface{}) (err error) {
+func (d *Database) SaveTx(ctx context.Context, query string, args interface{}) (err error) {
 	return d.RunTx(ctx, sql.LevelDefault, func(ctx context.Context, tx *sqlx.Tx) error {
-		d.viewQuery(query)
-		_, err = tx.NamedExecContext(ctx, query, args)
-		if err != nil {
-			return err
-		}
-		return nil
+		return d.Save(ctx, tx, query, args)
 	})
 }
 
 func (d *Database) SaveSafe(ctx context.Context, query string, args interface{}) (err error) {
 	return d.RunTx(ctx, sql.LevelSerializable, func(ctx context.Context, tx *sqlx.Tx) error {
-		d.viewQuery(query)
-		_, err = tx.NamedExecContext(ctx, query, args)
-		if err != nil {
-			return err
-		}
-		return nil
+		return d.Save(ctx, tx, query, args)
 	})
+}
+
+func (d *Database) SaveGettingId(ctx context.Context, query string, tx *sqlx.Tx, args ...interface{}) (id int, err error) {
+	d.viewQuery(query)
+	if tx == nil {
+		err = d.DB.QueryRowContext(ctx, query, args...).Scan(&id)
+	} else {
+		err = tx.QueryRowContext(ctx, query, args...).Scan(&id)
+	}
+	return
 }
 
 // InsertedId inserts record and returns id
 // LastInsertId function should not be used with this SQL Server driver
 // Please use OUTPUT clause or SCOPE_IDENTITY() to the end of your query
 func (d *Database) InsertedId(ctx context.Context, query string, args ...interface{}) (id int, err error) {
-	err = d.RunTx(ctx, sql.LevelSerializable, func(ctx context.Context, tx *sqlx.Tx) error {
-		d.viewQuery(query)
-		err = tx.QueryRowContext(ctx, query, args...).Scan(&id)
-		if err != nil {
-			return err
-		}
-		return nil
+	err = d.RunTx(ctx, sql.LevelDefault, func(ctx context.Context, tx *sqlx.Tx) error {
+		id, err = d.SaveGettingId(ctx, query, tx, args...)
+		return err
 	})
 	return
 }
@@ -326,7 +289,13 @@ func (d *Database) InsertMany(c context.Context, query string, size, col int, ar
 		placeholders = append(placeholders, "("+strings.Join(row, ", ")+")")
 	}
 	query += strings.Join(placeholders, ", ")
-	return d.Execute(c, query, args...)
+	return d.ExecuteTx(c, query, args...)
+}
+
+func (d *Database) Delete(ctx context.Context, query string, args interface{}) (err error) {
+	return d.RunTx(ctx, sql.LevelDefault, func(ctx context.Context, tx *sqlx.Tx) error {
+		return d.Save(ctx, tx, query, args)
+	})
 }
 
 func (d *Database) UpdateMany(ctx context.Context, query string, entities []interface{}) (err error) {
