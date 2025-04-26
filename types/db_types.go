@@ -51,21 +51,6 @@ func (k KindDB) GetPlaceHolder() string {
 	}
 }
 
-func (k KindDB) GetConnectionString() string {
-	switch k {
-	case SqlServer:
-		return "sqlserver://%s:%s@%s:%d?database=%s"
-	case Postgres:
-		return "postgres://%s:%s@%s:%d/%s?sslmode=disable"
-	case Oracle:
-		return "%s/%s@%s:%d/%s"
-	case MySQL:
-		return "%s:%s@tcp(%s:%d)/%s"
-	default:
-		return ""
-	}
-}
-
 func (k KindDB) GetDialect() string {
 	switch k {
 	case SqlServer:

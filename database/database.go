@@ -60,11 +60,25 @@ func NewDB(cf *ConfigDB) (*Database, error) {
 
 func newConnection(cf *ConfigDB) (*sqlx.DB, error) {
 	var (
-		db  *sqlx.DB
-		err error
+		db      *sqlx.DB
+		err     error
+		connStr string
 	)
-	var connStr = cf.Kind.GetConnectionString()
-	if connStr == "" {
+	// build connectionString
+	switch cf.Kind {
+	case types.SqlServer:
+		connStr = fmt.Sprintf("sqlserver://%s:%s@%s:%d?database=%s",
+			cf.Username, cf.Password, cf.Host, cf.Port, cf.Schema)
+	case types.Postgres:
+		connStr = fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
+			cf.Username, cf.Password, cf.Host, cf.Port, cf.Schema)
+	case types.Oracle:
+		connStr = fmt.Sprintf("%s/%s@%s:%d/%s",
+			cf.Username, cf.Password, cf.Host, cf.Port, cf.Schema)
+	case types.MySQL:
+		connStr = fmt.Sprintf("%s:%s@tcp(%s:%d)/%s",
+			cf.Username, cf.Password, cf.Host, cf.Port, cf.Schema)
+	default:
 		return nil, errors.New("unsupported database kind " + cf.Kind.String())
 	}
 
