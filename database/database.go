@@ -124,7 +124,7 @@ func (d *Database) IsNoResult(err error) bool {
 	return errors.Is(err, sql.ErrNoRows)
 }
 
-func (d *Database) mustBePtr(dest interface{}) (err error) {
+func (d *Database) MustBePtr(dest interface{}) (err error) {
 	if !validate.IsPtr(dest) {
 		return errors.New("must be a pointer")
 	}
@@ -146,7 +146,7 @@ func (d *Database) RebindQuery(query string, args ...interface{}) (string, []int
 	return query, args, err
 }
 
-func (d *Database) formatRow(idx int) string {
+func (d *Database) FormatRow(idx int) string {
 	var p = d.kindDB.GetPlaceHolder()
 	if types.MySQL == d.kindDB {
 		return p
@@ -183,7 +183,7 @@ func (d *Database) RunTx(c context.Context, level sql.IsolationLevel, fn func(ct
 }
 
 func (d *Database) GetList(c context.Context, dest interface{}, query string, args ...interface{}) error {
-	if err := d.mustBePtr(dest); err != nil {
+	if err := d.MustBePtr(dest); err != nil {
 		return err
 	}
 
@@ -202,7 +202,7 @@ func (d *Database) GetList(c context.Context, dest interface{}, query string, ar
 }
 
 func (d *Database) GetAny(c context.Context, dest interface{}, query string, args ...interface{}) error {
-	if err := d.mustBePtr(dest); err != nil {
+	if err := d.MustBePtr(dest); err != nil {
 		return err
 	}
 
@@ -298,7 +298,7 @@ func (d *Database) InsertMany(c context.Context, query string, size, col int, ar
 	for i := 0; i < size; i++ {
 		var row []string
 		for j := 1; j <= col; j++ {
-			row = append(row, d.formatRow(i*col+j))
+			row = append(row, d.FormatRow(i*col+j))
 		}
 		placeholders = append(placeholders, "("+strings.Join(row, ", ")+")")
 	}
