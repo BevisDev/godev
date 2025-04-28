@@ -17,7 +17,7 @@ func TestNewConfig_InvalidDest(t *testing.T) {
 	err := NewConfig(&Config{
 		Path:       "./testdata",
 		ConfigType: "yaml",
-		Dest:       TestConfigStruct{}, // not pointer
+		Dest:       TestConfigStruct{},
 	})
 	assert.Error(t, err)
 	assert.Equal(t, "must be a pointer", err.Error())
@@ -30,7 +30,6 @@ func TestNewConfig_LoadYAML_Success(t *testing.T) {
 		Path:       "./testdata",
 		ConfigType: "yaml",
 		Dest:       cfg,
-		AutoEnv:    false,
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, "demo-app", cfg.AppName)
@@ -38,16 +37,21 @@ func TestNewConfig_LoadYAML_Success(t *testing.T) {
 }
 
 func TestNewConfig_AutoEnvOverride(t *testing.T) {
-	os.Setenv("GO_PROFILE", "test")
+	os.Setenv("GO_PROFILE", "test_env")
 	os.Setenv("APP_NAME", "env-app")
 	os.Setenv("PORT", "9090")
+	defer func() {
+		os.Unsetenv("GO_PROFILE")
+		os.Unsetenv("APP_NAME")
+		os.Unsetenv("PORT")
+	}()
 
 	cfg := &TestConfigStruct{}
 	err := NewConfig(&Config{
 		Path:       "./testdata",
 		ConfigType: "yaml",
 		Dest:       cfg,
-		AutoEnv:    true,
+		BindEnv:    true,
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, "env-app", cfg.AppName)
@@ -57,13 +61,17 @@ func TestNewConfig_AutoEnvOverride(t *testing.T) {
 func TestNewConfig_AssignProfile_WithEnvOverride(t *testing.T) {
 	os.Setenv("APP_NAME", "env-app")
 	os.Setenv("PORT", "9090")
+	defer func() {
+		os.Unsetenv("APP_NAME")
+		os.Unsetenv("PORT")
+	}()
 
 	cfg := &TestConfigStruct{}
 	err := NewConfig(&Config{
 		Path:       "./testdata",
 		ConfigType: "yaml",
 		Dest:       cfg,
-		AutoEnv:    true,
+		BindEnv:    true,
 		Profile:    "test_env",
 	})
 	assert.NoError(t, err)

@@ -51,3 +51,7 @@ func CalcAgeAt(dob, t time.Time) int {
 	}
 	return age
 }
+
+func GetCurrentTimestamp() int64 {
+	return time.Now().UnixMilli()
+}

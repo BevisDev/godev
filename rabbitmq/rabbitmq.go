@@ -2,6 +2,7 @@ package rabbitmq
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/BevisDev/godev/consts"
 	"github.com/BevisDev/godev/utils/jsonx"
@@ -25,6 +26,10 @@ type RabbitMQ struct {
 }
 
 func NewRabbitMQ(config *RabbitMQConfig) (*RabbitMQ, error) {
+	if config == nil {
+		return nil, errors.New("config is nil")
+	}
+	
 	conn, err := amqp.Dial(fmt.Sprintf("amqp://%s:%s@%s:%d/",
 		config.Username, config.Password, config.Host, config.Port))
 	if err != nil {
@@ -61,7 +66,7 @@ func (r *RabbitMQ) DeclareQueue(queueName string) (amqp.Queue, error) {
 	)
 }
 
-func (r *RabbitMQ) PutMessageToQueue(c context.Context, queueName string, message interface{}) error {
+func (r *RabbitMQ) Publish(c context.Context, queueName string, message interface{}) error {
 	json := jsonx.ToJSONBytes(message)
 	if len(json) > 50000 {
 		return fmt.Errorf("message is too large: %d", len(json))
@@ -92,7 +97,7 @@ func (r *RabbitMQ) PutMessageToQueue(c context.Context, queueName string, messag
 	return nil
 }
 
-func (r *RabbitMQ) ConsumeMessage(queueName string, handler func(amqp.Delivery)) error {
+func (r *RabbitMQ) Subscribe(queueName string, handler func(amqp.Delivery)) error {
 	q, err := r.DeclareQueue(queueName)
 	if err != nil {
 		return err

@@ -111,3 +111,8 @@ func TestCalcAgeAt(t *testing.T) {
 		})
 	}
 }
+
+func TestGetCurrentTimestamp(t *testing.T) {
+	ts := GetCurrentTimestamp()
+	assert.Greater(t, ts, int64(0))
+}

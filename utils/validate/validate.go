@@ -38,18 +38,27 @@ func IsErrorOrEmpty(err error, i interface{}) bool {
 }
 
 func IsPtr(i interface{}) bool {
-	return reflect.ValueOf(i).Kind() == reflect.Ptr
+	if i == nil {
+		return false
+	}
+	v := reflect.ValueOf(i)
+	return v.Kind() == reflect.Ptr && !v.IsNil()
 }
 
 func IsStruct(i interface{}) bool {
 	if i == nil {
 		return false
 	}
-	t := reflect.TypeOf(i)
-	if t.Kind() == reflect.Ptr {
-		t = t.Elem()
+	v := reflect.ValueOf(i)
+
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return false
+		}
+		v = v.Elem()
 	}
-	return t.Kind() == reflect.Struct
+
+	return v.Kind() == reflect.Struct
 }
 
 func IsTimedOut(err error) bool {

@@ -73,6 +73,8 @@ func TestIsErrorOrEmpty(t *testing.T) {
 
 func TestIsPtr(t *testing.T) {
 	a := 5
+	var pNil *int
+
 	tests := []struct {
 		name     string
 		input    interface{}
@@ -81,6 +83,7 @@ func TestIsPtr(t *testing.T) {
 		{"pointer int", &a, true},
 		{"non-pointer", a, false},
 		{"nil", nil, false},
+		{"nil pointer", pNil, false},
 	}
 
 	for _, tt := range tests {
@@ -97,19 +100,24 @@ func TestIsStruct(t *testing.T) {
 	type MyStruct struct{ Name string }
 	var s *MyStruct
 	var i interface{}
+	var ip *int
 
 	tests := []struct {
 		name     string
 		input    interface{}
 		expected bool
 	}{
+		{"struct", MyStruct{"hello"}, true},
+		{"pointer to struct", &MyStruct{"hi"}, true},
 		{"nil", nil, false},
 		{"int", 123, false},
 		{"string", "abc", false},
-		{"struct", MyStruct{"hello"}, true},
-		{"pointer to struct", &MyStruct{"hi"}, true},
 		{"untyped nil interface", i, false},
-		{"typed nil pointer", s, true}, // still a typed nil pointer to struct
+		{"typed nil pointer", s, false},
+		{"pointer to int", ip, false},
+		{"slice", []int{1, 2, 3}, false},
+		{"map", map[string]int{"a": 1}, false},
+		{"array", [2]int{1, 2}, false},
 	}
 
 	for _, tt := range tests {

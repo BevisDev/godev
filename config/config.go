@@ -11,52 +11,52 @@ type Config struct {
 	Path       string
 	ConfigType string
 	Dest       interface{}
-	AutoEnv    bool
+	BindEnv    bool
 	Profile    string
 }
 
+func (c *Config) GetProfile() string {
+	if c.Profile != "" {
+		return c.Profile
+	}
+	if p := os.Getenv("GO_PROFILE"); p != "" {
+		return p
+	}
+	return "dev"
+}
+
 func NewConfig(config *Config) error {
-	var (
-		err     error
-		profile = config.Profile
-	)
+	if config == nil {
+		return errors.New("config is nil")
+	}
 	if !validate.IsPtr(config.Dest) {
 		return errors.New("must be a pointer")
 	}
-	if profile == "" {
-		p := os.Getenv("GO_PROFILE")
-		if p == "" {
-			profile = "dev"
-		} else {
-			profile = p
-		}
-	}
 
+	profile := config.GetProfile()
 	v := viper.New()
 	v.AddConfigPath(config.Path)
 	v.SetConfigName(profile)
 	v.SetConfigType(config.ConfigType)
-	if config.AutoEnv {
-		v.AutomaticEnv()
-	}
 
 	// read config
-	if err = v.ReadInConfig(); err != nil {
+	if err := v.ReadInConfig(); err != nil {
 		return err
 	}
 
 	// read environment
-	if config.AutoEnv && profile != "dev" {
+	if config.BindEnv {
 		settings := v.AllSettings()
+
 		replaceEnvVars(settings)
-		err = v.MergeConfigMap(settings)
+
+		err := v.MergeConfigMap(settings)
 		if err != nil {
 			return err
 		}
 	}
 
-	err = v.Unmarshal(&config.Dest)
-	return err
+	return v.Unmarshal(&config.Dest)
 }
 
 func replaceEnvVars(data interface{}) {

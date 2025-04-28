@@ -1,2 +1,2 @@
-app_name: app-env
-port: 8888
+app_name: $APP_NAME
+port: $PORT

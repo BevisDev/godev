@@ -41,6 +41,9 @@ type Database struct {
 }
 
 func NewDB(cf *ConfigDB) (*Database, error) {
+	if cf == nil {
+		return nil, errors.New("config is nil")
+	}
 	if cf.TimeoutSec <= 0 {
 		cf.TimeoutSec = defaultTimeoutSec
 	}
