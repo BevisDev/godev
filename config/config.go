@@ -45,7 +45,7 @@ func NewConfig(config *Config) error {
 	}
 
 	// read environment
-	if config.BindEnv {
+	if config.BindEnv && profile != "dev" {
 		settings := v.AllSettings()
 
 		replaceEnvVars(settings)
