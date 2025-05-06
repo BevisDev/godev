@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/BevisDev/godev/utils/datetime"
-	"strings"
 	"time"
 )
 
@@ -12,15 +11,20 @@ type Date struct {
 	time.Time
 }
 
+var layoutDate = datetime.DateOnly
+
 func (d *Date) UnmarshalJSON(b []byte) error {
-	str := strings.TrimSpace(string(b))
-	if str == "null" {
+	if string(b) == "null" {
 		*d = Date{}
 		return nil
 	}
 
-	s := strings.Trim(str, `"`)
-	t, err := datetime.ToTime(s, datetime.DateOnly)
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return fmt.Errorf("invalid JSON string: %w", err)
+	}
+
+	t, err := datetime.ToTime(s, layoutDate)
 	if err != nil {
 		return err
 	}
@@ -30,7 +34,7 @@ func (d *Date) UnmarshalJSON(b []byte) error {
 }
 
 func (d *Date) MarshalJSON() ([]byte, error) {
-	return json.Marshal(d.Format(datetime.DateOnly))
+	return json.Marshal(d.Format(layoutDate))
 }
 
 func (d *Date) ToTime() *time.Time {
@@ -45,7 +49,7 @@ func (d *Date) ToString() string {
 	if d == nil || d.Time.IsZero() {
 		return ""
 	}
-	return datetime.ToString(d.Time, datetime.DateOnly)
+	return datetime.ToString(d.Time, layoutDate)
 }
 
 func (d *Date) Scan(value interface{}) error {
@@ -53,13 +57,13 @@ func (d *Date) Scan(value interface{}) error {
 	case time.Time:
 		d.Time = v
 	case string:
-		t, err := datetime.ToTime(v, datetime.DateOnly)
+		t, err := datetime.ToTime(v, layoutDate)
 		if err != nil {
 			return fmt.Errorf("scan string to Date failed: %w", err)
 		}
 		d.Time = *t
 	case []byte:
-		t, err := datetime.ToTime(string(v), datetime.DateOnly)
+		t, err := datetime.ToTime(string(v), layoutDate)
 		if err != nil {
 			return fmt.Errorf("scan []byte to Date failed: %w", err)
 		}

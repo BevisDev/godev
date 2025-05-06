@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/BevisDev/godev/utils/datetime"
-	"strings"
 	"time"
 )
 
@@ -12,15 +11,20 @@ type DateSQL struct {
 	time.Time
 }
 
+var layoutDateSQL = datetime.DateTimeSQL
+
 func (d *DateSQL) UnmarshalJSON(b []byte) error {
-	str := strings.TrimSpace(string(b))
-	if str == "null" {
+	if string(b) == "null" {
 		*d = DateSQL{}
 		return nil
 	}
 
-	s := strings.Trim(str, `"`)
-	t, err := datetime.ToTime(s, datetime.DateTimeSQL)
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return fmt.Errorf("invalid JSON string: %w", err)
+	}
+
+	t, err := datetime.ToTime(s, layoutDateSQL)
 	if err != nil {
 		return err
 	}
@@ -30,7 +34,7 @@ func (d *DateSQL) UnmarshalJSON(b []byte) error {
 }
 
 func (d *DateSQL) MarshalJSON() ([]byte, error) {
-	return json.Marshal(d.Format(datetime.DateTimeSQL))
+	return json.Marshal(d.Format(layoutDateSQL))
 }
 
 func (d *DateSQL) ToTime() *time.Time {
@@ -45,7 +49,7 @@ func (d *DateSQL) ToString() string {
 	if d == nil || d.Time.IsZero() {
 		return ""
 	}
-	return datetime.ToString(d.Time, datetime.DateTimeSQL)
+	return datetime.ToString(d.Time, layoutDateSQL)
 }
 
 func (d *DateSQL) Scan(value interface{}) error {
@@ -53,13 +57,13 @@ func (d *DateSQL) Scan(value interface{}) error {
 	case time.Time:
 		d.Time = v
 	case string:
-		t, err := datetime.ToTime(v, datetime.DateTimeSQL)
+		t, err := datetime.ToTime(v, layoutDateSQL)
 		if err != nil {
 			return fmt.Errorf("scan string to DateSQL failed: %w", err)
 		}
 		d.Time = *t
 	case []byte:
-		t, err := datetime.ToTime(string(v), datetime.DateTimeSQL)
+		t, err := datetime.ToTime(string(v), layoutDateSQL)
 		if err != nil {
 			return fmt.Errorf("scan []byte to DateSQL failed: %w", err)
 		}

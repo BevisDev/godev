@@ -21,6 +21,7 @@ const (
 	DateTimeOffset Layout = "2006-01-02T15:04:05Z07:00"
 	DatetimeUTC    Layout = "2006-01-02T15:04:05Z"
 	DateTimeSQL    Layout = "2006-01-02 15:04:05.000"
+	DateTimeNoTZ   Layout = "2006-01-02T15:04:05"
 
 	// format time
 	TimeOnly    Layout = "15:04:05"
@@ -28,12 +29,14 @@ const (
 	TimeNoSec   Layout = "1504"
 
 	// AddTime layout
-	Second Layout = "Second"
-	Minute Layout = "Minute"
-	Hour   Layout = "Hour"
-	Day    Layout = "Day"
-	Month  Layout = "Month"
-	Year   Layout = "Year"
+	Nanosecond  Layout = "Nanosecond"
+	Millisecond Layout = "Millisecond"
+	Second      Layout = "Second"
+	Minute      Layout = "Minute"
+	Hour        Layout = "Hour"
+	Day         Layout = "Day"
+	Month       Layout = "Month"
+	Year        Layout = "Year"
 )
 
 func ToString(time time.Time, format Layout) string {
@@ -58,6 +61,10 @@ func EndDay(date time.Time) time.Time {
 
 func AddTime(date time.Time, v int, kind Layout) time.Time {
 	switch kind {
+	case Nanosecond:
+		return date.Add(time.Duration(v) * time.Nanosecond)
+	case Millisecond:
+		return date.Add(time.Duration(v) * time.Millisecond)
 	case Second:
 		return date.Add(time.Duration(v) * time.Second)
 	case Minute:

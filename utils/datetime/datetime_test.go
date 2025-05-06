@@ -66,6 +66,8 @@ func TestAddTime(t *testing.T) {
 		value    int
 		expected time.Time
 	}{
+		{Nanosecond, 10, base.Add(10 * time.Nanosecond)},
+		{Millisecond, 10, base.Add(10 * time.Millisecond)},
 		{Second, 10, base.Add(10 * time.Second)},
 		{Minute, 5, base.Add(5 * time.Minute)},
 		{Hour, 2, base.Add(2 * time.Hour)},

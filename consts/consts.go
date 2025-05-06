@@ -23,6 +23,7 @@ const (
 	ClientCredentials = "client_credentials"
 	AuthorizationCode = "authorization_code"
 	Password          = "password"
+	AccessToken       = "access_token"
 	RefreshToken      = "refresh_token"
 )
 
