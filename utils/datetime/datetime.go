@@ -81,3 +81,29 @@ func AddTime(date time.Time, v int, kind Layout) time.Time {
 		return date
 	}
 }
+
+func IsSameDate(t1, t2 time.Time) bool {
+	return t1.Year() == t2.Year() &&
+		t1.Month() == t2.Month() &&
+		t1.Day() == t2.Day()
+}
+
+func IsWithin(t time.Time, day int) bool {
+	return time.Since(t) <= time.Duration(day)*24*time.Hour
+}
+
+func DaysBetween(t1, t2 time.Time) int {
+	diff := t1.Sub(t2)
+	if diff < 0 {
+		diff = -diff
+	}
+	return int(diff.Hours()) / 24
+}
+
+func StartOfMonth(t time.Time) time.Time {
+	return time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, t.Location())
+}
+
+func EndOfMonth(t time.Time) time.Time {
+	return StartOfMonth(t).AddDate(0, 1, -1)
+}

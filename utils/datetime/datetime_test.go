@@ -86,3 +86,62 @@ func TestAddTime(t *testing.T) {
 		})
 	}
 }
+
+func TestIsSameDate(t *testing.T) {
+	t1 := time.Date(2025, 5, 12, 10, 0, 0, 0, time.UTC)
+	t2 := time.Date(2025, 5, 12, 22, 59, 59, 0, time.UTC)
+	t3 := time.Date(2025, 5, 13, 0, 0, 0, 0, time.UTC)
+
+	if !IsSameDate(t1, t2) {
+		t.Errorf("Expected t1 and t2 to be same date")
+	}
+	if IsSameDate(t1, t3) {
+		t.Errorf("Expected t1 and t3 to be different date")
+	}
+}
+
+func TestIsWithin(t *testing.T) {
+	now := time.Now()
+	threeDaysAgo := now.AddDate(0, 0, -3)
+	tenDaysAgo := now.AddDate(0, 0, -10)
+
+	if !IsWithin(threeDaysAgo, 5) {
+		t.Errorf("Expected threeDaysAgo to be within 5 days")
+	}
+	if IsWithin(tenDaysAgo, 5) {
+		t.Errorf("Expected tenDaysAgo to be outside 5 days")
+	}
+}
+
+func TestDaysBetween(t *testing.T) {
+	t1 := time.Date(2025, 5, 10, 0, 0, 0, 0, time.UTC)
+	t2 := time.Date(2025, 5, 12, 0, 0, 0, 0, time.UTC)
+
+	if got := DaysBetween(t1, t2); got != 2 {
+		t.Errorf("Expected 2 days between, got %d", got)
+	}
+
+	if got := DaysBetween(t2, t1); got != 2 {
+		t.Errorf("Expected 2 days between (reversed), got %d", got)
+	}
+}
+
+func TestStartOfMonth(t *testing.T) {
+	t1 := time.Date(2025, 5, 12, 15, 30, 0, 0, time.UTC)
+	start := StartOfMonth(t1)
+	expected := time.Date(2025, 5, 1, 0, 0, 0, 0, time.UTC)
+
+	if !start.Equal(expected) {
+		t.Errorf("Expected start of month %v, got %v", expected, start)
+	}
+}
+
+func TestEndOfMonth(t *testing.T) {
+	t1 := time.Date(2025, 2, 15, 0, 0, 0, 0, time.UTC)
+	end := EndOfMonth(t1)
+	expected := time.Date(2025, 2, 28, 0, 0, 0, 0, time.UTC)
+
+	if !end.Equal(expected) {
+		t.Errorf("Expected end of month %v, got %v", expected, end)
+	}
+}
