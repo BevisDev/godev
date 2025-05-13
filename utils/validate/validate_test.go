@@ -35,6 +35,15 @@ func TestIsNilOrEmpty(t *testing.T) {
 		{"non-nil pointer", func() interface{} { i := 42; return &i }(), false},
 		{"int", 123, false},
 		{"struct", struct{ Name string }{"Hi"}, false},
+		{"nil *string", (*string)(nil), true},
+		{"empty *string", func() interface{} { s := ""; return &s }(), true},
+		{"non-empty *string", func() interface{} { s := "hello"; return &s }(), false},
+		{"nil *[]int", (*[]int)(nil), true},
+		{"empty *[]int", func() interface{} { var s []int; return &s }(), true},
+		{"non-empty *[]int", func() interface{} { var s = []int{1}; return &s }(), false},
+		{"nil *map", (*map[string]string)(nil), true},
+		{"empty *map", func() interface{} { m := map[string]string{}; return &m }(), true},
+		{"non-empty *map", func() interface{} { m := map[string]string{"x": "y"}; return &m }(), false},
 	}
 
 	for _, tc := range tests {
