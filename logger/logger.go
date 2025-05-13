@@ -96,8 +96,9 @@ func writeSync(cf *ConfigLogger) zapcore.WriteSyncer {
 		return zapcore.AddSync(os.Stdout)
 	}
 
+	var fileName = getFilename(cf.DirName, cf.Filename, cf.IsSplit)
 	lumberLogger := lumberjack.Logger{
-		Filename:   getFilename(cf.DirName, cf.Filename),
+		Filename:   fileName,
 		MaxSize:    cf.MaxSize,
 		MaxBackups: cf.MaxBackups,
 		MaxAge:     cf.MaxAge,
@@ -108,7 +109,7 @@ func writeSync(cf *ConfigLogger) zapcore.WriteSyncer {
 	if cf.IsSplit {
 		c := cron.New()
 		c.AddFunc("0 0 * * *", func() {
-			lumberLogger.Filename = getFilename(cf.DirName, cf.Filename)
+			lumberLogger.Filename = getFilename(cf.DirName, cf.Filename, cf.IsSplit)
 			lumberLogger.Rotate()
 		})
 		c.Start()
@@ -117,9 +118,12 @@ func writeSync(cf *ConfigLogger) zapcore.WriteSyncer {
 	return zapcore.AddSync(&lumberLogger)
 }
 
-func getFilename(dir, fileName string) string {
-	now := time.Now().Format(datetime.DateOnly)
-	return filepath.Join(dir, now, fileName)
+func getFilename(dir, fileName string, isSplit bool) string {
+	if isSplit {
+		now := datetime.ToString(time.Now(), datetime.DateOnly)
+		return filepath.Join(dir, now, fileName)
+	}
+	return filepath.Join(dir, fileName)
 }
 
 func (l *AppLogger) logApp(level zapcore.Level, state string, msg string, args ...interface{}) {
