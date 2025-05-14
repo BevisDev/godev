@@ -55,3 +55,79 @@ func CalcAgeAt(dob, t time.Time) int {
 func GetCurrentTimestamp() int64 {
 	return time.Now().UnixMilli()
 }
+
+func MaskLeft(s string, size int) string {
+	if size <= 0 || size > len(s) {
+		size = len(s)
+	}
+	mask := strings.Repeat("*", size)
+	return mask + s[size:]
+}
+
+func MaskRight(s string, size int) string {
+	if size <= 0 || size > len(s) {
+		size = len(s)
+	}
+	mask := strings.Repeat("*", size)
+	return s[:len(s)-size] + mask
+}
+
+func MaskCenter(s string, size int) string {
+	n := len(s)
+	if size <= 0 || size >= n {
+		return strings.Repeat("*", n)
+	}
+
+	left := (n - size) / 2
+	right := n - size - left
+
+	return s[:left] + strings.Repeat("*", size) + s[n-right:]
+}
+
+// MaskEmail masks a portion of the local and domain parts of an email address.
+//
+// The `sizeLocal` and `sizeDomain` parameters specify how many characters to mask
+// from the end of the local part and the domain part, respectively.
+//
+// If `sizeLocal` or `sizeDomain` is greater than the length of their respective parts,
+// the entire part will be masked. If either is zero or negative, masking is skipped.
+//
+// Returns the masked email address. If the input is not a valid email (no "@"), it returns the input unchanged.
+//
+// Examples:
+//
+//	MaskEmail("john.doe@example.com", 3, 4)   // "john.***@exam****"
+//	MaskEmail("abc@domain.com", 10, 10)       // "***@**********"
+//	MaskEmail("a@x.com", 1, 1)                // "*@x.co*"
+//	MaskEmail("invalid-email", 3, 3)          // "invalid-email"
+func MaskEmail(email string, sizeLocal, sizeDomain int) string {
+	parts := strings.Split(email, "@")
+	if len(parts) != 2 {
+		return email
+	}
+
+	var maskedLocal, maskedDomain string
+	local, domain := parts[0], parts[1]
+
+	// --- Mask local ---
+	if sizeLocal < 0 || sizeLocal > len(local) {
+		sizeLocal = len(local)
+	}
+	if sizeLocal == 0 {
+		maskedLocal = local
+	} else {
+		maskedLocal = local[:len(local)-sizeLocal] + strings.Repeat("*", sizeLocal)
+	}
+
+	// --- Mask domain ---
+	if sizeDomain < 0 || sizeDomain > len(domain) {
+		sizeDomain = len(domain)
+	}
+	if sizeDomain == 0 {
+		maskedDomain = domain
+	} else {
+		maskedDomain = domain[:len(domain)-sizeDomain] + strings.Repeat("*", sizeDomain)
+	}
+
+	return maskedLocal + "@" + maskedDomain
+}

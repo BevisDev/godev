@@ -15,19 +15,34 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
-type AppLogger struct {
-	Logger *zap.Logger
-}
-
+// ConfigLogger defines the configuration options for setting up the application logger.
+//
+// It supports file-based logging with rotation (via lumberjack) and optional
+// profile-based behavior (e.g., dev/prod).
 type ConfigLogger struct {
-	Profile    string
-	MaxSize    int
+	// Profile indicates the runtime profile (e.g., "dev", "prod") and can affect logging format/output
+	Profile string
+
+	// MaxSize is the maximum size (in megabytes) of the log file before it gets rotated.
+	MaxSize int
+
+	// MaxBackups is the maximum number of old log files to retain.
 	MaxBackups int
-	MaxAge     int
-	Compress   bool
-	IsSplit    bool
-	DirName    string
-	Filename   string
+
+	// MaxAge is the maximum number of days to retain old log files.
+	MaxAge int
+
+	// Compress determines whether rotated log files are compressed using gzip.
+	Compress bool
+
+	// IsSplit indicates whether to split log files by day or by module (depending on implementation).
+	IsSplit bool
+
+	// DirName is the directory path where logs will be stored.
+	DirName string
+
+	// Filename is the base name of the log file (e.g., "app.log").
+	Filename string
 }
 
 type RequestLogger struct {
@@ -48,6 +63,32 @@ type ResponseLogger struct {
 	Body        any
 }
 
+type AppLogger struct {
+	Logger *zap.Logger
+}
+
+// NewLogger initializes and returns a new application logger (`*AppLogger`) using the Zap logging library.
+//
+// It configures the log encoder format (e.g., JSON or console), the log output (e.g., file path),
+// and log rotation settings based on the provided `ConfigLogger`.
+//
+// The logger includes caller information (`zap.AddCaller`) and uses `zapcore.InfoLevel` by default.
+// Log rotation is handled via Lumberjack based on `MaxSize`, `MaxBackups`, `MaxAge`, and `Compress`.
+//
+// Example:
+//
+//	logger := NewLogger(&ConfigLogger{
+//	    Profile:    "prod",
+//	    MaxSize:    100,             // 100 MB per file
+//	    MaxBackups: 7,               // keep 7 rotated logs
+//	    MaxAge:     30,              // keep logs for 30 days
+//	    Compress:   true,            // compress old logs
+//	    IsSplit:    false,           // no daily split
+//	    DirName:    "./logs",
+//	    Filename:   "app.log",
+//	})
+//
+//	logger.Info("Application started")
 func NewLogger(cf *ConfigLogger) *AppLogger {
 	var zapLogger *zap.Logger
 	encoder := getEncoderLog(cf)

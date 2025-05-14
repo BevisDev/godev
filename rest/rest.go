@@ -21,14 +21,34 @@ import (
 	"github.com/BevisDev/godev/utils"
 )
 
+// Request defines a standardized structure for making HTTP requests using RestClient.
+//
+// It supports query parameters, path parameters, custom headers, body payloads (as JSON),
+// form-encoded bodies, and an optional Result destination for unmarshaling the response.
 type Request struct {
-	URL      string
-	Query    map[string]string
-	Params   map[string]string
+	// URL is the target API endpoint (e.g., "/users/:id").
+	URL string
+
+	// Query contains query parameters to be appended to the URL (?key=value).
+	Query map[string]string
+
+	// Params contains path parameters to replace placeholders in the URL (e.g., ":id").
+	Params map[string]string
+
+	// BodyForm contains form data (application/x-www-form-urlencoded).
+	// Used only if Body is nil and the request requires form encoding.
 	BodyForm map[string]string
-	Header   map[string]string
-	Body     any
-	Result   any
+
+	// Header allows you to set custom headers (e.g., Authorization, Content-Type).
+	Header map[string]string
+
+	// Body is the raw request body (typically a struct to be JSON-encoded).
+	// This is ignored if BodyForm is set.
+	Body any
+
+	// Result is a pointer to the variable where the response should be unmarshaled.
+	// Example: &MyResponseStruct
+	Result any
 }
 
 type HttpError struct {
@@ -57,12 +77,25 @@ func AsHttpError(err error) (*HttpError, bool) {
 
 var defaultTimeoutSec = 30
 
+// RestClient wraps an HTTP client with a configurable timeout and optional logger.
+//
+// It is intended for making REST API calls with consistent timeout settings
+// and optional logging support via AppLogger.
 type RestClient struct {
 	Client     *http.Client
 	TimeoutSec int
 	logger     *logger.AppLogger
 }
 
+// NewRestClient creates a new RestClient with the given timeout in seconds.
+//
+// If the timeout is less than or equal to zero, a default timeout is used.
+// Logging is disabled in this version.
+//
+// Example:
+//
+//	client := NewRestClient(10)
+//	resp, err := client.Client.Get("https://api.example.com")
 func NewRestClient(timeoutSec int) *RestClient {
 	if timeoutSec <= 0 {
 		timeoutSec = defaultTimeoutSec
@@ -74,6 +107,15 @@ func NewRestClient(timeoutSec int) *RestClient {
 	}
 }
 
+// NewRestWithLogger creates a new RestClient with the given timeout and a provided logger.
+//
+// This is useful for tracing outgoing requests, logging retries, failures, etc.
+//
+// Example:
+//
+//	logger := NewLogger(...)
+//	client := NewRestWithLogger(15, logger)
+//	client.logger.Info("making request...")
 func NewRestWithLogger(timeoutSec int, logger *logger.AppLogger) *RestClient {
 	if timeoutSec <= 0 {
 		timeoutSec = defaultTimeoutSec

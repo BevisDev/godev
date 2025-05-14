@@ -40,6 +40,31 @@ func TestToString(t *testing.T) {
 	}
 }
 
+func TestToInt64(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected int64
+	}{
+		{"Valid positive number", "12345", 12345},
+		{"Valid negative number", "-67890", -67890},
+		{"Zero", "0", 0},
+		{"Invalid string", "abc", 0},
+		{"Empty string", "", 0},
+		{"Float as string", "3.14", 0},
+		{"Too large for int64", "9999999999999999999999999", 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ToInt64(tt.input)
+			if result != tt.expected {
+				t.Errorf("ToInt64(%q) = %d; want %d", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
 func TestToInt(t *testing.T) {
 	tests := []struct {
 		input    string
@@ -184,6 +209,79 @@ func TestTruncateText(t *testing.T) {
 			actual := TruncateText(tt.input, tt.max)
 			if actual != tt.expected {
 				t.Errorf("expected '%s', got '%s'", tt.expected, actual)
+			}
+		})
+	}
+}
+
+func TestPadLeft(t *testing.T) {
+	tests := []struct {
+		input    string
+		count    int
+		char     rune
+		expected string
+	}{
+		{"abc", 3, '*', "***abc"},
+		{"hello", 0, '-', "hello"},
+		{"go", -1, '!', "go"},
+		{"", 2, '0', "00"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			result := PadLeft(tt.input, tt.count, tt.char)
+			if result != tt.expected {
+				t.Errorf("PadLeft(%q, %d, %q) = %q; want %q", tt.input, tt.count, tt.char, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestPadRight(t *testing.T) {
+	tests := []struct {
+		input    string
+		count    int
+		char     rune
+		expected string
+	}{
+		{"abc", 3, '*', "abc***"},
+		{"hello", 0, '-', "hello"},
+		{"go", -1, '!', "go"},
+		{"", 2, '0', "00"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			result := PadRight(tt.input, tt.count, tt.char)
+			if result != tt.expected {
+				t.Errorf("PadRight(%q, %d, %q) = %q; want %q", tt.input, tt.count, tt.char, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestPadCenter(t *testing.T) {
+	tests := []struct {
+		input    string
+		start    int
+		count    int
+		char     rune
+		expected string
+	}{
+		{"abcdef", 2, 3, '*', "ab***cdef"},
+		{"end", 10, 3, '-', "end---"},
+		{"hello", -5, 2, '_', "__hello"},
+		{"", 0, 4, '#', "####"},
+		{"12345", 2, 0, '*', "12345"},
+		{"123", 1, -3, '!', "123"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			result := PadCenter(tt.input, tt.start, tt.count, tt.char)
+			if result != tt.expected {
+				t.Errorf("PadCenter(%q, %d, %d, %q) = %q; want %q",
+					tt.input, tt.start, tt.count, tt.char, result, tt.expected)
 			}
 		})
 	}

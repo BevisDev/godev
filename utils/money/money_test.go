@@ -154,3 +154,30 @@ func TestFormat(t *testing.T) {
 		}
 	}
 }
+
+func TestIsDecimal(t *testing.T) {
+	d := decimal.NewFromFloat(1.23)
+	dPtr := &d
+
+	tests := []struct {
+		name     string
+		input    interface{}
+		expected bool
+	}{
+		{"Decimal value", d, true},
+		{"Pointer to Decimal", dPtr, true},
+		{"Float64", 1.23, false},
+		{"String", "1.23", false},
+		{"Nil", nil, false},
+		{"Int", 123, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IsDecimal(tt.input)
+			if result != tt.expected {
+				t.Errorf("IsDecimal(%v) = %v; want %v", tt.input, result, tt.expected)
+			}
+		})
+	}
+}

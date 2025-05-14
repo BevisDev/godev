@@ -105,10 +105,10 @@ func TestIsWithin(t *testing.T) {
 	threeDaysAgo := now.AddDate(0, 0, -3)
 	tenDaysAgo := now.AddDate(0, 0, -10)
 
-	if !IsWithin(threeDaysAgo, 5) {
+	if !IsWithinDays(threeDaysAgo, 5) {
 		t.Errorf("Expected threeDaysAgo to be within 5 days")
 	}
-	if IsWithin(tenDaysAgo, 5) {
+	if IsWithinDays(tenDaysAgo, 5) {
 		t.Errorf("Expected tenDaysAgo to be outside 5 days")
 	}
 }
@@ -143,5 +143,22 @@ func TestEndOfMonth(t *testing.T) {
 
 	if !end.Equal(expected) {
 		t.Errorf("Expected end of month %v, got %v", expected, end)
+	}
+}
+
+func TestIsWeekend(t *testing.T) {
+	tests := []struct {
+		input    time.Time
+		expected bool
+	}{
+		{time.Date(2025, 5, 17, 0, 0, 0, 0, time.UTC), true},  // Saturday
+		{time.Date(2025, 5, 18, 0, 0, 0, 0, time.UTC), true},  // Sunday
+		{time.Date(2025, 5, 19, 0, 0, 0, 0, time.UTC), false}, // Monday
+	}
+
+	for _, tt := range tests {
+		if result := IsWeekend(tt.input); result != tt.expected {
+			t.Errorf("IsWeekend(%v) = %v; want %v", tt.input, result, tt.expected)
+		}
 	}
 }

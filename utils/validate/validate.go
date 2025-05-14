@@ -5,8 +5,26 @@ import (
 	"errors"
 	"reflect"
 	"strings"
+	"unicode"
 )
 
+// IsNilOrEmpty checks whether the given input is nil or empty.
+//
+// It supports multiple types including:
+//   - nil pointers
+//   - empty strings (after trimming spaces)
+//   - empty arrays, slices, maps, or channels
+//
+// For all other types, it returns false by default.
+//
+// Examples:
+//
+//	IsNilOrEmpty(nil)                         // true
+//	IsNilOrEmpty("")                          // true
+//	IsNilOrEmpty("   ")                       // true
+//	IsNilOrEmpty([]int{})                     // true
+//	IsNilOrEmpty(map[string]string{})         // true
+//	IsNilOrEmpty(123)                         // false
 func IsNilOrEmpty(inp interface{}) bool {
 	if inp == nil {
 		return true
@@ -65,4 +83,17 @@ func IsStruct(i interface{}) bool {
 
 func IsTimedOut(err error) bool {
 	return errors.Is(err, context.DeadlineExceeded)
+}
+
+func IsValidPhoneNumber(phone string, size int) bool {
+	length := len(phone)
+	if length != size {
+		return false
+	}
+	for _, r := range phone {
+		if !unicode.IsDigit(r) {
+			return false
+		}
+	}
+	return true
 }

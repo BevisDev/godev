@@ -160,3 +160,30 @@ func TestIsTimedOut(t *testing.T) {
 		})
 	}
 }
+
+func TestIsValidPhoneNumber(t *testing.T) {
+	tests := []struct {
+		name     string
+		phone    string
+		size     int
+		expected bool
+	}{
+		{"ValidPhone", "0123456789", 10, true},
+		{"TooShort", "01234", 10, false},
+		{"TooLong", "012345678901", 10, false},
+		{"ContainsLetter", "01234abc89", 10, false},
+		{"EmptyString", "", 0, true},
+		{"Valid11Digits", "01234567890", 11, true},
+		{"AllLetters", "abcdefghij", 10, false},
+		{"SpecialChars", "01234-7890", 10, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IsValidPhoneNumber(tt.phone, tt.size)
+			if result != tt.expected {
+				t.Errorf("IsValidPhoneNumber(%q, %d) = %v; want %v", tt.phone, tt.size, result, tt.expected)
+			}
+		})
+	}
+}

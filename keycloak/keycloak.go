@@ -10,6 +10,18 @@ type KeyCloak struct {
 	Client *gocloak.GoCloak
 }
 
+// NewKeyCloak creates a new KeyCloak client connected to the specified host and port.
+//
+// The returned client can be used to authenticate users, manage realms, roles,
+// and perform other Keycloak administrative tasks.
+//
+// Example:
+//
+//	kc := NewKeyCloak("http://localhost", 8080)
+//	token, err := kc.Client.Login(...)
+//	if err != nil {
+//	    log.Fatalf("login failed: %v", err)
+//	}
 func NewKeyCloak(host string, port int) *KeyCloak {
 	return &KeyCloak{
 		Client: gocloak.NewClient(fmt.Sprintf("%s:%d", host, port)),

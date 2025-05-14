@@ -4,46 +4,43 @@ import (
 	"time"
 )
 
-// Layout datetime
-type Layout = string
-
 const (
 	// format common
-	DD_MM_YYYYY       Layout = "02-01-2006"
-	DD_MM_YYYYY_FLASH Layout = "02/01/2006"
-	DD_MMM_YYYY       Layout = "02-Jan-2006"
-	YYYYMMDDHHMMSS    Layout = "20060102150405"
-	YYYYMMDD          Layout = "20060102"
+	DD_MM_YYYYY       = "02-01-2006"
+	DD_MM_YYYYY_FLASH = "02/01/2006"
+	DD_MMM_YYYY       = "02-Jan-2006"
+	YYYYMMDDHHMMSS    = "20060102150405"
+	YYYYMMDD          = "20060102"
 
 	// format ISO 8601 / RFC3339
-	DateOnly       Layout = "2006-01-02"
-	DateTime       Layout = "2006-01-02 15:04:05"
-	DateTimeOffset Layout = "2006-01-02T15:04:05Z07:00"
-	DatetimeUTC    Layout = "2006-01-02T15:04:05Z"
-	DateTimeSQL    Layout = "2006-01-02 15:04:05.000"
-	DateTimeNoTZ   Layout = "2006-01-02T15:04:05"
+	DateOnly       = "2006-01-02"
+	DateTime       = "2006-01-02 15:04:05"
+	DateTimeOffset = "2006-01-02T15:04:05Z07:00"
+	DatetimeUTC    = "2006-01-02T15:04:05Z"
+	DateTimeSQL    = "2006-01-02 15:04:05.000"
+	DateTimeNoTZ   = "2006-01-02T15:04:05"
 
 	// format time
-	TimeOnly    Layout = "15:04:05"
-	TimeCompact Layout = "150405"
-	TimeNoSec   Layout = "1504"
+	TimeOnly    = "15:04:05"
+	TimeCompact = "150405"
+	TimeNoSec   = "1504"
 
-	// AddTime layout
-	Nanosecond  Layout = "Nanosecond"
-	Millisecond Layout = "Millisecond"
-	Second      Layout = "Second"
-	Minute      Layout = "Minute"
-	Hour        Layout = "Hour"
-	Day         Layout = "Day"
-	Month       Layout = "Month"
-	Year        Layout = "Year"
+	// using for AddTime
+	Nanosecond  = "Nanosecond"
+	Millisecond = "Millisecond"
+	Second      = "Second"
+	Minute      = "Minute"
+	Hour        = "Hour"
+	Day         = "Day"
+	Month       = "Month"
+	Year        = "Year"
 )
 
-func ToString(time time.Time, format Layout) string {
+func ToString(time time.Time, format string) string {
 	return time.Format(format)
 }
 
-func ToTime(timeStr string, format Layout) (*time.Time, error) {
+func ToTime(timeStr string, format string) (*time.Time, error) {
 	parsedTime, err := time.Parse(format, timeStr)
 	if err != nil {
 		return nil, err
@@ -59,7 +56,7 @@ func EndDay(date time.Time) time.Time {
 	return time.Date(date.Year(), date.Month(), date.Day(), 23, 59, 59, 999999000, date.Location())
 }
 
-func AddTime(date time.Time, v int, kind Layout) time.Time {
+func AddTime(date time.Time, v int, kind string) time.Time {
 	switch kind {
 	case Nanosecond:
 		return date.Add(time.Duration(v) * time.Nanosecond)
@@ -88,7 +85,7 @@ func IsSameDate(t1, t2 time.Time) bool {
 		t1.Day() == t2.Day()
 }
 
-func IsWithin(t time.Time, day int) bool {
+func IsWithinDays(t time.Time, day int) bool {
 	return time.Since(t) <= time.Duration(day)*24*time.Hour
 }
 
@@ -106,4 +103,9 @@ func StartOfMonth(t time.Time) time.Time {
 
 func EndOfMonth(t time.Time) time.Time {
 	return StartOfMonth(t).AddDate(0, 1, -1)
+}
+
+func IsWeekend(t time.Time) bool {
+	weekday := t.Weekday()
+	return weekday == time.Saturday || weekday == time.Sunday
 }

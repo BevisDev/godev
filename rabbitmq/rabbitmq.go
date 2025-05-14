@@ -12,11 +12,11 @@ import (
 )
 
 type RabbitMQConfig struct {
-	Host       string
-	Port       int
-	Username   string
-	Password   string
-	TimeoutSec int
+	Host       string // RabbitMQ server host
+	Port       int    // RabbitMQ server port
+	Username   string // Username for authentication
+	Password   string // Password for authentication
+	TimeoutSec int    // Timeout in seconds for message operations
 }
 
 type RabbitMQ struct {
@@ -25,11 +25,37 @@ type RabbitMQ struct {
 	TimeoutSec int
 }
 
+var defaultTimeoutSec = 10
+
+// NewRabbitMQ creates a new RabbitMQ client using the provided configuration.
+//
+// It connects to the broker using the AMQP protocol, establishes a connection,
+// opens a channel, and returns a `*RabbitMQ` instance.
+//
+// Returns an error if the configuration is nil, the connection fails,
+// or the channel cannot be created.
+//
+// Example:
+//
+//	cfg := &RabbitMQConfig{
+//	    Host:     "localhost",
+//	    Port:     5672,
+//	    Username: "guest",
+//	    Password: "guest",
+//	}
+//
+//	client, err := NewRabbitMQ(cfg)
+//	if err != nil {
+//	    log.Fatalf("failed to connect to RabbitMQ: %v", err)
+//	}
 func NewRabbitMQ(config *RabbitMQConfig) (*RabbitMQ, error) {
 	if config == nil {
 		return nil, errors.New("config is nil")
 	}
-	
+	if config.TimeoutSec == 0 {
+		config.TimeoutSec = defaultTimeoutSec
+	}
+
 	conn, err := amqp.Dial(fmt.Sprintf("amqp://%s:%s@%s:%d/",
 		config.Username, config.Password, config.Host, config.Port))
 	if err != nil {

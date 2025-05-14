@@ -116,3 +116,135 @@ func TestGetCurrentTimestamp(t *testing.T) {
 	ts := GetCurrentTimestamp()
 	assert.Greater(t, ts, int64(0))
 }
+
+func TestMaskLeft(t *testing.T) {
+	tests := []struct {
+		input    string
+		size     int
+		expected string
+	}{
+		{"abcdef", 3, "***def"},
+		{"abcdef", 0, "******"},
+		{"abcdef", 10, "******"},
+		{"a", 1, "*"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			result := MaskLeft(tt.input, tt.size)
+			if result != tt.expected {
+				t.Errorf("MaskLeft(%q, %d) = %q; want %q", tt.input, tt.size, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestMaskRight(t *testing.T) {
+	tests := []struct {
+		input    string
+		size     int
+		expected string
+	}{
+		{"abcdef", 3, "abc***"},
+		{"abcdef", 0, "******"},
+		{"abcdef", 10, "******"},
+		{"a", 1, "*"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			result := MaskRight(tt.input, tt.size)
+			if result != tt.expected {
+				t.Errorf("MaskRight(%q, %d) = %q; want %q", tt.input, tt.size, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestMaskCenter(t *testing.T) {
+	tests := []struct {
+		input    string
+		size     int
+		expected string
+	}{
+		{"abcdef", 2, "ab**ef"},
+		{"abcdef", 3, "a***ef"},
+		{"abcdef", 0, "******"},
+		{"abcdef", 6, "******"},
+		{"abcdef", 10, "******"},
+		{"abc", 1, "a*c"},
+		{"a", 1, "*"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			result := MaskCenter(tt.input, tt.size)
+			if result != tt.expected {
+				t.Errorf("MaskCenter(%q, %d) = %q; want %q", tt.input, tt.size, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestMaskEmail(t *testing.T) {
+	tests := []struct {
+		name       string
+		email      string
+		sizeLocal  int
+		sizeDomain int
+		expected   string
+	}{
+		{
+			name:       "Basic masking",
+			email:      "john.doe@example.com",
+			sizeLocal:  3,
+			sizeDomain: 4,
+			expected:   "john.***@example****",
+		},
+		{
+			name:       "Mask full local",
+			email:      "abc@example.com",
+			sizeLocal:  10,
+			sizeDomain: 4,
+			expected:   "***@example****",
+		},
+		{
+			name:       "Mask nothing",
+			email:      "user@domain.com",
+			sizeLocal:  0,
+			sizeDomain: 0,
+			expected:   "user@domain.com",
+		},
+		{
+			name:       "Mask whole domain",
+			email:      "someone@short.io",
+			sizeLocal:  3,
+			sizeDomain: 100,
+			expected:   "some***@********",
+		},
+		{
+			name:       "Invalid email format",
+			email:      "invalid-email",
+			sizeLocal:  3,
+			sizeDomain: 3,
+			expected:   "invalid-email",
+		},
+		{
+			name:       "Short local and domain",
+			email:      "a@b",
+			sizeLocal:  1,
+			sizeDomain: 1,
+			expected:   "*@*",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := MaskEmail(tt.email, tt.sizeLocal, tt.sizeDomain)
+			if result != tt.expected {
+				t.Errorf("MaskEmail(%q, %d, %d) = %q; want %q",
+					tt.email, tt.sizeLocal, tt.sizeDomain, result, tt.expected)
+			}
+		})
+	}
+}

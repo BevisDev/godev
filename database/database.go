@@ -15,23 +15,53 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+// ConfigDB defines the configuration for connecting to a SQL database.
+//
+// It supports common settings such as connection parameters, pool sizing, timeouts,
+// and connection string customization. The `Kind` field determines the target
+// database type (e.g., MySQL, Postgres, SQL Server, Oracle).
 type ConfigDB struct {
-	Kind           types.KindDB
-	Schema         string
-	TimeoutSec     int
-	Host           string
-	Port           int
-	Username       string
-	Password       string
-	MaxOpenConns   int
-	MaxIdleConns   int
+	// Kind specifies the type of database (e.g., types.MySQL, types.Postgres).
+	Kind types.KindDB
+
+	// Schema is the name of the target database/schema.
+	Schema string
+
+	// TimeoutSec defines the default timeout (in seconds) for DB operations.
+	TimeoutSec int
+
+	// Host is the hostname or IP address of the database server.
+	Host string
+
+	// Port is the port number to connect to the database server.
+	Port int
+
+	// Username is the database login username.
+	Username string
+
+	// Password is the database login password.
+	Password string
+
+	// MaxOpenConns sets the maximum number of open connections to the database.
+	MaxOpenConns int
+
+	// MaxIdleConns sets the maximum number of idle connections in the pool.
+	MaxIdleConns int
+
+	// MaxIdleTimeSec is the maximum amount of time (in seconds) a connection can remain idle.
 	MaxIdleTimeSec int
+
+	// MaxLifeTimeSec is the maximum amount of time (in seconds) a connection can be reused.
 	MaxLifeTimeSec int
-	ShowQuery      bool
-	Params         map[string]string
+
+	// ShowQuery enables SQL query logging when set to true.
+	ShowQuery bool
+
+	// Params is an optional map of additional connection string parameters.
+	Params map[string]string
 }
 
-var defaultTimeoutSec = 30
+var defaultTimeoutSec = 10
 
 type Database struct {
 	DB         *sqlx.DB
@@ -40,6 +70,24 @@ type Database struct {
 	kindDB     types.KindDB
 }
 
+// NewDB creates a new `*Database` instance from the given ConfigDB.
+//
+// It initializes connection settings (pool, timeout), connects to the
+// appropriate database based on the `Kind` (e.g., SQL Server, Postgres),
+// and performs a ping to verify connectivity.
+//
+// If the config is nil, or connection fails, it returns an error.
+//
+// Example:
+//
+//	db, err := NewDB(&ConfigDB{
+//	    Kind:     types.Postgres,
+//	    Host:     "localhost",
+//	    Port:     5432,
+//	    Username: "admin",
+//	    Password: "secret",
+//	    Schema:   "mydb",
+//	})
 func NewDB(cf *ConfigDB) (*Database, error) {
 	if cf == nil {
 		return nil, errors.New("config is nil")
@@ -61,6 +109,14 @@ func NewDB(cf *ConfigDB) (*Database, error) {
 	}, err
 }
 
+// newConnection establishes a new `sqlx.DB` connection based on the provided ConfigDB.
+//
+// It builds the connection string depending on the database type (Kind),
+// sets connection pool parameters if configured, and verifies the connection with a ping.
+//
+// Supported databases: SQL Server, Postgres, Oracle, MySQL.
+//
+// Returns an error if the database kind is unsupported or connection fails.
 func newConnection(cf *ConfigDB) (*sqlx.DB, error) {
 	var (
 		db      *sqlx.DB
@@ -157,7 +213,28 @@ func (d *Database) FormatRow(idx int) string {
 	return fmt.Sprintf("%s%d", p, idx)
 }
 
-// RunTx is template transaction with callback func
+// RunTx executes a function within a database transaction with a given isolation level.
+//
+// It automatically manages context timeout (`d.TimeoutSec`), begins a transaction,
+// and ensures proper commit or rollback based on the outcome of the callback function.
+//
+// If the callback returns an error or a panic occurs, the transaction is rolled back.
+// If the callback succeeds, the transaction is committed.
+//
+// Example:
+//
+//	err := db.RunTx(ctx, sql.LevelSerializable, func(txCtx context.Context, tx *sqlx.Tx) error {
+//	    _, err := tx.ExecContext(txCtx, "UPDATE accounts SET balance = balance - 100 WHERE id = ?", 1)
+//	    if err != nil {
+//	        return err
+//	    }
+//	    _, err = tx.ExecContext(txCtx, "UPDATE accounts SET balance = balance + 100 WHERE id = ?", 2)
+//	    return err
+//	})
+//
+//	if err != nil {
+//	    log.Fatalf("transaction failed: %v", err)
+//	}
 func (d *Database) RunTx(c context.Context, level sql.IsolationLevel, fn func(ctx context.Context, tx *sqlx.Tx) error) (err error) {
 	ctx, cancel := utils.CreateCtxTimeout(c, d.TimeoutSec)
 	defer cancel()
@@ -255,11 +332,31 @@ func (d *Database) Save(ctx context.Context, tx *sqlx.Tx, query string, args int
 	return
 }
 
-// SaveTx using for Insert Or Update query with Transaction
-// Any named placeholder parameters are replaced with fields from arg.
-// Example query: INSERT INTO person (first_name,last_name,email) VALUES (:first,:last,:email)
-// args: map[string]interface{}{ "first": "Bin","last": "Smith", "email": "bensmith@allblacks.nz"}
-// or struct with the `db` tag
+// SaveTx executes an INSERT or UPDATE SQL statement within a transaction,
+// using named placeholder parameters.
+//
+// Any named placeholders in the query (e.g., :first, :last) are replaced
+// with values from `arg`, which can be either a `map[string]interface{}`
+// or a struct tagged with `db`.
+//
+// Example:
+//
+//	query := `INSERT INTO person (first_name, last_name, email)
+//	          VALUES (:first, :last, :email)`
+//
+//	args := map[string]interface{}{
+//	    "first": "Bin",
+//	    "last":  "Smith",
+//	    "email": "bensmith@allblacks.nz",
+//	}
+//
+//	// or use a struct:
+//	type Person struct {
+//	    First string `db:"first"`
+//	    Last  string `db:"last"`
+//	    Email string `db:"email"`
+//	}
+//	SaveTx(ctx, db, query, Person{...})
 func (d *Database) SaveTx(ctx context.Context, query string, args interface{}) (err error) {
 	return d.RunTx(ctx, sql.LevelDefault, func(ctx context.Context, tx *sqlx.Tx) error {
 		return d.Save(ctx, tx, query, args)
@@ -282,9 +379,22 @@ func (d *Database) SaveGettingId(ctx context.Context, query string, tx *sqlx.Tx,
 	return
 }
 
-// InsertedId inserts record and returns id
-// LastInsertId function should not be used with this SQL Server driver
-// Please use OUTPUT clause or SCOPE_IDENTITY() to the end of your query
+// InsertedId executes an INSERT query within a transaction and returns the newly inserted record's ID.
+//
+// This method is intended for SQL Server, where `LastInsertId` is not supported by the driver.
+// To retrieve the inserted ID, your query must include the `OUTPUT` clause or use `SCOPE_IDENTITY()`.
+//
+// Example:
+//
+//	query := `INSERT INTO users (name, email)
+//	          OUTPUT INSERTED.id VALUES (?, ?)`
+//
+//	id, err := db.InsertedId(ctx, query, "John", "john@example.com")
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//
+//	fmt.Println("New ID:", id)
 func (d *Database) InsertedId(ctx context.Context, query string, args ...interface{}) (id int, err error) {
 	err = d.RunTx(ctx, sql.LevelDefault, func(ctx context.Context, tx *sqlx.Tx) error {
 		id, err = d.SaveGettingId(ctx, query, tx, args...)

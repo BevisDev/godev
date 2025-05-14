@@ -14,6 +14,15 @@ func ToFloat(m types.Money) float64 {
 	return f
 }
 
+func IsDecimal(val interface{}) bool {
+	switch val.(type) {
+	case decimal.Decimal, *decimal.Decimal:
+		return true
+	default:
+		return false
+	}
+}
+
 func GreaterThanFloat(m types.Money, f float64) bool {
 	return m.GreaterThan(FromFloat(f))
 }
