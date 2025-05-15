@@ -57,24 +57,29 @@ type Config struct {
 // The `Dest` field in `Config` must be a pointer to a struct, which will be filled
 // with the parsed config data using `viper.Unmarshal`.
 //
-// If `BindEnv` is true and the profile is not "dev", environment variables are merged
-// with file-based configuration (after being sanitized).
-//
 // Returns an error if the config file is missing, malformed, or the `Dest` is not a pointer.
 //
 // Example:
 //
-//	var appConfig AppConfig
-//	err := NewConfig(&Config{
-//	    Path:       "./configs",
-//	    ConfigType: "yaml",
-//	    BindEnv:    true,
-//	    Dest:       &appConfig,
-//	})
+//		var appConfig AppConfig
 //
-//	if err != nil {
-//	    log.Fatalf("failed to load config: %v", err)
-//	}
+//	 // to get profile flexible using environment
+//		profile := os.Getenv("GO_PROFILE")
+//		if profile == "" {
+//		  cf.Profile = "dev"
+//		} else if profile != "dev" {
+//		  cf.Profile = profile
+//		  cf.AutoEnv = true
+//		}
+//
+//		err := NewConfig(&Config{
+//		  Path:       "./configs",
+//		  ConfigType: "yaml",
+//		  Dest:       &appConfig,
+//		})
+//		if err != nil {
+//		  log.Fatalf("failed to load config: %v", err)
+//		}
 func NewConfig(cf *Config) error {
 	if cf == nil {
 		return errors.New("config is nil")
@@ -83,10 +88,9 @@ func NewConfig(cf *Config) error {
 		return errors.New("must be a pointer")
 	}
 
-	profile := cf.GetProfile()
 	v := viper.New()
 	v.AddConfigPath(cf.Path)
-	v.SetConfigName(profile)
+	v.SetConfigName(cf.Profile)
 	v.SetConfigType(cf.ConfigType)
 	if cf.AutoEnv {
 		v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
@@ -109,16 +113,6 @@ func NewConfig(cf *Config) error {
 	}
 
 	return v.Unmarshal(&cf.Dest)
-}
-
-func (c *Config) GetProfile() string {
-	if c.Profile != "" {
-		return c.Profile
-	}
-	if p := os.Getenv("GO_PROFILE"); p != "" {
-		return p
-	}
-	return "dev"
 }
 
 func replaceEnvVars(data interface{}) {

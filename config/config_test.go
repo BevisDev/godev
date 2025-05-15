@@ -58,12 +58,12 @@ func TestNewConfig_InvalidDest(t *testing.T) {
 }
 
 func TestNewConfig_LoadYAML_Success(t *testing.T) {
-	os.Setenv("GO_PROFILE", "test")
 	cfg := &TestConfigStruct{}
 	err := NewConfig(&Config{
 		Path:       "./testdata",
 		ConfigType: "yaml",
 		Dest:       cfg,
+		Profile:    "test",
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, "demo-app", cfg.AppName)
@@ -83,6 +83,7 @@ func TestNewConfig_AutoEnvOverride(t *testing.T) {
 		Path:       "./testdata",
 		ConfigType: "yaml",
 		Dest:       cfg,
+		Profile:    "test_env",
 		AutoEnv:    true,
 	})
 	assert.NoError(t, err)
