@@ -248,3 +248,33 @@ func TestMaskEmail(t *testing.T) {
 		})
 	}
 }
+
+func TestIgnoreContentTypeLog(t *testing.T) {
+	tests := []struct {
+		name        string
+		contentType string
+		want        bool
+	}{
+		{"Image PNG", "image/png", true},
+		{"Video MP4", "video/mp4", true},
+		{"Audio MP3", "audio/mpeg", true},
+		{"PDF", "application/pdf", true},
+		{"Zip", "application/zip", true},
+		{"VND Excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", true},
+		{"Protobuf", "application/x-protobuf", true},
+		{"Binary", "application/octet-stream", true},
+		{"Form-data", "multipart/form-data", true},
+		{"JSON", "application/json", false},
+		{"JSON with charset", "application/json; charset=utf-8", false},
+		{"Plain text", "text/plain", false},
+		{"Unknown type", "application/unknown", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IgnoreContentTypeLog(tt.contentType); got != tt.want {
+				t.Errorf("IgnoreContentTypeLog(%q) = %v, want %v", tt.contentType, got, tt.want)
+			}
+		})
+	}
+}

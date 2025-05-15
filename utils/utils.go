@@ -131,3 +131,22 @@ func MaskEmail(email string, sizeLocal, sizeDomain int) string {
 
 	return maskedLocal + "@" + maskedDomain
 }
+
+func IgnoreContentTypeLog(contentType string) bool {
+	switch {
+	case strings.HasPrefix(contentType, "image"),
+		strings.HasPrefix(contentType, "video"),
+		strings.HasPrefix(contentType, "audio"),
+		strings.HasPrefix(contentType, "application/octet-stream"),
+		strings.HasPrefix(contentType, "multipart/form-data"),
+		strings.HasPrefix(contentType, "application/pdf"),
+		strings.HasPrefix(contentType, "application/zip"),
+		strings.HasPrefix(contentType, "application/x-zip-compressed"),
+		strings.HasPrefix(contentType, "application/vnd."),
+		strings.HasPrefix(contentType, "application/msword"),
+		strings.HasPrefix(contentType, "application/x-protobuf"):
+		return true
+	default:
+		return false
+	}
+}

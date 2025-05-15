@@ -56,6 +56,7 @@ type RestConfig struct {
 	TimeoutSec      int
 	Logger          *logger.AppLogger
 	IgnoreLogHeader bool
+	IgnoreLogAPIs   []string
 }
 
 // NewRestClient creates a new RestClient instance using the provided RestConfig.
@@ -89,6 +90,7 @@ func NewRestClient(cf *RestConfig) *RestClient {
 		TimeoutSec:      cf.TimeoutSec,
 		logger:          cf.Logger,
 		IgnoreLogHeader: cf.IgnoreLogHeader,
+		IgnoreLogAPIs:   cf.IgnoreLogAPIs,
 	}
 }
 
@@ -101,6 +103,7 @@ type RestClient struct {
 	TimeoutSec      int
 	logger          *logger.AppLogger
 	IgnoreLogHeader bool
+	IgnoreLogAPIs   []string
 }
 
 func (r *RestClient) Get(c context.Context, req *Request) error {
@@ -156,9 +159,12 @@ func (r *RestClient) restTemplate(c context.Context, method string, req *Request
 		reqLogger := &logger.RequestLogger{
 			State:  state,
 			URL:    req.URL,
+			Query:  str.ToString(req.Query),
 			Method: method,
-			Body:   bodyStr,
 			Time:   startTime,
+		}
+		if !matchPathIgnoreLogBody(urlStr, r.IgnoreLogAPIs) && bodyStr != "" {
+			req.Body = bodyStr
 		}
 		if !r.IgnoreLogHeader {
 			reqLogger.Header = req.Header
@@ -168,13 +174,14 @@ func (r *RestClient) restTemplate(c context.Context, method string, req *Request
 		var sb strings.Builder
 		sb.WriteString("========== REST REQUEST INFO ==========\n")
 		sb.WriteString(fmt.Sprintf(consts.State+": %s\n", state))
-		sb.WriteString(fmt.Sprintf(consts.Url+": %s\n", req.URL))
+		sb.WriteString(fmt.Sprintf(consts.Url+": %s\n", urlStr))
+		sb.WriteString(fmt.Sprintf(consts.Query+": %v\n", req.Query))
 		sb.WriteString(fmt.Sprintf(consts.Method+": %s\n", method))
 		sb.WriteString(fmt.Sprintf(consts.Time+": %s\n", datetime.ToString(startTime, datetime.DateTimeOffset)))
 		if !r.IgnoreLogHeader {
 			sb.WriteString(fmt.Sprintf(consts.Header+": %s\n", req.Header))
 		}
-		if bodyStr != "" {
+		if !matchPathIgnoreLogBody(urlStr, r.IgnoreLogAPIs) && bodyStr != "" {
 			sb.WriteString(fmt.Sprintf(consts.Body+": %s\n", bodyStr))
 		}
 		sb.WriteString("=================================\n")
@@ -229,6 +236,10 @@ func (r *RestClient) execute(request *http.Request, req *Request, startTime time
 		return err
 	}
 
+	hasBody := !validate.IsNilOrEmpty(respBodyBytes)
+	if hasBody {
+		respBodyStr = str.ToString(respBodyBytes)
+	}
 	// log response
 	var (
 		respLogger logger.ResponseLogger
@@ -262,8 +273,23 @@ func (r *RestClient) execute(request *http.Request, req *Request, startTime time
 	}()
 
 	// check body
-	hasBody := !validate.IsNilOrEmpty(respBodyBytes)
-	if hasBody {
+	if b, ok := req.Result.(*[]byte); ok {
+		if response.StatusCode >= 400 {
+			return &HttpError{
+				StatusCode: response.StatusCode,
+				Body:       respBodyStr,
+			}
+		}
+		if hasBody {
+			*b = respBodyBytes
+		}
+		return nil
+	}
+
+	// log body
+	if hasBody &&
+		!utils.IgnoreContentTypeLog(response.Header.Get(consts.ContentType)) &&
+		!matchPathIgnoreLogBody(request.URL.Path, r.IgnoreLogAPIs) {
 		respBodyStr = str.ToString(respBodyBytes)
 		if isLog {
 			respLogger.Body = respBodyStr
@@ -279,11 +305,28 @@ func (r *RestClient) execute(request *http.Request, req *Request, startTime time
 		}
 	}
 
-	if req.Result == nil || !hasBody {
+	if req.Result == nil {
 		return nil
 	}
-
 	return jsonx.JSONBytesToStruct(respBodyBytes, req.Result)
+}
+
+func matchPathIgnoreLogBody(u string, apis []string) bool {
+	if len(apis) == 0 {
+		return false
+	}
+	parsed, err := url.Parse(u)
+	if err != nil {
+		return false
+	}
+	path := parsed.Path
+
+	for _, pattern := range apis {
+		if strings.HasSuffix(path, pattern) || strings.Contains(path, pattern) {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *RestClient) buildURL(urlStr string, query map[string]string, params map[string]string) string {

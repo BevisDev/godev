@@ -65,17 +65,12 @@ type Config struct {
 //
 //	 // to get profile flexible using environment
 //		profile := os.Getenv("GO_PROFILE")
-//		if profile == "" {
-//		  cf.Profile = "dev"
-//		} else if profile != "dev" {
-//		  cf.Profile = profile
-//		  cf.AutoEnv = true
-//		}
 //
 //		err := NewConfig(&Config{
 //		  Path:       "./configs",
 //		  ConfigType: "yaml",
 //		  Dest:       &appConfig,
+//		  Profile:    profile,
 //		})
 //		if err != nil {
 //		  log.Fatalf("failed to load config: %v", err)
