@@ -1,11 +1,28 @@
 package str
 
 import (
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"testing"
+	"time"
 )
 
+func decimalPtr(f float64) *decimal.Decimal {
+	d := decimal.NewFromFloat(f)
+	return &d
+}
+
 func TestToString(t *testing.T) {
+	now := time.Date(2024, 5, 1, 12, 30, 0, 0, time.UTC)
+	dec := decimal.NewFromFloat(12.345)
+	decPtr := decimalPtr(9.99)
+
+	type User struct {
+		Name string `json:"name"`
+		Age  int    `json:"age"`
+	}
+	user := User{"Bob", 30}
+
 	tests := []struct {
 		name     string
 		input    any
@@ -28,6 +45,17 @@ func TestToString(t *testing.T) {
 		{"*bool", func() any { b := true; return &b }(), "true"},
 		{"*float64", func() any { f := 3.3; return &f }(), "3.3"},
 		{"nil *int", func() any { var p *int = nil; return p }(), ""},
+
+		// time cases
+		{"time.Time", now, now.Format(time.RFC3339)},
+		{"*time.Time", &now, now.Format(time.RFC3339)},
+
+		// decimal.Decimal
+		{"decimal.Decimal", dec, dec.String()},
+		{"*decimal.Decimal", decPtr, decPtr.String()},
+
+		// generic struct (JSON)
+		{"struct as JSON", user, `{"name":"Bob","age":30}`},
 	}
 
 	for _, tt := range tests {

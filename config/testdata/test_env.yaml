@@ -1,2 +1,13 @@
-app_name: $APP_NAME
-port: $PORT
+app_name:
+port:
+
+someKey:
+  clientName:
+  ClientPort:
+  Client_Key:
+
+databaseAPP:
+  host:
+
+RedisAPP:
+  Host:

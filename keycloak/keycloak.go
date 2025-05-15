@@ -18,7 +18,7 @@ type KeyCloak struct {
 // Example:
 //
 //	kc := NewKeyCloak("http://localhost", 8080)
-//	token, err := kc.Client.Login(...)
+//	token, err := kc.LoginClient(...)
 //	if err != nil {
 //	    log.Fatalf("login failed: %v", err)
 //	}

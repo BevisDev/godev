@@ -25,7 +25,7 @@ type RabbitMQ struct {
 	TimeoutSec int
 }
 
-var defaultTimeoutSec = 10
+const defaultTimeoutSec = 10
 
 // NewRabbitMQ creates a new RabbitMQ client using the provided configuration.
 //

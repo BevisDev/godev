@@ -11,7 +11,7 @@ type DateTime struct {
 	time.Time
 }
 
-var layoutDateTime = datetime.DateTimeNoTZ
+const layoutDateTime = datetime.DateTimeNoTZ
 
 func (d *DateTime) UnmarshalJSON(b []byte) error {
 	if string(b) == "null" {

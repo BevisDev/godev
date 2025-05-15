@@ -11,6 +11,40 @@ import (
 type TestConfigStruct struct {
 	AppName string `mapstructure:"app_name"`
 	Port    int    `mapstructure:"port"`
+	SomeKey struct {
+		ClientName string `mapstructure:"clientName"`
+		ClientPort int    `mapstructure:"ClientPort"`
+		ClientKey  string `mapstructure:"Client_Key"`
+	} `mapstructure:"someKey"`
+	DatabaseAPP struct {
+		Host string `mapstructure:"host"`
+	} `mapstructure:"databaseAPP"`
+
+	RedisAPP struct {
+		Host string `mapstructure:"Host"`
+	} `mapstructure:"RedisAPP"`
+}
+
+func setupEnv(vars map[string]string) func() {
+	for k, v := range vars {
+		os.Setenv(k, v)
+	}
+	return func() {
+		for k := range vars {
+			os.Unsetenv(k)
+		}
+	}
+}
+
+func TestNewConfig_MissingFile(t *testing.T) {
+	cfg := &TestConfigStruct{}
+	err := NewConfig(&Config{
+		Path:       "./not_exist",
+		ConfigType: "yaml",
+		Dest:       cfg,
+	})
+	assert.Error(t, err)
+	assert.True(t, errors.As(err, &viper.ConfigFileNotFoundError{}))
 }
 
 func TestNewConfig_InvalidDest(t *testing.T) {
@@ -37,41 +71,64 @@ func TestNewConfig_LoadYAML_Success(t *testing.T) {
 }
 
 func TestNewConfig_AutoEnvOverride(t *testing.T) {
-	os.Setenv("GO_PROFILE", "test_env")
-	os.Setenv("APP_NAME", "env-app")
-	os.Setenv("PORT", "9090")
-	defer func() {
-		os.Unsetenv("GO_PROFILE")
-		os.Unsetenv("APP_NAME")
-		os.Unsetenv("PORT")
-	}()
+	cleanup := setupEnv(map[string]string{
+		"GO_PROFILE": "test_env",
+		"APP_NAME":   "env-app",
+		"PORT":       "9090",
+	})
+	defer cleanup()
 
 	cfg := &TestConfigStruct{}
 	err := NewConfig(&Config{
 		Path:       "./testdata",
 		ConfigType: "yaml",
 		Dest:       cfg,
-		BindEnv:    true,
+		AutoEnv:    true,
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, "env-app", cfg.AppName)
 	assert.Equal(t, 9090, cfg.Port)
 }
 
-func TestNewConfig_AssignProfile_WithEnvOverride(t *testing.T) {
-	os.Setenv("APP_NAME", "env-app")
-	os.Setenv("PORT", "9090")
-	defer func() {
-		os.Unsetenv("APP_NAME")
-		os.Unsetenv("PORT")
-	}()
+func TestNewConfig_AutoEnv_MixedKeys(t *testing.T) {
+	cleanup := setupEnv(map[string]string{
+		"SOMEKEY_CLIENTNAME": "envName",
+		"SOMEKEY_CLIENTPORT": "8888",
+		"SOMEKEY_CLIENT_KEY": "xyz123",
+		"DATABASEAPP_HOST":   "dbHost",
+		"REDISAPP_HOST":      "redisHost",
+	})
+	defer cleanup()
 
 	cfg := &TestConfigStruct{}
 	err := NewConfig(&Config{
 		Path:       "./testdata",
 		ConfigType: "yaml",
 		Dest:       cfg,
-		BindEnv:    true,
+		Profile:    "test_env",
+		AutoEnv:    true,
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, "envName", cfg.SomeKey.ClientName)
+	assert.Equal(t, 8888, cfg.SomeKey.ClientPort)
+	assert.Equal(t, "xyz123", cfg.SomeKey.ClientKey)
+	assert.Equal(t, "dbHost", cfg.DatabaseAPP.Host)
+	assert.Equal(t, "redisHost", cfg.RedisAPP.Host)
+}
+
+func TestNewConfig_AssignProfile_WithEnvOverride(t *testing.T) {
+	cleanup := setupEnv(map[string]string{
+		"APP_NAME": "env-app",
+		"PORT":     "9090",
+	})
+	defer cleanup()
+
+	cfg := &TestConfigStruct{}
+	err := NewConfig(&Config{
+		Path:       "./testdata",
+		ConfigType: "yaml",
+		Dest:       cfg,
+		AutoEnv:    true,
 		Profile:    "test_env",
 	})
 	assert.NoError(t, err)
@@ -79,13 +136,22 @@ func TestNewConfig_AssignProfile_WithEnvOverride(t *testing.T) {
 	assert.Equal(t, 9090, cfg.Port)
 }
 
-func TestNewConfig_MissingFile(t *testing.T) {
+func TestNewConfig_ReplaceEnv(t *testing.T) {
+	cleanup := setupEnv(map[string]string{
+		"APP_NAME": "expanded-app",
+		"PORT":     "9090", // optional: ensure it doesn't override if not expanded manually
+	})
+	defer cleanup()
+
 	cfg := &TestConfigStruct{}
 	err := NewConfig(&Config{
-		Path:       "./not_exist",
+		Path:       "./testdata",
 		ConfigType: "yaml",
 		Dest:       cfg,
+		Profile:    "test_replace_env",
+		ReplaceEnv: true,
 	})
-	assert.Error(t, err)
-	assert.True(t, errors.As(err, &viper.ConfigFileNotFoundError{}))
+	assert.NoError(t, err)
+	assert.Equal(t, "expanded-app", cfg.AppName)
+	assert.Equal(t, 8080, cfg.Port)
 }

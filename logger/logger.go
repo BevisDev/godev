@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/BevisDev/godev/consts"
 	"github.com/BevisDev/godev/utils/datetime"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -151,7 +152,11 @@ func writeSync(cf *ConfigLogger) zapcore.WriteSyncer {
 		c := cron.New()
 		c.AddFunc("0 0 * * *", func() {
 			lumberLogger.Filename = getFilename(cf.DirName, cf.Filename, cf.IsSplit)
-			lumberLogger.Rotate()
+			err := lumberLogger.Rotate()
+			if err != nil {
+				log.Println(err)
+				return
+			}
 		})
 		c.Start()
 	}
@@ -241,13 +246,13 @@ func (l *AppLogger) LogRequest(req *RequestLogger) {
 	l.Logger.WithOptions(
 		zap.AddCallerSkip(1)).Info(
 		"[===== REQUEST INFO =====]",
-		zap.String("State", req.State),
-		zap.String("URL", req.URL),
-		zap.Time("Time", req.Time),
-		zap.String("Method", req.Method),
-		zap.String("Query", req.Query),
-		zap.Any("Header", req.Header),
-		zap.Any("Body", req.Body),
+		zap.String(consts.State, req.State),
+		zap.String(consts.Url, req.URL),
+		zap.Time(consts.Time, req.Time),
+		zap.String(consts.Method, req.Method),
+		zap.String(consts.Query, req.Query),
+		zap.Any(consts.Header, req.Header),
+		zap.Any(consts.Body, req.Body),
 	)
 }
 
@@ -255,11 +260,11 @@ func (l *AppLogger) LogResponse(resp *ResponseLogger) {
 	l.Logger.WithOptions(
 		zap.AddCallerSkip(1)).Info(
 		"[===== RESPONSE INFO =====]",
-		zap.String("State", resp.State),
-		zap.Int("Status", resp.Status),
-		zap.Float64("DurationSec", resp.DurationSec.Seconds()),
-		zap.Any("Header", resp.Header),
-		zap.Any("Body", resp.Body),
+		zap.String(consts.State, resp.State),
+		zap.Int(consts.Status, resp.Status),
+		zap.Float64(consts.Duration, resp.DurationSec.Seconds()),
+		zap.Any(consts.Header, resp.Header),
+		zap.Any(consts.Body, resp.Body),
 	)
 }
 
@@ -267,13 +272,13 @@ func (l *AppLogger) LogExtRequest(req *RequestLogger) {
 	l.Logger.WithOptions(
 		zap.AddCallerSkip(2)).Info(
 		"[===== REQUEST EXTERNAL INFO =====]",
-		zap.String("State", req.State),
-		zap.String("URL", req.URL),
-		zap.Time("Time", req.Time),
-		zap.String("Method", req.Method),
-		zap.String("Query", req.Query),
-		zap.Any("Header", req.Header),
-		zap.Any("Body", req.Body),
+		zap.String(consts.State, req.State),
+		zap.String(consts.Url, req.URL),
+		zap.Time(consts.Time, req.Time),
+		zap.String(consts.Method, req.Method),
+		zap.String(consts.Query, req.Query),
+		zap.Any(consts.Header, req.Header),
+		zap.Any(consts.Body, req.Body),
 	)
 }
 
@@ -281,10 +286,10 @@ func (l *AppLogger) LogExtResponse(resp *ResponseLogger) {
 	l.Logger.WithOptions(
 		zap.AddCallerSkip(1)).Info(
 		"[===== RESPONSE EXTERNAL INFO =====]",
-		zap.String("State", resp.State),
-		zap.Int("Status", resp.Status),
-		zap.Float64("DurationSec", resp.DurationSec.Seconds()),
-		zap.Any("Header", resp.Header),
-		zap.Any("Body", resp.Body),
+		zap.String(consts.State, resp.State),
+		zap.Int(consts.Status, resp.Status),
+		zap.Float64(consts.Duration, resp.DurationSec.Seconds()),
+		zap.Any(consts.Header, resp.Header),
+		zap.Any(consts.Body, resp.Body),
 	)
 }

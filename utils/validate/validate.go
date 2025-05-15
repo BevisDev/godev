@@ -31,6 +31,7 @@ func IsNilOrEmpty(inp interface{}) bool {
 	}
 	v := reflect.ValueOf(inp)
 
+	// get val ptr
 	if v.Kind() == reflect.Ptr {
 		if v.IsNil() {
 			return true

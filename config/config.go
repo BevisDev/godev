@@ -5,14 +5,48 @@ import (
 	"github.com/BevisDev/godev/utils/validate"
 	"github.com/spf13/viper"
 	"os"
+	"strings"
 )
 
+// Config defines the input configuration for loading application settings from file and/or environment.
+//
+// It is typically used with Viper or similar tools to load a config file into a target struct.
 type Config struct {
-	Path       string
+	// Path is the directory path where the config file is located (e.g., "./configs").
+	Path string
+
+	// ConfigType specifies the type of the config file (e.g., "yaml", "json", "toml").
 	ConfigType string
-	Dest       interface{}
-	BindEnv    bool
-	Profile    string
+
+	// Dest is a pointer to a struct that will be populated with the configuration data.
+	// This must be a pointer; otherwise, loading will fail.
+	Dest interface{}
+
+	// AutoEnv enables Viper's automatic environment variable binding.
+	//
+	// When enabled, Viper will automatically try to map environment variables to configuration keys.
+	// Keys are matched by transforming them (e.g., dots to underscores, camelCase to UPPER_SNAKE_CASE),
+	// and matched variables will override corresponding keys in the config.
+	//
+	// Example:
+	//	Config key: "app.port"
+	//	Environment: APP_PORT=9000
+	//	Result: viper.Get("app.port") == 9000
+	AutoEnv bool
+
+	// ReplaceEnv determines whether environment variable placeholders in the config values
+	// (e.g., "$APP_NAME") should be expanded using os.Getenv.
+	//
+	// When enabled, after reading the config file, all string values in the configuration
+	// will be recursively scanned and any "$VAR" will be replaced with the value of the corresponding environment variable.
+	//
+	// This is useful when your config file contains placeholders like:
+	//	app_name: $APP_NAME
+	ReplaceEnv bool
+
+	// Profile is the name of the config file to load (without extension), e.g., "dev", "prod".
+	// It will be combined with Path and ConfigType to locate the file.
+	Profile string
 }
 
 // NewConfig loads configuration from a file and optionally merges environment variables.
@@ -41,19 +75,23 @@ type Config struct {
 //	if err != nil {
 //	    log.Fatalf("failed to load config: %v", err)
 //	}
-func NewConfig(config *Config) error {
-	if config == nil {
+func NewConfig(cf *Config) error {
+	if cf == nil {
 		return errors.New("config is nil")
 	}
-	if !validate.IsPtr(config.Dest) {
+	if !validate.IsPtr(cf.Dest) {
 		return errors.New("must be a pointer")
 	}
 
-	profile := config.GetProfile()
+	profile := cf.GetProfile()
 	v := viper.New()
-	v.AddConfigPath(config.Path)
+	v.AddConfigPath(cf.Path)
 	v.SetConfigName(profile)
-	v.SetConfigType(config.ConfigType)
+	v.SetConfigType(cf.ConfigType)
+	if cf.AutoEnv {
+		v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+		v.AutomaticEnv()
+	}
 
 	// read config
 	if err := v.ReadInConfig(); err != nil {
@@ -61,18 +99,16 @@ func NewConfig(config *Config) error {
 	}
 
 	// read environment
-	if config.BindEnv && profile != "dev" {
+	if cf.ReplaceEnv {
 		settings := v.AllSettings()
-
 		replaceEnvVars(settings)
-
 		err := v.MergeConfigMap(settings)
 		if err != nil {
 			return err
 		}
 	}
 
-	return v.Unmarshal(&config.Dest)
+	return v.Unmarshal(&cf.Dest)
 }
 
 func (c *Config) GetProfile() string {

@@ -22,11 +22,21 @@ const (
 	GrantType         = "grant_type"
 	ClientCredentials = "client_credentials"
 	AuthorizationCode = "authorization_code"
+	Username          = "username"
 	Password          = "password"
 	AccessToken       = "access_token"
 	RefreshToken      = "refresh_token"
+	Scope             = "scope"
 )
 
 const (
-	State = "state"
+	State    = "state"
+	Status   = "status"
+	Header   = "header"
+	Body     = "body"
+	Duration = "duration"
+	Time     = "time"
+	Method   = "method"
+	Url      = "url"
+	Query    = "query"
 )

@@ -11,7 +11,7 @@ type DateTimeUTC struct {
 	time.Time
 }
 
-var layoutDateTimeUTC = datetime.DatetimeUTC
+const layoutDateTimeUTC = datetime.DatetimeUTC
 
 func (d *DateTimeUTC) UnmarshalJSON(b []byte) error {
 	if string(b) == "null" {

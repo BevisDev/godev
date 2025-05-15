@@ -11,7 +11,7 @@ type DateSQL struct {
 	time.Time
 }
 
-var layoutDateSQL = datetime.DateTimeSQL
+const layoutDateSQL = datetime.DateTimeSQL
 
 func (d *DateSQL) UnmarshalJSON(b []byte) error {
 	if string(b) == "null" {

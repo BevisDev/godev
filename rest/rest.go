@@ -3,7 +3,6 @@ package rest
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"github.com/BevisDev/godev/consts"
 	"github.com/BevisDev/godev/utils/datetime"
@@ -51,80 +50,57 @@ type Request struct {
 	Result any
 }
 
-type HttpError struct {
-	StatusCode int
-	Body       string
+const defaultTimeoutSec = 30
+
+type RestConfig struct {
+	TimeoutSec      int
+	Logger          *logger.AppLogger
+	IgnoreLogHeader bool
 }
 
-func (e *HttpError) Error() string {
-	return fmt.Sprintf("status %d: %s", e.StatusCode, e.Body)
-}
+// NewRestClient creates a new RestClient instance using the provided RestConfig.
+//
+// It initializes the internal HTTP client and applies the specified timeout in seconds.
+// If `TimeoutSec` is less than or equal to zero, a default timeout is used.
+// Logging is disabled in this version unless added manually.
+// The `HeaderLog` flag can be used to exclude headers from being logged (if logging is enabled later).
+//
+// Returns nil if the provided config is nil.
+//
+// Example:
+//
+//	cf := &RestConfig{
+//	    TimeoutSec:      10,
+//	    IgnoreLogHeader: true,
+//	}
+//
+//	restClient := NewRestClient(cf)
+func NewRestClient(cf *RestConfig) *RestClient {
+	if cf == nil {
+		return nil
+	}
 
-func (e *HttpError) IsClientError() bool {
-	return e.StatusCode >= 400 && e.StatusCode < 500
-}
+	if cf.TimeoutSec <= 0 {
+		cf.TimeoutSec = defaultTimeoutSec
+	}
 
-func (e *HttpError) IsServerError() bool {
-	return e.StatusCode >= 500
+	return &RestClient{
+		Client:          new(http.Client),
+		TimeoutSec:      cf.TimeoutSec,
+		logger:          cf.Logger,
+		IgnoreLogHeader: cf.IgnoreLogHeader,
+	}
 }
-
-// AsHttpError to check error http
-func AsHttpError(err error) (*HttpError, bool) {
-	var httpErr *HttpError
-	ok := errors.As(err, &httpErr)
-	return httpErr, ok
-}
-
-var defaultTimeoutSec = 30
 
 // RestClient wraps an HTTP client with a configurable timeout and optional logger.
 //
 // It is intended for making REST API calls with consistent timeout settings
 // and optional logging support via AppLogger.
 type RestClient struct {
-	Client     *http.Client
-	TimeoutSec int
-	logger     *logger.AppLogger
-}
-
-// NewRestClient creates a new RestClient with the given timeout in seconds.
-//
-// If the timeout is less than or equal to zero, a default timeout is used.
-// Logging is disabled in this version.
-//
-// Example:
-//
-//	client := NewRestClient(10)
-//	resp, err := client.Client.Get("https://api.example.com")
-func NewRestClient(timeoutSec int) *RestClient {
-	if timeoutSec <= 0 {
-		timeoutSec = defaultTimeoutSec
-	}
-	return &RestClient{
-		Client:     &http.Client{},
-		TimeoutSec: timeoutSec,
-		logger:     nil,
-	}
-}
-
-// NewRestWithLogger creates a new RestClient with the given timeout and a provided logger.
-//
-// This is useful for tracing outgoing requests, logging retries, failures, etc.
-//
-// Example:
-//
-//	logger := NewLogger(...)
-//	client := NewRestWithLogger(15, logger)
-//	client.logger.Info("making request...")
-func NewRestWithLogger(timeoutSec int, logger *logger.AppLogger) *RestClient {
-	if timeoutSec <= 0 {
-		timeoutSec = defaultTimeoutSec
-	}
-	return &RestClient{
-		Client:     &http.Client{},
-		TimeoutSec: timeoutSec,
-		logger:     logger,
-	}
+	Client          *http.Client
+	TimeoutSec      int
+	logger          *logger.AppLogger
+	IgnoreLogHeader bool
 }
 
 func (r *RestClient) Get(c context.Context, req *Request) error {
@@ -177,22 +153,29 @@ func (r *RestClient) restTemplate(c context.Context, method string, req *Request
 	// log request
 	startTime := time.Now()
 	if isLog {
-		r.logger.LogExtRequest(&logger.RequestLogger{
+		reqLogger := &logger.RequestLogger{
 			State:  state,
 			URL:    req.URL,
 			Method: method,
 			Body:   bodyStr,
 			Time:   startTime,
-		})
+		}
+		if !r.IgnoreLogHeader {
+			reqLogger.Header = req.Header
+		}
+		r.logger.LogExtRequest(reqLogger)
 	} else {
 		var sb strings.Builder
 		sb.WriteString("========== REST REQUEST INFO ==========\n")
-		sb.WriteString(fmt.Sprintf("State: %s\n", state))
-		sb.WriteString(fmt.Sprintf("URL: %s\n", req.URL))
-		sb.WriteString(fmt.Sprintf("Method: %s\n", method))
-		sb.WriteString(fmt.Sprintf("Time: %s\n", datetime.ToString(startTime, datetime.DateTimeOffset)))
+		sb.WriteString(fmt.Sprintf(consts.State+": %s\n", state))
+		sb.WriteString(fmt.Sprintf(consts.Url+": %s\n", req.URL))
+		sb.WriteString(fmt.Sprintf(consts.Method+": %s\n", method))
+		sb.WriteString(fmt.Sprintf(consts.Time+": %s\n", datetime.ToString(startTime, datetime.DateTimeOffset)))
+		if !r.IgnoreLogHeader {
+			sb.WriteString(fmt.Sprintf(consts.Header+": %s\n", req.Header))
+		}
 		if bodyStr != "" {
-			sb.WriteString(fmt.Sprintf("Body: %s\n", bodyStr))
+			sb.WriteString(fmt.Sprintf(consts.Body+": %s\n", bodyStr))
 		}
 		sb.WriteString("=================================\n")
 		log.Println(sb.String())
@@ -257,11 +240,17 @@ func (r *RestClient) execute(request *http.Request, req *Request, startTime time
 			Status:      response.StatusCode,
 			DurationSec: time.Since(startTime),
 		}
+		if !r.IgnoreLogHeader {
+			respLogger.Header = response.Header
+		}
 	} else {
 		sb.WriteString("========== REST RESPONSE INFO ==========\n")
-		sb.WriteString(fmt.Sprintf("State: %s\n", state))
-		sb.WriteString(fmt.Sprintf("Status: %d\n", response.StatusCode))
-		sb.WriteString(fmt.Sprintf("Duration: %s\n", time.Since(startTime)))
+		sb.WriteString(fmt.Sprintf(consts.State+": %s\n", state))
+		sb.WriteString(fmt.Sprintf(consts.Status+": %d\n", response.StatusCode))
+		sb.WriteString(fmt.Sprintf(consts.Duration+": %s\n", time.Since(startTime)))
+		if !r.IgnoreLogHeader {
+			sb.WriteString(fmt.Sprintf(consts.Header+": %s\n", response.Header))
+		}
 	}
 	defer func() {
 		if isLog {
@@ -279,7 +268,7 @@ func (r *RestClient) execute(request *http.Request, req *Request, startTime time
 		if isLog {
 			respLogger.Body = respBodyStr
 		} else {
-			sb.WriteString(fmt.Sprintf("Body: %s\n", respBodyStr))
+			sb.WriteString(fmt.Sprintf(consts.Body+": %s\n", respBodyStr))
 		}
 	}
 

@@ -1,21 +1,46 @@
 package str
 
 import (
+	"encoding/json"
 	"fmt"
+	"github.com/shopspring/decimal"
 	"golang.org/x/text/unicode/norm"
 	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 )
 
+// ToString converts a value of any supported type to its string representation.
+//
+// It handles common primitive types including:
+//   - string
+//   - int, uint (and their variants)
+//   - float32, float64
+//   - bool
+//   - []byte (converted to string)
+//
+// If the value is a pointer, it will be dereferenced (unless nil).
+// For unsupported or complex types, it falls back to fmt.Sprintf("%+v", value).
+//
+// Returns an empty string if the value is nil or a nil pointer.
+//
+// Examples:
+//
+//	ToString(123)          → "123"
+//	ToString(3.14)         → "3.14"
+//	ToString(true)         → "true"
+//	ToString([]byte("hi")) → "hi"
+//	ToString(nil)          → ""
 func ToString(value any) string {
 	if value == nil {
 		return ""
 	}
 	val := reflect.ValueOf(value)
-	// handle ptr
+
+	// get val ptr
 	if val.Kind() == reflect.Ptr {
 		if val.IsNil() {
 			return ""
@@ -40,6 +65,17 @@ func ToString(value any) string {
 		if val.Type().Elem().Kind() == reflect.Uint8 {
 			return string(val.Bytes()) // handle []byte
 		}
+	case reflect.Struct:
+		if t, ok := val.Interface().(time.Time); ok {
+			return t.Format(time.RFC3339)
+		}
+		if d, ok := val.Interface().(decimal.Decimal); ok {
+			return d.String()
+		}
+		if b, err := json.Marshal(val.Interface()); err == nil {
+			return string(b)
+		}
+		return fmt.Sprintf("%+v", val.Interface())
 	default:
 		return fmt.Sprintf("%+v", val.Interface())
 	}

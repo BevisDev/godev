@@ -61,7 +61,7 @@ type ConfigDB struct {
 	Params map[string]string
 }
 
-var defaultTimeoutSec = 10
+const defaultTimeoutSec = 10
 
 type Database struct {
 	DB         *sqlx.DB

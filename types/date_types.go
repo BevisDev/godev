@@ -11,7 +11,7 @@ type Date struct {
 	time.Time
 }
 
-var layoutDate = datetime.DateOnly
+const layoutDate = datetime.DateOnly
 
 func (d *Date) UnmarshalJSON(b []byte) error {
 	if string(b) == "null" {
