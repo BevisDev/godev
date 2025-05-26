@@ -159,9 +159,11 @@ func (r *RestClient) restTemplate(c context.Context, method string, req *Request
 		reqLogger := &logger.RequestLogger{
 			State:  state,
 			URL:    req.URL,
-			Query:  str.ToString(req.Query),
 			Method: method,
 			Time:   startTime,
+		}
+		if !validate.IsNilOrEmpty(req.Query) {
+			reqLogger.Query = str.ToString(req.Query)
 		}
 		if !matchPathIgnoreLogBody(urlStr, r.IgnoreLogAPIs) && bodyStr != "" {
 			req.Body = bodyStr

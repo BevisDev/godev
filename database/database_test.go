@@ -9,6 +9,11 @@ import (
 	"testing"
 )
 
+type User struct {
+	Id   int    `db:"id"`
+	Name string `db:"name"`
+}
+
 func newTestDB(t *testing.T) (*Database, sqlmock.Sqlmock) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
@@ -48,12 +53,34 @@ func TestDatabase_Save(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
 
-	err := db.Save(ctx, "INSERT INTO users (name, email) VALUES (:name, :email)", map[string]interface{}{
+	err := db.Save(ctx, nil, "INSERT INTO users (name, email) VALUES (:name, :email)", map[string]interface{}{
 		"name":  "Alice",
 		"email": "alice@example.com",
 	})
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestDatabase_InsertMany(t *testing.T) {
+	db, mock := newTestDB(t)
+	ctx := context.Background()
+
+	users := []User{
+		{Id: 1, Name: "Alice"},
+		{Id: 2, Name: "Bob"},
+	}
+
+	mock.ExpectBegin()
+	mock.ExpectExec(`INSERT INTO user .*`).
+		WithArgs(1, "Alice", 2, "Bob").
+		WillReturnResult(sqlmock.NewResult(1, 2))
+	mock.ExpectCommit()
+
+	err := db.InsertMany(ctx, "user", users)
+	assert.NoError(t, err)
+	if err = mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
 }
 
 func TestDatabase_InsertedId(t *testing.T) {

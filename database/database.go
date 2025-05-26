@@ -8,6 +8,7 @@ import (
 	"github.com/BevisDev/godev/types"
 	"github.com/BevisDev/godev/utils/validate"
 	"log"
+	"reflect"
 	"strings"
 	"time"
 
@@ -386,15 +387,28 @@ func (d *Database) SaveGettingId(ctx context.Context, query string, tx *sqlx.Tx,
 //
 // Example:
 //
-//	query := `INSERT INTO users (name, email)
-//	          OUTPUT INSERTED.id VALUES (?, ?)`
+//	query := `INSERT INTO users (name, email) VALUES (@p1, @p2);
+//	          SELECT SCOPE_IDENTITY();`
 //
-//	id, err := db.InsertedId(ctx, query, "John", "john@example.com")
+//	args := []interface{}{
+//	    "John",
+//	    "john@example.com",
+//	}
+//
+//	id, err := db.InsertedId(ctx, query, args...)
 //	if err != nil {
 //	    log.Fatal(err)
 //	}
-//
 //	fmt.Println("New ID:", id)
+//
+// Parameters:
+//   - ctx: context for timeout or cancellation.
+//   - query: the INSERT SQL query string.
+//   - args: variadic parameters to match the placeholders in the query.
+//
+// Returns:
+//   - id: the auto-generated primary key returned by the query.
+//   - err: any error encountered during execution.
 func (d *Database) InsertedId(ctx context.Context, query string, args ...interface{}) (id int, err error) {
 	err = d.RunTx(ctx, sql.LevelDefault, func(ctx context.Context, tx *sqlx.Tx) error {
 		id, err = d.SaveGettingId(ctx, query, tx, args...)
@@ -403,20 +417,76 @@ func (d *Database) InsertedId(ctx context.Context, query string, args ...interfa
 	return
 }
 
-func (d *Database) InsertMany(c context.Context, query string, size, col int, args ...interface{}) error {
-	if size <= 0 {
-		return errors.New("size must be greater than 0")
+// InsertMany inserts multiple records into the given table using a single SQL statement.
+//
+// It expects `list` to be a slice of structs or pointers to structs,
+// where fields have `db:"..."` tags to map to database columns.
+// The function builds a dynamic INSERT query and executes it with all values.
+//
+// Parameters:
+//   - ctx: context for timeout/cancellation
+//   - table: target table name
+//   - list: slice of struct or *struct
+//
+// Returns:
+//   - error: if input is invalid or execution fails
+func (d *Database) InsertMany(ctx context.Context, table string, list interface{}) error {
+	val := reflect.ValueOf(list)
+
+	if val.Kind() != reflect.Slice && val.Kind() != reflect.Array {
+		return fmt.Errorf("list must be slice or array")
 	}
-	var placeholders []string
-	for i := 0; i < size; i++ {
+	if val.Len() <= 0 {
+		return fmt.Errorf("size must be greater than 0")
+	}
+
+	firstItem := val.Index(0).Interface()
+	first := reflect.TypeOf(firstItem)
+	if first.Kind() == reflect.Ptr {
+		first = first.Elem()
+	}
+	if first.Kind() != reflect.Struct {
+		return fmt.Errorf("element must be struct or pointer to struct")
+	}
+	numFields := first.NumField()
+
+	// get name cols
+	var (
+		colNames     []string
+		fieldIndexes []int
+	)
+	for i := 0; i < numFields; i++ {
+		field := first.Field(i)
+		dbTag := field.Tag.Get("db")
+		if dbTag != "" {
+			colNames = append(colNames, dbTag)
+			fieldIndexes = append(fieldIndexes, i)
+		}
+	}
+
+	var (
+		placeholders []string
+		args         []interface{}
+	)
+	for i := 0; i < val.Len(); i++ {
+		item := val.Index(i)
+		if item.Kind() == reflect.Ptr {
+			item = item.Elem()
+		}
+
 		var row []string
-		for j := 1; j <= col; j++ {
-			row = append(row, d.FormatRow(i*col+j))
+		for _, idx := range fieldIndexes {
+			args = append(args, item.Field(idx).Interface())
+			row = append(row, d.FormatRow(len(args)))
 		}
 		placeholders = append(placeholders, "("+strings.Join(row, ", ")+")")
 	}
-	query += strings.Join(placeholders, ", ")
-	return d.ExecuteTx(c, query, args...)
+
+	cols := strings.Join(colNames, ", ")
+	placeholderStr := strings.Join(placeholders, ", ")
+	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES %s", table, cols, placeholderStr)
+
+	return d.ExecuteTx(ctx, query, args...)
 }
 
 func (d *Database) Delete(ctx context.Context, query string, args interface{}) (err error) {
