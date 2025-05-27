@@ -8,7 +8,6 @@ import (
 	"github.com/BevisDev/godev/types"
 	"github.com/BevisDev/godev/utils/validate"
 	"log"
-	"reflect"
 	"strings"
 	"time"
 
@@ -417,67 +416,32 @@ func (d *Database) InsertedId(ctx context.Context, query string, args ...interfa
 	return
 }
 
-// InsertMany inserts multiple records into the given table using a single SQL statement.
+// InsertMany inserts multiple rows into the given table using bulk INSERT.
 //
-// It expects `list` to be a slice of structs or pointers to structs,
-// where fields have `db:"..."` tags to map to database columns.
-// The function builds a dynamic INSERT query and executes it with all values.
+// It builds placeholders dynamically and executes the insert in a single query.
 //
-// Parameters:
-//   - ctx: context for timeout/cancellation
-//   - table: target table name
-//   - list: slice of struct or *struct
+// Params:
+//   - table:     Table name.
+//   - size:      Number of rows to insert.
+//   - colNames:  Columns to insert (must match args order).
+//   - args:      values to insert
 //
-// Returns:
-//   - error: if input is invalid or execution fails
-func (d *Database) InsertMany(ctx context.Context, table string, list interface{}) error {
-	val := reflect.ValueOf(list)
-
-	if val.Kind() != reflect.Slice && val.Kind() != reflect.Array {
-		return fmt.Errorf("list must be slice or array")
-	}
-	if val.Len() <= 0 {
-		return fmt.Errorf("size must be greater than 0")
-	}
-
-	firstItem := val.Index(0).Interface()
-	first := reflect.TypeOf(firstItem)
-	if first.Kind() == reflect.Ptr {
-		first = first.Elem()
-	}
-	if first.Kind() != reflect.Struct {
-		return fmt.Errorf("element must be struct or pointer to struct")
-	}
-	numFields := first.NumField()
-
-	// get name cols
-	var (
-		colNames     []string
-		fieldIndexes []int
-	)
-	for i := 0; i < numFields; i++ {
-		field := first.Field(i)
-		dbTag := field.Tag.Get("db")
-		if dbTag != "" {
-			colNames = append(colNames, dbTag)
-			fieldIndexes = append(fieldIndexes, i)
-		}
+// Example:
+//
+//	colNames := []string{"name", "email"}
+//	args := []interface{}{"Alice", "alice@example.com", "Bob", "bob@example.com"}
+//	err := db.InsertMany(ctx, "users", 2, colNames, args...)
+func (d *Database) InsertMany(ctx context.Context, table string, size int, colNames []string, args ...interface{}) error {
+	sizeCol := len(colNames)
+	if sizeCol <= 0 {
+		return errors.New("size must be greater than 0")
 	}
 
-	var (
-		placeholders []string
-		args         []interface{}
-	)
-	for i := 0; i < val.Len(); i++ {
-		item := val.Index(i)
-		if item.Kind() == reflect.Ptr {
-			item = item.Elem()
-		}
-
+	var placeholders []string
+	for i := 0; i < size; i++ {
 		var row []string
-		for _, idx := range fieldIndexes {
-			args = append(args, item.Field(idx).Interface())
-			row = append(row, d.FormatRow(len(args)))
+		for j := 1; j <= sizeCol; j++ {
+			row = append(row, d.FormatRow(i*sizeCol+j))
 		}
 		placeholders = append(placeholders, "("+strings.Join(row, ", ")+")")
 	}
@@ -485,7 +449,6 @@ func (d *Database) InsertMany(ctx context.Context, table string, list interface{
 	cols := strings.Join(colNames, ", ")
 	placeholderStr := strings.Join(placeholders, ", ")
 	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES %s", table, cols, placeholderStr)
-
 	return d.ExecuteTx(ctx, query, args...)
 }
 

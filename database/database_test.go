@@ -2,16 +2,19 @@ package database
 
 import (
 	"context"
+	"database/sql/driver"
+	"fmt"
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"regexp"
+	"strings"
 	"testing"
 )
 
 type User struct {
-	Id   int    `db:"id"`
-	Name string `db:"name"`
+	Name  string `db:"name"`
+	Email string `db:"email"`
 }
 
 func newTestDB(t *testing.T) (*Database, sqlmock.Sqlmock) {
@@ -61,26 +64,54 @@ func TestDatabase_Save(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-func TestDatabase_InsertMany(t *testing.T) {
+func TestInsertMany_Users(t *testing.T) {
 	db, mock := newTestDB(t)
 	ctx := context.Background()
 
+	table := "users"
+	colNames := []string{"name", "email"}
 	users := []User{
-		{Id: 1, Name: "Alice"},
-		{Id: 2, Name: "Bob"},
+		{Name: "Alice", Email: "alice@example.com"},
+		{Name: "Bob", Email: "bob@example.com"},
 	}
 
+	var args []interface{}
+	for _, u := range users {
+		args = append(args, u.Name, u.Email)
+	}
+
+	size := len(users)
+
+	// Build expected query
+	var placeholders []string
+	for i := 0; i < size; i++ {
+		var row []string
+		for j := 1; j <= len(colNames); j++ {
+			row = append(row, fmt.Sprintf("@p%d", i*len(colNames)+j))
+		}
+		placeholders = append(placeholders, "("+strings.Join(row, ", ")+")")
+	}
+
+	mockPlaceholder := make([]string, size)
+	for i := 0; i < size; i++ {
+		mockPlaceholder[i] = "(?, ?)"
+	}
+
+	var driverArgs []driver.Value
+	for _, arg := range args {
+		driverArgs = append(driverArgs, arg)
+	}
+	expectedQuery := "INSERT INTO users (name, email) VALUES (@p1, @p2), (@p3, @p4)"
+
 	mock.ExpectBegin()
-	mock.ExpectExec(`INSERT INTO user .*`).
-		WithArgs(1, "Alice", 2, "Bob").
+	mock.ExpectExec(regexp.QuoteMeta(expectedQuery)).
+		WithArgs(driverArgs...).
 		WillReturnResult(sqlmock.NewResult(1, 2))
 	mock.ExpectCommit()
 
-	err := db.InsertMany(ctx, "user", users)
+	err := db.InsertMany(ctx, table, size, colNames, args...)
 	assert.NoError(t, err)
-	if err = mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("there were unfulfilled expectations: %s", err)
-	}
+	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestDatabase_InsertedId(t *testing.T) {
