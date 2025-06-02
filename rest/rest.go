@@ -45,7 +45,7 @@ type Request struct {
 	// This is ignored if BodyForm is set.
 	Body any
 
-	// Result is a pointer to the variable where the response should be unmarshaled.
+	// Result is a pointer to the variable where the response should be unmarshalled.
 	// Example: &MyResponseStruct
 	Result any
 }
@@ -78,7 +78,7 @@ type RestConfig struct {
 //	restClient := NewRestClient(cf)
 func NewRestClient(cf *RestConfig) *RestClient {
 	if cf == nil {
-		return nil
+		cf = new(RestConfig)
 	}
 
 	if cf.TimeoutSec <= 0 {
@@ -242,6 +242,7 @@ func (r *RestClient) execute(request *http.Request, req *Request, startTime time
 	if hasBody {
 		respBodyStr = str.ToString(respBodyBytes)
 	}
+
 	// log response
 	var (
 		respLogger logger.ResponseLogger
@@ -274,6 +275,15 @@ func (r *RestClient) execute(request *http.Request, req *Request, startTime time
 		}
 	}()
 
+	if !hasBody {
+		if isLog {
+			respLogger.Body = "no body response"
+		} else {
+			sb.WriteString(fmt.Sprintf(consts.Body + ": no body response \n"))
+		}
+		return nil
+	}
+
 	// check body
 	if b, ok := req.Result.(*[]byte); ok {
 		if response.StatusCode >= 400 {
@@ -282,15 +292,12 @@ func (r *RestClient) execute(request *http.Request, req *Request, startTime time
 				Body:       respBodyStr,
 			}
 		}
-		if hasBody {
-			*b = respBodyBytes
-		}
+		*b = respBodyBytes
 		return nil
 	}
 
 	// log body
-	if hasBody &&
-		!utils.IgnoreContentTypeLog(response.Header.Get(consts.ContentType)) &&
+	if !utils.IgnoreContentTypeLog(response.Header.Get(consts.ContentType)) &&
 		!matchPathIgnoreLogBody(request.URL.Path, r.IgnoreLogAPIs) {
 		respBodyStr = str.ToString(respBodyBytes)
 		if isLog {

@@ -2,11 +2,14 @@ package utils
 
 import (
 	"context"
+	"fmt"
 	"github.com/BevisDev/godev/consts"
 	"github.com/BevisDev/godev/utils/random"
 	"strings"
 	"time"
 )
+
+type M map[string]interface{}
 
 func GetState(ctx context.Context) string {
 	if ctx == nil {
@@ -149,4 +152,28 @@ func IgnoreContentTypeLog(contentType string) bool {
 	default:
 		return false
 	}
+}
+
+func Parse[T any](obj interface{}) (T, error) {
+	val, ok := obj.(T)
+	if !ok {
+		return val, fmt.Errorf("cannot cast %T to target type", obj)
+	}
+	return val, nil
+}
+
+func ParseMap[T any](key string, objMap M) (T, error) {
+	var zero T
+
+	raw, ok := objMap[key]
+	if !ok {
+		return zero, fmt.Errorf("key %q not found in map", key)
+	}
+
+	val, ok := raw.(T)
+	if !ok {
+		return zero, fmt.Errorf("cannot cast value of key %q (type %T) to target type", key, raw)
+	}
+
+	return val, nil
 }

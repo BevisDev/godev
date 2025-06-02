@@ -9,6 +9,11 @@ import (
 	"time"
 )
 
+type User struct {
+	Name string
+	Age  int
+}
+
 func TestGetState_WhenCtxNil(t *testing.T) {
 	state := GetState(nil)
 	if state == "" {
@@ -277,4 +282,89 @@ func TestIgnoreContentTypeLog(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestParse_Success(t *testing.T) {
+	obj := 123
+	val, err := Parse[int](obj)
+
+	assert.NoError(t, err)
+	assert.Equal(t, 123, val)
+}
+
+func TestParse_Fail(t *testing.T) {
+	obj := "abc"
+	val, err := Parse[int](obj)
+
+	assert.Error(t, err)
+	assert.Equal(t, 0, val)
+}
+
+func TestParse_WithStruct(t *testing.T) {
+	obj := User{Name: "Alice", Age: 30}
+
+	val, err := Parse[User](obj)
+
+	assert.NoError(t, err)
+	assert.Equal(t, "Alice", val.Name)
+	assert.Equal(t, 30, val.Age)
+}
+
+func TestParse_WithPointer(t *testing.T) {
+	obj := &User{Name: "Bob", Age: 25}
+
+	val, err := Parse[*User](obj)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, val)
+	assert.Equal(t, "Bob", val.Name)
+	assert.Equal(t, 25, val.Age)
+}
+
+func TestParse_Struct_CastFail(t *testing.T) {
+	var obj interface{} = "not a User"
+	val, err := Parse[User](obj)
+
+	assert.Error(t, err)
+	assert.Equal(t, User{}, val) // zero value
+}
+
+func TestParse_Pointer_CastFail(t *testing.T) {
+	var obj interface{} = "not a *User"
+	val, err := Parse[*User](obj)
+
+	assert.Error(t, err)
+	assert.Nil(t, val)
+}
+
+func TestParseMap_Success(t *testing.T) {
+	m := M{
+		"user": User{Name: "Alice", Age: 30},
+	}
+
+	val, err := ParseMap[User]("user", m)
+
+	assert.NoError(t, err)
+	assert.Equal(t, "Alice", val.Name)
+	assert.Equal(t, 30, val.Age)
+}
+
+func TestParseMap_MissingKey(t *testing.T) {
+	m := M{}
+
+	val, err := ParseMap[int]("notfound", m)
+
+	assert.Error(t, err)
+	assert.Equal(t, 0, val)
+}
+
+func TestParseMap_TypeMismatch(t *testing.T) {
+	m := M{
+		"age": "not-an-int",
+	}
+
+	val, err := ParseMap[int]("age", m)
+
+	assert.Error(t, err)
+	assert.Equal(t, 0, val)
 }

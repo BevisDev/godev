@@ -28,7 +28,7 @@ func TestRestClient_Get(t *testing.T) {
 	defer server.Close()
 
 	// Setup client
-	client := NewRestClient(5)
+	client := NewRestClient(nil)
 
 	// Setup request
 	type resultStruct struct {
@@ -74,7 +74,7 @@ func TestRestClient_Get_WithQueryParam(t *testing.T) {
 	defer server.Close()
 
 	// Create client
-	client := NewRestClient(5)
+	client := NewRestClient(nil)
 
 	// Setup RestRequest
 	result := &MockResponse{}
@@ -106,7 +106,9 @@ func TestRestClient_Timeout(t *testing.T) {
 	defer server.Close()
 
 	// Tạo RestClient với timeout thấp hơn thời gian phản hồi server
-	client := NewRestClient(1)
+	client := NewRestClient(&RestConfig{
+		TimeoutSec: 1,
+	})
 
 	// Request mock
 	req := &Request{
@@ -160,7 +162,7 @@ func TestRestClient_PostForm_WithBodyFormAndHeader(t *testing.T) {
 	defer server.Close()
 
 	// Setup client
-	client := NewRestClient(5)
+	client := NewRestClient(nil)
 
 	// Setup request
 	result := &MockResponse{}
@@ -199,7 +201,7 @@ func TestRestClient_Server500Error(t *testing.T) {
 	defer server.Close()
 
 	// new rest client
-	client := NewRestClient(5)
+	client := NewRestClient(nil)
 
 	// Setup RestRequest
 	req := &Request{
@@ -229,7 +231,7 @@ func TestRestClient_Post(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	client := NewRestClient(5)
+	client := NewRestClient(nil)
 
 	type Response struct {
 		Message string `json:"message"`
@@ -260,7 +262,7 @@ func TestRestClient_Put(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	client := NewRestClient(5)
+	client := NewRestClient(nil)
 
 	type Response struct {
 		Message string `json:"message"`
@@ -291,7 +293,7 @@ func TestRestClient_Patch(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	client := NewRestClient(5)
+	client := NewRestClient(nil)
 
 	type Response struct {
 		Message string `json:"message"`
@@ -322,7 +324,7 @@ func TestRestClient_Delete(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	client := NewRestClient(5)
+	client := NewRestClient(nil)
 
 	type Response struct {
 		Message string `json:"message"`
@@ -349,7 +351,7 @@ func TestRestClient_Response_NoBody(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	client := NewRestClient(5)
+	client := NewRestClient(nil)
 
 	type Response struct {
 		Message string `json:"message"`
