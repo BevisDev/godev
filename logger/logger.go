@@ -247,7 +247,7 @@ func (l *AppLogger) formatAny(v interface{}) string {
 
 	switch rv.Kind() {
 	case reflect.Struct, reflect.Map, reflect.Slice, reflect.Array:
-		return jsonx.Pretty(v)
+		return jsonx.ToJSON(v)
 	default:
 		if rv.CanInterface() {
 			return fmt.Sprintf("%+v", rv.Interface())

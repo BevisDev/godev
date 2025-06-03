@@ -55,7 +55,7 @@ func StructToMap(entry interface{}) map[string]interface{} {
 }
 
 func Pretty[T any](v T) string {
-	b, err := json.MarshalIndent(v, "", "  ")
+	b, err := json.MarshalIndent(v, "", "\t")
 	if err != nil {
 		return "{}"
 	}
