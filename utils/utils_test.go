@@ -495,3 +495,29 @@ func TestRoundTo5(t *testing.T) {
 		})
 	}
 }
+
+func TestPtrTo(t *testing.T) {
+	t.Run("string", func(t *testing.T) {
+		s := "hello"
+		p := PtrTo(s)
+		assert.NotNil(t, p)
+		assert.Equal(t, "hello", *p)
+	})
+
+	t.Run("int", func(t *testing.T) {
+		n := 42
+		p := PtrTo(n)
+		assert.NotNil(t, p)
+		assert.Equal(t, int(42), *p)
+	})
+
+	t.Run("struct", func(t *testing.T) {
+		type User struct {
+			ID int
+		}
+		u := User{ID: 1}
+		p := PtrTo(u)
+		assert.NotNil(t, p)
+		assert.Equal(t, 1, p.ID)
+	})
+}

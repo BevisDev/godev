@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"time"
 
@@ -213,7 +214,37 @@ func (l *AppLogger) formatMessage(msg string, args ...interface{}) string {
 		message = msg
 	}
 
-	return fmt.Sprintf(message, args...)
+	return fmt.Sprintf(message, l.deferArgs(args...)...)
+}
+
+func (l *AppLogger) deferArgs(args ...interface{}) []interface{} {
+	out := make([]interface{}, len(args))
+
+	for i, arg := range args {
+		if arg == nil {
+			out[i] = "<nil>"
+			continue
+		}
+
+		val := reflect.ValueOf(arg)
+		
+		for val.Kind() == reflect.Ptr {
+			if val.IsNil() {
+				out[i] = "<nil>"
+				goto next
+			}
+			val = val.Elem()
+		}
+
+		if val.IsValid() && val.CanInterface() {
+			out[i] = val.Interface()
+		} else {
+			out[i] = fmt.Sprintf("<unreadable: %T>", arg)
+		}
+
+	next:
+	}
+	return out
 }
 
 func (l *AppLogger) Sync() {

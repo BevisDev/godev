@@ -242,3 +242,15 @@ func Percent[T constraints.Integer](n T) float64 {
 func RoundTo5[T constraints.Integer](n T) T {
 	return (n / 5) * 5
 }
+
+// PtrTo returns a pointer to the given value.
+//
+// Useful in tests and code where you want to pass a pointer literal.
+//
+// Example:
+//
+//	s := ptrTo("hello")  // *string → "hello"
+//	n := ptrTo(123)      // *int → 123
+func PtrTo[T any](v T) *T {
+	return &v
+}
