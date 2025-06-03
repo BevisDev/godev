@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/BevisDev/godev/consts"
 	"github.com/BevisDev/godev/utils/datetime"
+	"github.com/BevisDev/godev/utils/jsonx"
 	"log"
 	"os"
 	"path/filepath"
@@ -219,32 +220,40 @@ func (l *AppLogger) formatMessage(msg string, args ...interface{}) string {
 
 func (l *AppLogger) deferArgs(args ...interface{}) []interface{} {
 	out := make([]interface{}, len(args))
-
 	for i, arg := range args {
-		if arg == nil {
-			out[i] = "<nil>"
-			continue
-		}
-
-		val := reflect.ValueOf(arg)
-		
-		for val.Kind() == reflect.Ptr {
-			if val.IsNil() {
-				out[i] = "<nil>"
-				goto next
-			}
-			val = val.Elem()
-		}
-
-		if val.IsValid() && val.CanInterface() {
-			out[i] = val.Interface()
-		} else {
-			out[i] = fmt.Sprintf("<unreadable: %T>", arg)
-		}
-
-	next:
+		out[i] = l.formatAny(arg)
 	}
 	return out
+}
+
+func (l *AppLogger) formatAny(v interface{}) string {
+	if v == nil {
+		return "<nil>"
+	}
+
+	rv := reflect.ValueOf(v)
+
+	// Deref multiple levels if it's pointer
+	for rv.Kind() == reflect.Ptr {
+		if rv.IsNil() {
+			return "<nil>"
+		}
+		rv = rv.Elem()
+		if !rv.IsValid() {
+			return "<invalid>"
+		}
+		v = rv.Interface()
+	}
+
+	switch rv.Kind() {
+	case reflect.Struct, reflect.Map, reflect.Slice, reflect.Array:
+		return jsonx.Pretty(v)
+	default:
+		if rv.CanInterface() {
+			return fmt.Sprintf("%+v", rv.Interface())
+		}
+		return fmt.Sprintf("<unreadable: %T>", v)
+	}
 }
 
 func (l *AppLogger) Sync() {

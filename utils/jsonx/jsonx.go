@@ -29,7 +29,7 @@ func JSONBytesToStruct(jsonBytes []byte, entry interface{}) error {
 func ToJSON(v any) string {
 	jsonBytes, err := json.Marshal(v)
 	if err != nil {
-		return ""
+		return "{}"
 	}
 	return str.ToString(jsonBytes)
 }
@@ -52,4 +52,12 @@ func StructToMap(entry interface{}) map[string]interface{} {
 		return nil
 	}
 	return result
+}
+
+func Pretty[T any](v T) string {
+	b, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return "{}"
+	}
+	return string(b)
 }

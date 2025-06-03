@@ -1,6 +1,8 @@
 package jsonx
 
 import (
+	"encoding/json"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
@@ -91,4 +93,60 @@ func TestStructToMap(t *testing.T) {
 	if result["name"] != "Dan" || int(result["age"].(float64)) != 22 {
 		t.Errorf("Got %+v; want {name: Dan, age: 22}", result)
 	}
+}
+
+func TestPretty_Struct(t *testing.T) {
+	type User struct {
+		ID    int
+		Name  string
+		Email *string
+	}
+
+	email := "alice@example.com"
+	u := User{ID: 1, Name: "Alice", Email: &email}
+
+	output := Pretty(u)
+
+	expected := `{
+  "ID": 1,
+  "Name": "Alice",
+  "Email": "alice@example.com"
+}`
+
+	assert.JSONEq(t, expected, output)
+}
+
+func TestPretty_Map(t *testing.T) {
+	m := map[string]int{
+		"apple":  3,
+		"banana": 5,
+	}
+	result := Pretty(m)
+
+	// Validate it's valid JSON
+	var check map[string]int
+	err := json.Unmarshal([]byte(result), &check)
+	assert.NoError(t, err)
+	assert.Equal(t, 3, check["apple"])
+	assert.Equal(t, 5, check["banana"])
+}
+
+func TestPretty_Slice(t *testing.T) {
+	list := []string{"a", "b", "c"}
+	result := Pretty(list)
+
+	expected := `[
+  "a",
+  "b",
+  "c"
+]`
+
+	assert.JSONEq(t, expected, result)
+}
+
+func TestPretty_Nil(t *testing.T) {
+	var m map[string]int = nil
+	result := Pretty(m)
+
+	assert.Equal(t, "null", result)
 }

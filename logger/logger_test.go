@@ -31,8 +31,14 @@ func TestFormatMessage(t *testing.T) {
 		{"value is {}", []interface{}{123}, "value is 123"},
 		{"value is {}", []interface{}{ptrTo("abc")}, "value is abc"},
 		{"value is {}", []interface{}{(*string)(nil)}, "value is <nil>"},
-		{"value is {}", []interface{}{User{ID: 1, Name: "Alice"}}, "value is {ID:1 Name:Alice}"},
-		{"value is {}", []interface{}{&User{ID: 2, Name: "Bob"}}, "value is {ID:2 Name:Bob}"},
+		{"value is {}", []interface{}{User{ID: 1, Name: "Alice"}}, `value is {
+  "ID": 1,
+  "Name": "Alice"
+}`},
+		{"value is {}", []interface{}{&User{ID: 2, Name: "Bob"}}, `value is {
+  "ID": 2,
+  "Name": "Bob"
+}`},
 		{"multiple placeholders: {}, {}", []interface{}{123, "abc"}, "multiple placeholders: 123, abc"},
 	}
 
