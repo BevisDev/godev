@@ -104,3 +104,34 @@ func Abs(m types.Money) types.Money {
 func Format(m types.Money, decimalPlaces int32) string {
 	return m.StringFixed(decimalPlaces)
 }
+
+func Min(a, b decimal.Decimal) decimal.Decimal {
+	if a.LessThan(b) {
+		return a
+	}
+	return b
+}
+
+func Max(a, b decimal.Decimal) decimal.Decimal {
+	if a.GreaterThan(b) {
+		return a
+	}
+	return b
+}
+
+// RoundTo5 rounds a decimal number down to the nearest multiple of 5.
+//
+// It is useful for normalizing monetary or scoring values to step sizes.
+//
+// The rounding always floors the result (rounds toward negative infinity).
+//
+// Example:
+//
+//	decimal.NewFromInt(42)     => 40
+//	decimal.NewFromInt(45)     => 45
+//	decimal.NewFromInt(47)     => 45
+//	decimal.NewFromFloat(13.7) => 10
+func RoundTo5(n decimal.Decimal) decimal.Decimal {
+	five := decimal.NewFromInt(5)
+	return n.Div(five).Floor().Mul(five)
+}

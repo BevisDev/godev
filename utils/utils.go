@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"github.com/BevisDev/godev/consts"
 	"github.com/BevisDev/godev/utils/random"
+	"golang.org/x/exp/constraints"
+	"slices"
 	"strings"
 	"time"
 )
@@ -176,4 +178,67 @@ func ParseMap[T any](key string, objMap M) (T, error) {
 	}
 
 	return val, nil
+}
+
+func IsContains[T comparable](slice []T, value T) bool {
+	return slices.Contains(slice, value)
+}
+
+func IndexOf[T comparable](slice []T, value T) int {
+	return slices.Index(slice, value)
+}
+
+// Min returns the smaller of two ordered values a and b.
+//
+// Works with any comparable type (int, float64, string, etc.).
+//
+// Example:
+//
+//	min := Min(3, 7)        // min = 3
+//	min := Min("a", "b")    // min = "a"
+func Min[T constraints.Ordered](a, b T) T {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+// Max returns the larger of two ordered values a and b.
+//
+// Works with any comparable type (int, float64, string, etc.).
+//
+// Example:
+//
+//	max := Max(3, 7)        // max = 7
+//	max := Max("a", "b")    // max = "b"
+func Max[T constraints.Ordered](a, b T) T {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+// Percent converts an integer value to its percentage form as a float64.
+//
+// For example, Percent(65) returns 0.65.
+//
+// Example:
+//
+//	rate := Percent(30)     // rate = 0.3
+//	tax := Percent(8) * 250 // tax = 20.0
+func Percent[T constraints.Integer](n T) float64 {
+	return float64(n) / 100
+}
+
+// RoundTo5 rounds an integer down to the nearest multiple of 5.
+//
+// Useful for standardizing numeric values to pricing or scoring brackets.
+//
+// Example:
+//
+//	RoundTo5(42)  // returns 40
+//	RoundTo5(45)  // returns 45
+//	RoundTo5(47)  // returns 45
+func RoundTo5[T constraints.Integer](n T) T {
+	return (n / 5) * 5
 }

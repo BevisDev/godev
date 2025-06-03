@@ -3,6 +3,7 @@ package money
 import (
 	"github.com/BevisDev/godev/types"
 	"github.com/shopspring/decimal"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
@@ -178,6 +179,56 @@ func TestIsDecimal(t *testing.T) {
 			if result != tt.expected {
 				t.Errorf("IsDecimal(%v) = %v; want %v", tt.input, result, tt.expected)
 			}
+		})
+	}
+}
+
+func TestMinDecimal(t *testing.T) {
+	a := decimal.NewFromFloat(12.34)
+	b := decimal.NewFromFloat(56.78)
+	c := decimal.NewFromFloat(12.34)
+
+	assert.True(t, Min(a, b).Equal(a), "Min of a and b should be a")
+	assert.True(t, Min(b, a).Equal(a), "Min of b and a should be a")
+	assert.True(t, Min(a, c).Equal(a), "Min of equal values should return one of them")
+}
+
+func TestMaxDecimal(t *testing.T) {
+	a := decimal.NewFromFloat(12.34)
+	b := decimal.NewFromFloat(56.78)
+	c := decimal.NewFromFloat(56.78)
+
+	assert.True(t, Max(a, b).Equal(b), "Max of a and b should be b")
+	assert.True(t, Max(b, a).Equal(b), "Max of b and a should be b")
+	assert.True(t, Max(b, c).Equal(b), "Max of equal values should return one of them")
+}
+
+func TestRoundTo5(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    float64
+		expected float64
+	}{
+		{"round 0", 0, 0},
+		{"round exact 5", 5, 5},
+		{"round under 5", 4.9, 0},
+		{"round 7.1", 7.1, 5},
+		{"round 9.9", 9.9, 5},
+		{"round 10", 10, 10},
+		{"round 13.7", 13.7, 10},
+		{"round 15.0", 15.0, 15},
+		{"round 19.9", 19.9, 15},
+		{"round 25.0", 25.0, 25},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			input := decimal.NewFromFloat(tt.input)
+			want := decimal.NewFromFloat(tt.expected)
+
+			got := RoundTo5(input)
+
+			assert.True(t, got.Equal(want), "got %s; want %s", got, want)
 		})
 	}
 }

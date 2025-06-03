@@ -368,3 +368,130 @@ func TestParseMap_TypeMismatch(t *testing.T) {
 	assert.Error(t, err)
 	assert.Equal(t, 0, val)
 }
+
+func TestMin_Int(t *testing.T) {
+	assert.Equal(t, 3, Min(3, 5))
+	assert.Equal(t, -1, Min(-1, 0))
+	assert.Equal(t, 7, Min(7, 7))
+}
+
+func TestMax_Int(t *testing.T) {
+	assert.Equal(t, 5, Max(3, 5))
+	assert.Equal(t, 0, Max(-1, 0))
+	assert.Equal(t, 7, Max(7, 7))
+}
+
+func TestMin_Float(t *testing.T) {
+	assert.Equal(t, 3.2, Min(3.2, 5.9))
+	assert.Equal(t, -2.1, Min(-2.1, 0.0))
+}
+
+func TestMax_Float(t *testing.T) {
+	assert.Equal(t, 5.9, Max(3.2, 5.9))
+	assert.Equal(t, 0.0, Max(-2.1, 0.0))
+}
+
+func TestMin_String(t *testing.T) {
+	assert.Equal(t, "apple", Min("apple", "banana"))
+	assert.Equal(t, "abc", Min("abc", "abc"))
+}
+
+func TestMax_String(t *testing.T) {
+	assert.Equal(t, "banana", Max("apple", "banana"))
+	assert.Equal(t, "abc", Max("abc", "abc"))
+}
+
+func TestIsContains(t *testing.T) {
+	tests := []struct {
+		name     string
+		arr      []int
+		value    int
+		expected bool
+	}{
+		{"value exists", []int{1, 2, 3}, 2, true},
+		{"value not exists", []int{1, 2, 3}, 5, false},
+		{"empty array", []int{}, 1, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IsContains(tt.arr, tt.value)
+			if result != tt.expected {
+				t.Errorf("IsContains(%v, %v) = %v; want %v", tt.arr, tt.value, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestIndexOf(t *testing.T) {
+	slice := []int{10, 20, 30, 40}
+
+	assert.Equal(t, 2, IndexOf(slice, 30))
+	assert.Equal(t, -1, IndexOf(slice, 100))
+}
+
+func TestPercent(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    any
+		expected float64
+	}{
+		{"percent of int", 65, 0.65},
+		{"percent of int8", int8(25), 0.25},
+		{"percent of int16", int16(100), 1.0},
+		{"percent of int32", int32(3), 0.03},
+		{"percent of int64", int64(0), 0.0},
+		{"percent negative", -20, -0.2},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var actual float64
+
+			switch v := tt.input.(type) {
+			case int:
+				actual = Percent[int](v)
+			case int8:
+				actual = Percent[int8](v)
+			case int16:
+				actual = Percent[int16](v)
+			case int32:
+				actual = Percent[int32](v)
+			case int64:
+				actual = Percent[int64](v)
+			default:
+				t.Fatalf("unsupported type: %T", v)
+			}
+
+			assert.InDelta(t, tt.expected, actual, 0.00001)
+		})
+	}
+}
+
+func TestRoundTo5(t *testing.T) {
+	type testCase[T ~int | ~int8 | ~int16 | ~int32 | ~int64] struct {
+		name     string
+		input    T
+		expected T
+	}
+
+	tests := []testCase[int]{
+		{"round 0", 0, 0},
+		{"round exact", 5, 5},
+		{"round under", 3, 0},
+		{"round 42 → 40", 42, 40},
+		{"round 45 → 45", 45, 45},
+		{"round 47 → 45", 47, 45},
+		{"round 99 → 95", 99, 95},
+		{"round 100 → 100", 100, 100},
+		{"round negative 4 → -5", -4, 0},
+		{"round negative 0 → 0", 0, 0},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := RoundTo5(tc.input)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
