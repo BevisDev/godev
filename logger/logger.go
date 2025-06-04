@@ -204,18 +204,26 @@ func (l *AppLogger) formatMessage(msg string, args ...interface{}) string {
 	if len(args) == 0 {
 		return msg
 	}
+	numArgs := len(args)
 
-	var message string
 	if strings.Contains(msg, "{}") {
-		message = strings.ReplaceAll(msg, "{}", "%+v")
-	} else if strings.Contains(msg, "%") {
-		message = msg
-	} else {
-		msg += strings.Repeat(":%+v", len(args))
-		message = msg
+		count := strings.Count(msg, "{}")
+		if count < numArgs {
+			msg += strings.Repeat(" :{}", numArgs-count)
+		}
+		message := strings.ReplaceAll(msg, "{}", "%+v")
+		return fmt.Sprintf(message, l.deferArgs(args...)...)
 	}
 
-	return fmt.Sprintf(message, l.deferArgs(args...)...)
+	if strings.Contains(msg, "%") {
+		for _, arg := range args {
+			msg += " :" + l.formatAny(arg)
+		}
+		return msg
+	}
+
+	msg += strings.Repeat(":%+v", numArgs)
+	return fmt.Sprintf(msg, l.deferArgs(args...)...)
 }
 
 func (l *AppLogger) deferArgs(args ...interface{}) []interface{} {
@@ -229,6 +237,10 @@ func (l *AppLogger) deferArgs(args ...interface{}) []interface{} {
 func (l *AppLogger) formatAny(v interface{}) string {
 	if v == nil {
 		return "<nil>"
+	}
+
+	if err, ok := v.(error); ok {
+		return err.Error()
 	}
 
 	rv := reflect.ValueOf(v)
