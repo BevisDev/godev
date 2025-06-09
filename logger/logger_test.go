@@ -2,6 +2,11 @@ package logger
 
 import (
 	"bytes"
+	"context"
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -22,6 +27,8 @@ func ptrTo[T any](v T) *T {
 
 func TestFormatMessage(t *testing.T) {
 	logger := &AppLogger{}
+	now := time.Date(2025, 6, 9, 10, 0, 0, 0, time.UTC)
+
 	tests := []struct {
 		msg      string
 		args     []interface{}
@@ -31,15 +38,18 @@ func TestFormatMessage(t *testing.T) {
 		{"value is {}", []interface{}{123}, "value is 123"},
 		{"value is {}", []interface{}{ptrTo("abc")}, "value is abc"},
 		{"value is {}", []interface{}{(*string)(nil)}, "value is <nil>"},
-		{"value is {}", []interface{}{User{ID: 1, Name: "Alice"}}, `value is {
-  "ID": 1,
-  "Name": "Alice"
-}`},
-		{"value is {}", []interface{}{&User{ID: 2, Name: "Bob"}}, `value is {
-  "ID": 2,
-  "Name": "Bob"
-}`},
+		{"value is {}", []interface{}{User{ID: 1, Name: "Alice"}}, "value is {\"ID\":1,\"Name\":\"Alice\"}"},
+		{"value is {}", []interface{}{&User{ID: 2, Name: "Bob"}}, "value is {\"ID\":2,\"Name\":\"Bob\"}"},
 		{"multiple placeholders: {}, {}", []interface{}{123, "abc"}, "multiple placeholders: 123, abc"},
+		{"decimal: {}", []interface{}{decimal.NewFromFloat(12.34)}, "decimal: 12.34"},
+		{"nullstring: {}", []interface{}{sql.NullString{String: "ok", Valid: true}}, "nullstring: ok"},
+		{"nullstring: {}", []interface{}{sql.NullString{Valid: false}}, "nullstring: <null>"},
+		{"time: {}", []interface{}{now}, "time: 2025-06-09T10:00:00Z"},
+		{"bytes: {}", []interface{}{[]byte("hello")}, `bytes: "hello"`},
+		{"bytes: {}", []interface{}{[]byte{0xff, 0xfe}}, "bytes: []byte(len=2)"},
+		{"raw json: {}", []interface{}{json.RawMessage(`{"foo":"bar"}`)}, `raw json: {"foo":"bar"}`},
+		{"err: {}", []interface{}{fmt.Errorf("something went wrong")}, "err: something went wrong"},
+		{"ctx: {}", []interface{}{context.Background()}, "ctx: <context>"},
 	}
 
 	for _, tt := range tests {

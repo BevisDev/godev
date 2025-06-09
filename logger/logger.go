@@ -1,16 +1,21 @@
 package logger
 
 import (
+	"context"
+	"database/sql"
+	"encoding/json"
 	"fmt"
 	"github.com/BevisDev/godev/consts"
 	"github.com/BevisDev/godev/utils/datetime"
 	"github.com/BevisDev/godev/utils/jsonx"
+	"github.com/shopspring/decimal"
 	"log"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/robfig/cron/v3"
 	"go.uber.org/zap"
@@ -257,6 +262,49 @@ func (l *AppLogger) formatAny(v interface{}) string {
 		v = rv.Interface()
 	}
 
+	// special type
+	switch val := v.(type) {
+	case decimal.Decimal:
+		return val.String()
+	case time.Time:
+		return val.Format(time.RFC3339)
+	case json.RawMessage:
+		return string(val)
+	case []byte:
+		if utf8.Valid(val) {
+			return fmt.Sprintf("%q", val)
+		}
+		return fmt.Sprintf("[]byte(len=%d)", len(val))
+	case context.Context:
+		return "<context>"
+	case sql.NullString:
+		if val.Valid {
+			return val.String
+		}
+		return "<null>"
+	case sql.NullInt64:
+		if val.Valid {
+			return fmt.Sprintf("%d", val.Int64)
+		}
+		return "<null>"
+	case sql.NullFloat64:
+		if val.Valid {
+			return fmt.Sprintf("%f", val.Float64)
+		}
+		return "<null>"
+	case sql.NullBool:
+		if val.Valid {
+			return fmt.Sprintf("%t", val.Bool)
+		}
+		return "<null>"
+	case sql.NullTime:
+		if val.Valid {
+			return val.Time.Format(time.RFC3339)
+		}
+		return "<null>"
+	}
+
+	// struct, map, slice: serialize via JSON
 	switch rv.Kind() {
 	case reflect.Struct, reflect.Map, reflect.Slice, reflect.Array:
 		return jsonx.ToJSON(v)
