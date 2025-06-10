@@ -166,7 +166,7 @@ func (r *RestClient) restTemplate(c context.Context, method string, req *Request
 			reqLogger.Query = str.ToString(req.Query)
 		}
 		if !matchPathIgnoreLogBody(urlStr, r.IgnoreLogAPIs) && bodyStr != "" {
-			req.Body = bodyStr
+			reqLogger.Body = bodyStr
 		}
 		if !r.IgnoreLogHeader {
 			reqLogger.Header = req.Header
