@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/BevisDev/godev/utils/jsonx"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
@@ -157,7 +158,7 @@ func TestLogRequest(t *testing.T) {
 		Method: "GET",
 		Query:  "id=1",
 		Header: map[string]string{"Authorization": "Bearer token"},
-		Body:   map[string]string{"data": "value"},
+		Body:   jsonx.ToJSON(map[string]string{"data": "value"}),
 	}
 
 	appLogger.LogRequest(req)
@@ -172,7 +173,7 @@ func TestLogResponse(t *testing.T) {
 		DurationSec: 2 * time.Second,
 		Status:      200,
 		Header:      map[string]string{"Content-Type": "application/json"},
-		Body:        map[string]string{"result": "ok"},
+		Body:        jsonx.ToJSON(map[string]string{"result": "ok"}),
 	}
 
 	appLogger.LogResponse(resp)
