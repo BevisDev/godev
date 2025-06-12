@@ -60,7 +60,7 @@ type RequestLogger struct {
 	Query  string
 	Method string
 	Header any
-	Body   any
+	Body   string
 }
 
 type ResponseLogger struct {
@@ -68,7 +68,7 @@ type ResponseLogger struct {
 	DurationSec time.Duration
 	Status      int
 	Header      any
-	Body        any
+	Body        string
 }
 
 type AppLogger struct {
@@ -352,7 +352,7 @@ func (l *AppLogger) LogRequest(req *RequestLogger) {
 		zap.String(consts.Method, req.Method),
 		zap.String(consts.Query, req.Query),
 		zap.Any(consts.Header, req.Header),
-		zap.Any(consts.Body, req.Body),
+		zap.String(consts.Body, req.Body),
 	)
 }
 
@@ -364,7 +364,7 @@ func (l *AppLogger) LogResponse(resp *ResponseLogger) {
 		zap.Int(consts.Status, resp.Status),
 		zap.Float64(consts.Duration, resp.DurationSec.Seconds()),
 		zap.Any(consts.Header, resp.Header),
-		zap.Any(consts.Body, resp.Body),
+		zap.String(consts.Body, resp.Body),
 	)
 }
 
@@ -378,7 +378,7 @@ func (l *AppLogger) LogExtRequest(req *RequestLogger) {
 		zap.String(consts.Method, req.Method),
 		zap.String(consts.Query, req.Query),
 		zap.Any(consts.Header, req.Header),
-		zap.Any(consts.Body, req.Body),
+		zap.String(consts.Body, req.Body),
 	)
 }
 
@@ -390,6 +390,6 @@ func (l *AppLogger) LogExtResponse(resp *ResponseLogger) {
 		zap.Int(consts.Status, resp.Status),
 		zap.Float64(consts.Duration, resp.DurationSec.Seconds()),
 		zap.Any(consts.Header, resp.Header),
-		zap.Any(consts.Body, resp.Body),
+		zap.String(consts.Body, resp.Body),
 	)
 }
