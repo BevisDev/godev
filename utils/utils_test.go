@@ -277,8 +277,8 @@ func TestIgnoreContentTypeLog(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := IgnoreContentTypeLog(tt.contentType); got != tt.want {
-				t.Errorf("IgnoreContentTypeLog(%q) = %v, want %v", tt.contentType, got, tt.want)
+			if got := SkipContentType(tt.contentType); got != tt.want {
+				t.Errorf("SkipContentType(%q) = %v, want %v", tt.contentType, got, tt.want)
 			}
 		})
 	}
@@ -468,29 +468,56 @@ func TestPercent(t *testing.T) {
 	}
 }
 
-func TestRoundTo5(t *testing.T) {
-	type testCase[T ~int | ~int8 | ~int16 | ~int32 | ~int64] struct {
+func TestMilli(t *testing.T) {
+	type testCase struct {
 		name     string
-		input    T
-		expected T
+		input    int64
+		expected int64
 	}
 
-	tests := []testCase[int]{
-		{"round 0", 0, 0},
-		{"round exact", 5, 5},
-		{"round under", 3, 0},
-		{"round 42 → 40", 42, 40},
-		{"round 45 → 45", 45, 45},
-		{"round 47 → 45", 47, 45},
-		{"round 99 → 95", 99, 95},
-		{"round 100 → 100", 100, 100},
-		{"round negative 4 → -5", -4, 0},
-		{"round negative 0 → 0", 0, 0},
+	tests := []testCase{
+		{"zero", 0, 0},
+		{"one", 1, 1_000_000},
+		{"five", 5, 5_000_000},
+		{"hundred", 100, 100_000_000},
+		{"negative", -3, -3_000_000},
+		{"large", 1_234_567, 1_234_567_000_000},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			result := RoundTo5(tc.input)
+			result := Milli(tc.input)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
+
+func TestRoundDownToMul(t *testing.T) {
+	type testCase[T ~int | ~int8 | ~int16 | ~int32 | ~int64] struct {
+		name     string
+		input    T
+		mul      T
+		expected T
+	}
+
+	tests := []testCase[int]{
+		{"round 0", 0, 5, 0},
+		{"round exact", 5, 5, 5},
+		{"round under", 3, 5, 0},
+		{"round 42 → 40", 42, 5, 40},
+		{"round 45 → 45", 45, 5, 45},
+		{"round 47 → 45", 47, 5, 45},
+		{"round 99 → 95", 99, 5, 95},
+		{"round 100 → 100", 100, 5, 100},
+		{"round negative -4 → 0", -4, 5, 0},
+		{"round negative -7 → -5", -7, 5, -5},
+		{"round large million", 42_000_000, 5_000_000, 40_000_000},
+		{"round large exact", 45_000_000, 5_000_000, 45_000_000},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := RoundDownToMul(tc.input, tc.mul)
 			assert.Equal(t, tc.expected, result)
 		})
 	}

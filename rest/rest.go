@@ -20,6 +20,8 @@ import (
 	"github.com/BevisDev/godev/utils"
 )
 
+const defaultTimeoutSec = 30
+
 // Request defines a standardized structure for making HTTP requests using RestClient.
 //
 // It supports query parameters, path parameters, custom headers, body payloads (as JSON),
@@ -50,13 +52,23 @@ type Request struct {
 	Result any
 }
 
-const defaultTimeoutSec = 30
-
 type RestConfig struct {
-	TimeoutSec      int
-	Logger          *logger.AppLogger
-	IgnoreLogHeader bool
-	IgnoreLogAPIs   []string
+	TimeoutSec    int
+	Logger        *logger.AppLogger
+	SkipLogHeader bool
+	SkipLogAPIs   []string
+}
+
+// RestClient wraps an HTTP client with a configurable timeout and optional logger.
+//
+// It is intended for making REST API calls with consistent timeout settings
+// and optional logging support via AppLogger.
+type RestClient struct {
+	Client        *http.Client
+	TimeoutSec    int
+	logger        *logger.AppLogger
+	SkipLogHeader bool
+	SkipLogAPIs   []string
 }
 
 // NewRestClient creates a new RestClient instance using the provided RestConfig.
@@ -72,7 +84,7 @@ type RestConfig struct {
 //
 //	cf := &RestConfig{
 //	    TimeoutSec:      10,
-//	    IgnoreLogHeader: true,
+//	    SkipLogHeader: true,
 //	}
 //
 //	restClient := NewRestClient(cf)
@@ -86,24 +98,12 @@ func NewRestClient(cf *RestConfig) *RestClient {
 	}
 
 	return &RestClient{
-		Client:          new(http.Client),
-		TimeoutSec:      cf.TimeoutSec,
-		logger:          cf.Logger,
-		IgnoreLogHeader: cf.IgnoreLogHeader,
-		IgnoreLogAPIs:   cf.IgnoreLogAPIs,
+		Client:        new(http.Client),
+		TimeoutSec:    cf.TimeoutSec,
+		logger:        cf.Logger,
+		SkipLogHeader: cf.SkipLogHeader,
+		SkipLogAPIs:   cf.SkipLogAPIs,
 	}
-}
-
-// RestClient wraps an HTTP client with a configurable timeout and optional logger.
-//
-// It is intended for making REST API calls with consistent timeout settings
-// and optional logging support via AppLogger.
-type RestClient struct {
-	Client          *http.Client
-	TimeoutSec      int
-	logger          *logger.AppLogger
-	IgnoreLogHeader bool
-	IgnoreLogAPIs   []string
 }
 
 func (r *RestClient) Get(c context.Context, req *Request) error {
@@ -130,6 +130,18 @@ func (r *RestClient) Delete(c context.Context, req *Request) error {
 	return r.restTemplate(c, http.MethodDelete, req)
 }
 
+// restTemplate builds and executes an HTTP request with optional logging and timeout.
+//
+// It constructs the URL, serializes the body (JSON or form data),
+// logs the request if logging is enabled, sets headers, and sends the HTTP request.
+//
+// Params:
+//   - c: Context for cancellation and timeout.
+//   - method: HTTP method (e.g., "GET", "POST").
+//   - req: Request configuration (URL, headers, query, body).
+//
+// Returns:
+//   - error if request creation or execution fails.
 func (r *RestClient) restTemplate(c context.Context, method string, req *Request) error {
 	var (
 		state      = utils.GetState(c)
@@ -149,8 +161,14 @@ func (r *RestClient) restTemplate(c context.Context, method string, req *Request
 		}
 		bodyStr = formValues.Encode()
 	} else if !validate.IsNilOrEmpty(req.Body) {
-		reqBody = jsonx.ToJSONBytes(req.Body)
-		bodyStr = str.ToString(reqBody)
+		switch b := req.Body.(type) {
+		case []byte:
+			reqBody = b
+			bodyStr = "[binary body]"
+		default:
+			reqBody = jsonx.ToJSONBytes(req.Body)
+			bodyStr = str.ToString(reqBody)
+		}
 	}
 
 	// log request
@@ -165,10 +183,10 @@ func (r *RestClient) restTemplate(c context.Context, method string, req *Request
 		if !validate.IsNilOrEmpty(req.Query) {
 			reqLogger.Query = str.ToString(req.Query)
 		}
-		if !matchPathIgnoreLogBody(urlStr, r.IgnoreLogAPIs) && bodyStr != "" {
+		if bodyStr != "" && !SkipAPI(urlStr, r.SkipLogAPIs) {
 			reqLogger.Body = bodyStr
 		}
-		if !r.IgnoreLogHeader {
+		if !r.SkipLogHeader {
 			reqLogger.Header = req.Header
 		}
 		r.logger.LogExtRequest(reqLogger)
@@ -180,10 +198,10 @@ func (r *RestClient) restTemplate(c context.Context, method string, req *Request
 		sb.WriteString(fmt.Sprintf(consts.Query+": %v\n", req.Query))
 		sb.WriteString(fmt.Sprintf(consts.Method+": %s\n", method))
 		sb.WriteString(fmt.Sprintf(consts.Time+": %s\n", datetime.ToString(startTime, datetime.DateTimeOffset)))
-		if !r.IgnoreLogHeader {
+		if !r.SkipLogHeader {
 			sb.WriteString(fmt.Sprintf(consts.Header+": %s\n", req.Header))
 		}
-		if !matchPathIgnoreLogBody(urlStr, r.IgnoreLogAPIs) && bodyStr != "" {
+		if !SkipAPI(urlStr, r.SkipLogAPIs) && bodyStr != "" {
 			sb.WriteString(fmt.Sprintf(consts.Body+": %s\n", bodyStr))
 		}
 		sb.WriteString("=================================\n")
@@ -220,6 +238,23 @@ func (r *RestClient) restTemplate(c context.Context, method string, req *Request
 	return r.execute(request, req, startTime, state)
 }
 
+// execute sends the prepared HTTP request, reads the response,
+// logs metadata and body (if enabled), and deserializes the response body.
+//
+// Behavior:
+//   - If req.Result is *[]byte, assigns raw body bytes.
+//   - Otherwise, deserializes JSON into req.Result.
+//   - Logs headers and body based on configuration.
+//   - Returns HttpError if the status code >= 400.
+//
+// Parameters:
+//   - request: The prepared *http.Request.
+//   - req: The original Request configuration.
+//   - startTime: The request start time (for logging).
+//   - state: A correlation ID or request state.
+//
+// Returns:
+//   - error if the request fails, the response is an error, or decoding fails.
 func (r *RestClient) execute(request *http.Request, req *Request, startTime time.Time, state string) error {
 	response, err := r.Client.Do(request)
 	if err != nil {
@@ -254,7 +289,7 @@ func (r *RestClient) execute(request *http.Request, req *Request, startTime time
 			Status:      response.StatusCode,
 			DurationSec: time.Since(startTime),
 		}
-		if !r.IgnoreLogHeader {
+		if !r.SkipLogHeader {
 			respLogger.Header = response.Header
 		}
 	} else {
@@ -262,7 +297,7 @@ func (r *RestClient) execute(request *http.Request, req *Request, startTime time
 		sb.WriteString(fmt.Sprintf(consts.State+": %s\n", state))
 		sb.WriteString(fmt.Sprintf(consts.Status+": %d\n", response.StatusCode))
 		sb.WriteString(fmt.Sprintf(consts.Duration+": %s\n", time.Since(startTime)))
-		if !r.IgnoreLogHeader {
+		if !r.SkipLogHeader {
 			sb.WriteString(fmt.Sprintf(consts.Header+": %s\n", response.Header))
 		}
 	}
@@ -297,8 +332,8 @@ func (r *RestClient) execute(request *http.Request, req *Request, startTime time
 	}
 
 	// log body
-	if !utils.IgnoreContentTypeLog(response.Header.Get(consts.ContentType)) &&
-		!matchPathIgnoreLogBody(request.URL.Path, r.IgnoreLogAPIs) {
+	if !utils.SkipContentType(response.Header.Get(consts.ContentType)) &&
+		!SkipAPI(request.URL.Path, r.SkipLogAPIs) {
 		respBodyStr = str.ToString(respBodyBytes)
 		if isLog {
 			respLogger.Body = respBodyStr
@@ -320,7 +355,17 @@ func (r *RestClient) execute(request *http.Request, req *Request, startTime time
 	return jsonx.JSONBytesToStruct(respBodyBytes, req.Result)
 }
 
-func matchPathIgnoreLogBody(u string, apis []string) bool {
+// SkipAPI checks whether the URL path matches any of the ignored API patterns.
+//
+// Returns true if the URL path ends with or contains any string in apis.
+//
+// Parameters:
+//   - u: The URL to check.
+//   - apis: A list of substrings or suffixes to skip.
+//
+// Returns:
+//   - true if the URL matches any pattern, false otherwise.
+func SkipAPI(u string, apis []string) bool {
 	if len(apis) == 0 {
 		return false
 	}
@@ -338,6 +383,15 @@ func matchPathIgnoreLogBody(u string, apis []string) bool {
 	return false
 }
 
+// buildURL replaces path parameters and appends query parameters to a base URL.
+//
+// Parameters:
+//   - urlStr: Base URL string (e.g., "/api/:id").
+//   - query: Map of path placeholders to replace.
+//   - params: Map of query parameters to append.
+//
+// Returns:
+//   - The final URL string.
 func (r *RestClient) buildURL(urlStr string, query map[string]string, params map[string]string) string {
 	for key, val := range query {
 		urlStr = strings.ReplaceAll(urlStr, ":"+key, val)
@@ -357,11 +411,18 @@ func (r *RestClient) buildURL(urlStr string, query map[string]string, params map
 	return urlStr
 }
 
+// buildHeaders sets HTTP headers on the request,
+// defaulting to the given Content-Type if none is provided.
+//
+// Parameters:
+//   - rq: The HTTP request to set headers on.
+//   - headers: Map of headers to add.
+//   - contentType: Default Content-Type to set if none is provided.
 func (r *RestClient) buildHeaders(rq *http.Request, headers map[string]string, contentType string) {
 	if validate.IsNilOrEmpty(headers) || headers[consts.ContentType] == "" {
 		rq.Header.Set(consts.ContentType, contentType)
 	}
 	for key, value := range headers {
-		rq.Header.Add(key, value)
+		rq.Header.Set(key, value)
 	}
 }

@@ -137,7 +137,7 @@ func MaskEmail(email string, sizeLocal, sizeDomain int) string {
 	return maskedLocal + "@" + maskedDomain
 }
 
-func IgnoreContentTypeLog(contentType string) bool {
+func SkipContentType(contentType string) bool {
 	switch {
 	case strings.HasPrefix(contentType, "image"),
 		strings.HasPrefix(contentType, "video"),
@@ -230,17 +230,30 @@ func Percent[T constraints.Integer](n T) float64 {
 	return float64(n) / 100
 }
 
-// RoundTo5 rounds an integer down to the nearest multiple of 5.
+// Milli multiplies an integer by one million.
 //
-// Useful for standardizing numeric values to pricing or scoring brackets.
+// It is useful when you want to convert a base unit into millions.
+// For example, Milli(5) returns 5,000,000.
 //
 // Example:
 //
-//	RoundTo5(42)  // returns 40
-//	RoundTo5(45)  // returns 45
-//	RoundTo5(47)  // returns 45
-func RoundTo5[T constraints.Integer](n T) T {
-	return (n / 5) * 5
+//	n := 5
+//	result := Milli(n)
+//	// result == 5_000_000
+func Milli(n int64) int64 {
+	return n * 1_000_000
+}
+
+// RoundDownToMul rounds down n to the nearest multiple of "multiple".
+// Example:
+//
+//	RoundDownToMul(47, 5) = 45
+//	RoundDownToMul(42_000_000, 5_000_000) = 40_000_000
+func RoundDownToMul[T constraints.Integer](n T, mul T) T {
+	if mul <= 0 {
+		return n
+	}
+	return (n / mul) * mul
 }
 
 // PtrTo returns a pointer to the given value.

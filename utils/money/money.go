@@ -105,33 +105,30 @@ func Format(m types.Money, decimalPlaces int32) string {
 	return m.StringFixed(decimalPlaces)
 }
 
-func Min(a, b decimal.Decimal) decimal.Decimal {
+func Min(a, b types.Money) types.Money {
 	if a.LessThan(b) {
 		return a
 	}
 	return b
 }
 
-func Max(a, b decimal.Decimal) decimal.Decimal {
+func Max(a, b types.Money) types.Money {
 	if a.GreaterThan(b) {
 		return a
 	}
 	return b
 }
 
-// RoundTo5 rounds a decimal number down to the nearest multiple of 5.
-//
-// It is useful for normalizing monetary or scoring values to step sizes.
-//
-// The rounding always floors the result (rounds toward negative infinity).
+// RoundDownToMul rounds down n to the nearest multiple of "multiple".
 //
 // Example:
 //
-//	decimal.NewFromInt(42)     => 40
-//	decimal.NewFromInt(45)     => 45
-//	decimal.NewFromInt(47)     => 45
-//	decimal.NewFromFloat(13.7) => 10
-func RoundTo5(n decimal.Decimal) decimal.Decimal {
-	five := decimal.NewFromInt(5)
-	return n.Div(five).Floor().Mul(five)
+//	RoundDownToMul(decimal.NewFromInt(47), decimal.NewFromInt(5)) = 45
+//	RoundDownToMul(decimal.NewFromFloat(13.7), decimal.NewFromInt(5)) = 10
+//	RoundDownToMul(decimal.NewFromInt(42_000_000), decimal.NewFromInt(5_000_000)) = 40_000_000
+func RoundDownToMul(n, multiple types.Money) types.Money {
+	if multiple.LessThanOrEqual(decimal.Zero) {
+		return n
+	}
+	return n.Div(multiple).Floor().Mul(multiple)
 }
