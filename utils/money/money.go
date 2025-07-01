@@ -118,17 +118,3 @@ func Max(a, b types.Money) types.Money {
 	}
 	return b
 }
-
-// RoundDownToMul rounds down n to the nearest multiple of "multiple".
-//
-// Example:
-//
-//	RoundDownToMul(decimal.NewFromInt(47), decimal.NewFromInt(5)) = 45
-//	RoundDownToMul(decimal.NewFromFloat(13.7), decimal.NewFromInt(5)) = 10
-//	RoundDownToMul(decimal.NewFromInt(42_000_000), decimal.NewFromInt(5_000_000)) = 40_000_000
-func RoundDownToMul(n, multiple types.Money) types.Money {
-	if multiple.LessThanOrEqual(decimal.Zero) {
-		return n
-	}
-	return n.Div(multiple).Floor().Mul(multiple)
-}

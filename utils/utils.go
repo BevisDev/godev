@@ -249,11 +249,38 @@ func Milli(n int64) int64 {
 //
 //	RoundDownToMul(47, 5) = 45
 //	RoundDownToMul(42_000_000, 5_000_000) = 40_000_000
+//	RoundDownToMul(-1, 5)        // = -5
+//	RoundDownToMul(-7, 5)        // = -10
+//	RoundDownToMul(-13, 5)       // = -15
 func RoundDownToMul[T constraints.Integer](n T, mul T) T {
-	if mul <= 0 {
+	if n == 0 || mul <= 0 || n%mul == 0 {
 		return n
 	}
+	if n < 0 {
+		return ((n / mul) - 1) * mul
+	}
 	return (n / mul) * mul
+}
+
+// RoundUpToMul rounds up n to the nearest multiple of mul.
+// Example:
+//
+//	RoundUpToMul(47, 5)        // = 50
+//	RoundUpToMul(41, 10)       // = 50
+//	RoundUpToMul(40, 10)       // = 40
+//	RoundUpToMul(42_000_000, 5_000_000) // = 45_000_000
+//	RoundUpToMul(-7, 5)        // = -5
+//	RoundUpToMul(-11, 5)       // = -10
+//	RoundUpToMul(-4, 5)        // = 0
+//	RoundUpToMul(-5, 5)        // = -5
+func RoundUpToMul[T constraints.Integer](n T, mul T) T {
+	if n == 0 || mul <= 0 || n%mul == 0 {
+		return n
+	}
+	if n < 0 {
+		return (n / mul) * mul
+	}
+	return ((n / mul) + 1) * mul
 }
 
 // PtrTo returns a pointer to the given value.

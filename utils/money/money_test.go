@@ -202,38 +202,3 @@ func TestMaxDecimal(t *testing.T) {
 	assert.True(t, Max(b, a).Equal(b), "Max of b and a should be b")
 	assert.True(t, Max(b, c).Equal(b), "Max of equal values should return one of them")
 }
-
-func TestRoundDownToMul(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    float64
-		multiple float64
-		expected float64
-	}{
-		{"0 multiple 5", 0, 5, 0},
-		{"exact 5", 5, 5, 5},
-		{"under 5", 4.9, 5, 0},
-		{"7.1 multiple 5", 7.1, 5, 5},
-		{"9.9 multiple 5", 9.9, 5, 5},
-		{"10 multiple 5", 10, 5, 10},
-		{"13.7 multiple 5", 13.7, 5, 10},
-		{"15 multiple 5", 15, 5, 15},
-		{"19.9 multiple 5", 19.9, 5, 15},
-		{"25 multiple 5", 25, 5, 25},
-		{"42_000_000 multiple 5_000_000", 42_000_000, 5_000_000, 40_000_000},
-		{"13.7 multiple 10", 13.7, 10, 10},
-		{"13.7 multiple 1", 13.7, 1, 13},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			n := decimal.NewFromFloat(tt.input)
-			mul := decimal.NewFromFloat(tt.multiple)
-			want := decimal.NewFromFloat(tt.expected)
-
-			got := RoundDownToMul(n, mul)
-
-			assert.Truef(t, got.Equal(want), "input=%s multiple=%s: got=%s; want=%s", n, mul, got, want)
-		})
-	}
-}

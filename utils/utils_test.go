@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/BevisDev/godev/consts"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/exp/constraints"
 	"testing"
 	"time"
 )
@@ -509,10 +510,10 @@ func TestRoundDownToMul(t *testing.T) {
 		{"round 47 → 45", 47, 5, 45},
 		{"round 99 → 95", 99, 5, 95},
 		{"round 100 → 100", 100, 5, 100},
-		{"round negative -4 → 0", -4, 5, 0},
-		{"round negative -7 → -5", -7, 5, -5},
 		{"round large million", 42_000_000, 5_000_000, 40_000_000},
 		{"round large exact", 45_000_000, 5_000_000, 45_000_000},
+		{"round negative -7 → -10", -7, 5, -10},
+		{"round negative -4 → -5", -4, 5, -5},
 	}
 
 	for _, tc := range tests {
@@ -520,6 +521,41 @@ func TestRoundDownToMul(t *testing.T) {
 			result := RoundDownToMul(tc.input, tc.mul)
 			assert.Equal(t, tc.expected, result)
 		})
+	}
+}
+
+func TestRoundUpToMul(t *testing.T) {
+	type testCase[T constraints.Integer] struct {
+		n        T
+		mul      T
+		expected T
+	}
+
+	tests := []testCase[int]{
+		{47, 5, 50},
+		{40, 10, 40},
+		{41, 10, 50},
+		{0, 5, 0},
+		{5, 5, 5},
+		{42_000_000, 5_000_000, 45_000_000},
+		{47, 0, 47},
+		{47, -5, 47},
+		{-1, 5, 0},
+		{-4, 5, 0},
+		{-5, 5, -5},
+		{-6, 5, -5},
+		{-7, 5, -5},
+		{-11, 5, -10},
+		{-13, 5, -10},
+		{-15, 5, -15},
+		{-17, 5, -15},
+	}
+
+	for _, tc := range tests {
+		result := RoundUpToMul(tc.n, tc.mul)
+		if result != tc.expected {
+			t.Errorf("RoundUpToMul(%d, %d) = %d; want %d", tc.n, tc.mul, result, tc.expected)
+		}
 	}
 }
 
