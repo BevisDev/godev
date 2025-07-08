@@ -150,3 +150,25 @@ func TestPretty_Nil(t *testing.T) {
 
 	assert.Equal(t, "null", result)
 }
+
+func TestClonePerson(t *testing.T) {
+	original := Person{
+		Name: "Bob",
+		Age:  40,
+	}
+
+	cloned, err := Clone(original)
+	if err != nil {
+		t.Fatalf("Clone failed: %v", err)
+	}
+
+	if cloned != original {
+		t.Errorf("Cloned object does not match original. Got %+v", cloned)
+	}
+
+	// Modify cloned to ensure it's not the same reference (deep copy)
+	cloned.Name = "Alice"
+	if original.Name == cloned.Name {
+		t.Errorf("Original changed when cloned modified!")
+	}
+}

@@ -70,6 +70,18 @@ const (
 	Scope             = "scope"
 )
 
+// pattern
+const (
+	Email         = `^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`
+	TenDigitPhone = `^\d{10}$`
+	UUID          = `^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$`
+	AlphaNumeric  = `^[a-zA-Z0-9]+$`
+	DateYYYYMMDD  = `^\d{4}-\d{2}-\d{2}$`
+	IPv4          = `^(\d{1,3}\.){3}\d{1,3}$`
+	VNIDNumber    = `^\d{9}(\d{3})?$`
+	FilePattern   = `^[\w,\s-]+\.[A-Za-z0-9]{1,8}$`
+)
+
 const (
 	State    = "state"
 	Status   = "status"
@@ -80,4 +92,58 @@ const (
 	Method   = "method"
 	Url      = "url"
 	Query    = "query"
+)
+
+// extension
+const (
+	// Text files
+	ExtTXT  = "txt"
+	ExtCSV  = "csv"
+	ExtJSON = "json"
+	ExtXML  = "xml"
+	ExtYAML = "yaml"
+	ExtMD   = "md"
+
+	// Images
+	ExtJPG  = "jpg"
+	ExtJPEG = "jpeg"
+	ExtPNG  = "png"
+	ExtGIF  = "gif"
+	ExtBMP  = "bmp"
+	ExtSVG  = "svg"
+	ExtWEBP = "webp"
+
+	// Archives
+	ExtZIP = "zip"
+	ExtRAR = "rar"
+	Ext7Z  = "7z"
+	ExtTAR = "tar"
+	ExtGZ  = "gz"
+
+	// Documents
+	ExtPDF  = "pdf"
+	ExtDOC  = "doc"
+	ExtDOCX = "docx"
+	ExtXLS  = "xls"
+	ExtXLSX = "xlsx"
+	ExtPPT  = "ppt"
+	ExtPPTX = "pptx"
+
+	// Code
+	ExtGO   = "go"
+	ExtJS   = "js"
+	ExtTS   = "ts"
+	ExtHTML = "html"
+	ExtCSS  = "css"
+	ExtSQL  = "sql"
+	ExtJAVA = "java"
+	ExtPY   = "py"
+
+	// Video & Audio
+	ExtMP4 = "mp4"
+	ExtAVI = "avi"
+	ExtMKV = "mkv"
+	ExtMOV = "mov"
+	ExtMP3 = "mp3"
+	ExtWAV = "wav"
 )

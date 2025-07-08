@@ -384,7 +384,7 @@ func (l *AppLogger) LogExtRequest(req *RequestLogger) {
 
 func (l *AppLogger) LogExtResponse(resp *ResponseLogger) {
 	l.Logger.WithOptions(
-		zap.AddCallerSkip(1)).Info(
+		zap.AddCallerSkip(2)).Info(
 		"[===== RESPONSE EXTERNAL INFO =====]",
 		zap.String(consts.State, resp.State),
 		zap.Int(consts.Status, resp.Status),

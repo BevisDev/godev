@@ -45,6 +45,19 @@ func ToStruct(jsonStr string, entry interface{}) error {
 	return nil
 }
 
+// Clone clones any struct or map via JSON marshal/unmarshal.
+// Note: Won't work if the struct has unexported fields.
+func Clone[T any](src T) (T, error) {
+	var dst T
+	b, err := json.Marshal(src)
+	if err != nil {
+		return dst, err
+	}
+
+	err = json.Unmarshal(b, &dst)
+	return dst, err
+}
+
 func StructToMap(entry interface{}) map[string]interface{} {
 	j := ToJSONBytes(entry)
 	var result map[string]interface{}

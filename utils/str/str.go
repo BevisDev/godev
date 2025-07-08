@@ -106,39 +106,54 @@ func ToFloat(str string) float64 {
 	return f
 }
 
-// NormalizeToASCII converts a Unicode string to its ASCII equivalent.
+// RemoveAccents converts a Unicode string to its equivalent without diacritical marks.
 //
-// It removes diacritical marks (e.g., accents), and replaces Vietnamese
-// characters "Đ"/"đ" with "D"/"d" explicitly.
+// It removes accents and diacritical marks (e.g., á → a, ü → u) and explicitly
+// replaces Vietnamese characters "Đ"/"đ" with "D"/"d".
 //
 // Example:
 //
-//	NormalizeToASCII("Bình Đẹp Trai") → "Binh Dep Trai"
-func NormalizeToASCII(str string) string {
-	result := norm.NFD.String(str)
-	var output []rune
-	for _, r := range result {
+//	RemoveAccents("Đặng Thị Ánh")   // "Dang Thi Anh"
+//	RemoveAccents("Café Noël ü")   // "Cafe Noel u"
+func RemoveAccents(str string) string {
+	if str == "" {
+		return ""
+	}
+
+	// Decompose characters
+	decomposed := norm.NFD.String(str)
+
+	var builder strings.Builder
+	builder.Grow(len(decomposed))
+
+	for _, r := range decomposed {
 		if unicode.Is(unicode.M, r) {
 			continue
 		}
-		output = append(output, r)
+
+		// replace directly
+		switch r {
+		case 'Đ':
+			builder.WriteRune('D')
+		case 'đ':
+			builder.WriteRune('d')
+		default:
+			builder.WriteRune(r)
+		}
 	}
-	normalized := string(output)
-	normalized = strings.ReplaceAll(normalized, "Đ", "D")
-	normalized = strings.ReplaceAll(normalized, "đ", "d")
-	return normalized
+	return builder.String()
 }
 
-// CleanText normalizes a string to ASCII and removes all non-alphanumeric characters,
+// Clean normalizes a string to ASCII and removes all non-alphanumeric characters,
 // except spaces.
 //
 // It is useful for generating slugs, sanitized input, or matching keywords.
 //
 // Example:
 //
-//	CleanText("Đặng Văn Lâm!!!") → "Dang Van Lam"
-func CleanText(str string) string {
-	o := NormalizeToASCII(str)
+//	Clean("Đặng Thị Ánh ♥ 123!") → "Dang Thi Anh 123"
+func Clean(str string) string {
+	o := RemoveAccents(str)
 	re := regexp.MustCompile(`[^a-zA-Z0-9\s]+`)
 	return re.ReplaceAllString(o, "")
 }
@@ -152,13 +167,13 @@ func RemoveWhiteSpace(str string) string {
 	return strings.ReplaceAll(str, " ", "")
 }
 
-// TruncateText limits the length of a string to at most `maxLen` runes.
+// Truncate limits the length of a string to at most `maxLen` runes.
 // If the input string is shorter than or equal to `maxLen`, it is returned unchanged.
 //
 // Example:
 //
-//	TruncateText("Hello, world!", 5) → "Hello"
-func TruncateText(s string, maxLen int) string {
+//	Truncate("Hello, world!", 5) → "Hello"
+func Truncate(s string, maxLen int) string {
 	runes := []rune(s)
 	if len(runes) > maxLen {
 		return string(runes[:maxLen])
@@ -166,6 +181,14 @@ func TruncateText(s string, maxLen int) string {
 	return s
 }
 
+// PadLeft prepends the rune `c` to the string `s` `count` times.
+//
+// If `count` is less than or equal to 0, it returns `s` unchanged.
+//
+// Example:
+//
+//	PadLeft("abc", 3, '0') => "000abc"
+//	PadLeft("hello", 3, 'A') => "AAAhello"
 func PadLeft(s string, count int, c rune) string {
 	if count <= 0 {
 		return s
@@ -173,6 +196,14 @@ func PadLeft(s string, count int, c rune) string {
 	return strings.Repeat(string(c), count) + s
 }
 
+// PadRight appends the rune `c` to the string `s` `count` times.
+//
+// If `count` is less than or equal to 0, it returns `s` unchanged.
+//
+// Example:
+//
+//	PadRight("abc", 3, '0') => "abc000"
+//	PadRight("abc", 3, 'A') => "abcAAA"
 func PadRight(s string, count int, c rune) string {
 	if count <= 0 {
 		return s
@@ -212,4 +243,62 @@ func PadCenter(s string, start int, count int, c rune) string {
 
 	insert := strings.Repeat(string(c), count)
 	return s[:start] + insert + s[start:]
+}
+
+// CompileRegex compiles a regular expression pattern into a Regexp object.
+//
+// It returns an error if the pattern is invalid.
+//
+// Example:
+//
+//	re, err := CompileRegex(`\d+`)
+//	if err != nil {
+//	    // handle error
+//	}
+//	matches := re.FindAllString("abc123def456", -1) // ["123", "456"]
+func CompileRegex(pattern string) (*regexp.Regexp, error) {
+	return regexp.Compile(pattern)
+}
+
+// FindAllMatches finds all non-overlapping matches of the regular expression pattern
+// in the input string s and returns them as a slice of strings.
+//
+// If the pattern is invalid, it returns nil.
+//
+// Example:
+//
+//	FindAllMatches("a1b2c3", `\d`) → []string{"1", "2", "3"}
+func FindAllMatches(s, pattern string) []string {
+	re, err := CompileRegex(pattern)
+	if err != nil {
+		return nil
+	}
+	return re.FindAllString(s, -1)
+}
+
+// Contains reports whether the substring subStr is within s.
+//
+// Example:
+//
+//	Contains("Hello, world", "world") → true
+func Contains(s, subStr string) bool {
+	return strings.Contains(s, subStr)
+}
+
+// StartWith reports whether the string s begins with substring subStr.
+//
+// Example:
+//
+//	StartWith("Hello, world", "Hello") → true
+func StartWith(s, subStr string) bool {
+	return strings.HasPrefix(s, subStr)
+}
+
+// EndWith reports whether the string s ends with substring subStr.
+//
+// Example:
+//
+//	EndWith("Hello, world", "world") → true
+func EndWith(s, subStr string) bool {
+	return strings.HasSuffix(s, subStr)
 }

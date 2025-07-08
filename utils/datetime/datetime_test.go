@@ -1,6 +1,7 @@
 package datetime
 
 import (
+	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
 )
@@ -160,5 +161,161 @@ func TestIsWeekend(t *testing.T) {
 		if result := IsWeekend(tt.input); result != tt.expected {
 			t.Errorf("IsWeekend(%v) = %v; want %v", tt.input, result, tt.expected)
 		}
+	}
+}
+
+func TestGetTimestamp(t *testing.T) {
+	ts := GetTimestamp()
+	assert.Greater(t, ts, int64(0))
+}
+
+func TestCalcAgeAt(t *testing.T) {
+	tests := []struct {
+		dob      string
+		now      string
+		expected int
+		name     string
+	}{
+		{"2000-04-20", "2025-04-21", 25, "Birthday passed this year"},
+		{"2000-05-10", "2025-04-21", 24, "Birthday not yet this year"},
+		{"2000-04-21", "2025-04-21", 25, "Birthday is today"},
+		{"2025-04-21", "2025-04-21", 0, "Born today"},
+		{"2026-01-01", "2025-04-21", -1, "Future date"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dob := mustParse(tc.dob)
+			now := mustParse(tc.now)
+			age := CalculateAge(dob, now)
+			if age != tc.expected {
+				t.Errorf("Expected age %d, got %d", tc.expected, age)
+			}
+		})
+	}
+}
+
+func mustParse(date string) time.Time {
+	t, err := time.Parse("2006-01-02", date)
+	if err != nil {
+		panic(err)
+	}
+	return t
+}
+
+func TestIsToday(t *testing.T) {
+	now := time.Now()
+
+	if !IsToday(now) {
+		t.Error("Expected IsToday to return true for current time")
+	}
+
+	// Tomorrow
+	tomorrow := now.AddDate(0, 0, 1)
+	if IsToday(tomorrow) {
+		t.Error("Expected IsToday to return false for tomorrow")
+	}
+
+	// Yesterday
+	yesterday := now.AddDate(0, 0, -1)
+	if IsToday(yesterday) {
+		t.Error("Expected IsToday to return false for yesterday")
+	}
+}
+
+func TestIsYesterday(t *testing.T) {
+	now := time.Now()
+
+	// Yesterday
+	yesterday := now.AddDate(0, 0, -1)
+	if !IsYesterday(yesterday) {
+		t.Error("Expected IsYesterday to return true for yesterday")
+	}
+
+	// Today
+	if IsYesterday(now) {
+		t.Error("Expected IsYesterday to return false for today")
+	}
+
+	// Two days ago
+	twoDaysAgo := now.AddDate(0, 0, -2)
+	if IsYesterday(twoDaysAgo) {
+		t.Error("Expected IsYesterday to return false for two days ago")
+	}
+}
+
+func TestStartOfWeek(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    time.Time
+		expected time.Time
+	}{
+		{
+			name:     "Wednesday",
+			input:    time.Date(2025, 7, 9, 15, 30, 0, 0, time.UTC), // Wednesday
+			expected: time.Date(2025, 7, 7, 0, 0, 0, 0, time.UTC),   // Monday
+		},
+		{
+			name:     "Saturday",
+			input:    time.Date(2025, 7, 12, 12, 0, 0, 0, time.UTC), // Sunday
+			expected: time.Date(2025, 7, 7, 0, 0, 0, 0, time.UTC),   // Monday
+		},
+		{
+			name:     "Sunday",
+			input:    time.Date(2025, 7, 13, 12, 0, 0, 0, time.UTC), // Sunday
+			expected: time.Date(2025, 7, 7, 0, 0, 0, 0, time.UTC),   // Monday
+		},
+		{
+			name:     "Monday",
+			input:    time.Date(2025, 7, 7, 10, 0, 0, 0, time.UTC), // Monday
+			expected: time.Date(2025, 7, 7, 0, 0, 0, 0, time.UTC),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := StartOfWeek(tt.input)
+			if !got.Equal(tt.expected) {
+				t.Errorf("StartOfWeek() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestEndOfWeek(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    time.Time
+		expected time.Time
+	}{
+		{
+			name:     "Wednesday",
+			input:    time.Date(2025, 7, 9, 15, 30, 0, 0, time.UTC),           // Wednesday
+			expected: time.Date(2025, 7, 13, 23, 59, 59, 999999000, time.UTC), // Sunday
+		},
+		{
+			name:     "Saturday",
+			input:    time.Date(2025, 7, 12, 12, 0, 0, 0, time.UTC), // Sunday
+			expected: time.Date(2025, 7, 13, 23, 59, 59, 999999000, time.UTC),
+		},
+		{
+			name:     "Sunday",
+			input:    time.Date(2025, 7, 13, 12, 0, 0, 0, time.UTC), // Sunday
+			expected: time.Date(2025, 7, 13, 23, 59, 59, 999999000, time.UTC),
+		},
+		{
+			name:     "Monday",
+			input:    time.Date(2025, 7, 7, 10, 0, 0, 0, time.UTC), // Monday
+			expected: time.Date(2025, 7, 13, 23, 59, 59, 999999000, time.UTC),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := EndOfWeek(tt.input)
+			if !got.Equal(tt.expected) {
+				t.Errorf("EndOfWeek() = %v, want %v", got, tt.expected)
+			}
+		})
 	}
 }

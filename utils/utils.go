@@ -49,18 +49,6 @@ func ContainsIgnoreCase(s, substr string) bool {
 	)
 }
 
-func CalcAgeAt(dob, t time.Time) int {
-	age := t.Year() - dob.Year()
-	if t.Month() < dob.Month() || (t.Month() == dob.Month() && t.Day() < dob.Day()) {
-		age--
-	}
-	return age
-}
-
-func GetCurrentTimestamp() int64 {
-	return time.Now().UnixMilli()
-}
-
 func MaskLeft(s string, size int) string {
 	if size <= 0 || size > len(s) {
 		size = len(s)

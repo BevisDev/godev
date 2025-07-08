@@ -131,7 +131,7 @@ func TestToFloat(t *testing.T) {
 	}
 }
 
-func TestNormalizeToASCII(t *testing.T) {
+func TestRemoveAccents(t *testing.T) {
 	tests := []struct {
 		input    string
 		expected string
@@ -141,11 +141,12 @@ func TestNormalizeToASCII(t *testing.T) {
 		{"Điện Biên Phủ", "Dien Bien Phu"},
 		{"Tôi yêu tiếng Việt", "Toi yeu tieng Viet"},
 		{"Không dấu", "Khong dau"},
+		{"Ñandú", "Nandu"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			result := NormalizeToASCII(tt.input)
+			result := RemoveAccents(tt.input)
 			if result != tt.expected {
 				t.Errorf("NormalizeToASCII(%q) = %q; want %q", tt.input, result, tt.expected)
 			}
@@ -165,7 +166,7 @@ func TestCleanText(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			result := CleanText(tt.input)
+			result := Clean(tt.input)
 			if result != tt.expected {
 				t.Errorf("CleanText(%q) = %q; want %q", tt.input, result, tt.expected)
 			}
@@ -234,7 +235,7 @@ func TestTruncateText(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actual := TruncateText(tt.input, tt.max)
+			actual := Truncate(tt.input, tt.max)
 			if actual != tt.expected {
 				t.Errorf("expected '%s', got '%s'", tt.expected, actual)
 			}
@@ -312,5 +313,73 @@ func TestPadCenter(t *testing.T) {
 					tt.input, tt.start, tt.count, tt.char, result, tt.expected)
 			}
 		})
+	}
+}
+
+func TestCompileRegex(t *testing.T) {
+	pattern := `\d+`
+	re, err := CompileRegex(pattern)
+	if err != nil {
+		t.Fatalf("unexpected error compiling pattern: %v", err)
+	}
+	matches := re.FindAllString("abc123def456", -1)
+	expected := []string{"123", "456"}
+	if len(matches) != len(expected) {
+		t.Fatalf("expected %d matches, got %d", len(expected), len(matches))
+	}
+	for i := range matches {
+		if matches[i] != expected[i] {
+			t.Errorf("expected match %q, got %q", expected[i], matches[i])
+		}
+	}
+}
+
+func TestCompileRegex_InvalidPattern(t *testing.T) {
+	_, err := CompileRegex(`(\`)
+	if err == nil {
+		t.Fatal("expected error compiling invalid pattern, got nil")
+	}
+}
+
+func TestFindAllMatches(t *testing.T) {
+	input := "Emails: test1@mail.com, test2@abc.org"
+	pattern := `[\w\.-]+@[\w\.-]+\.\w+`
+	expected := []string{"test1@mail.com", "test2@abc.org"}
+
+	result := FindAllMatches(input, pattern)
+	if len(result) != len(expected) {
+		t.Fatalf("Expected %d matches, got %d", len(expected), len(result))
+	}
+	for i, match := range result {
+		if match != expected[i] {
+			t.Errorf("Expected %q, got %q", expected[i], match)
+		}
+	}
+}
+
+func TestContains(t *testing.T) {
+	if !Contains("Hello, world", "world") {
+		t.Error(`Contains("Hello, world", "world") = false; want true`)
+	}
+	if Contains("Hello, world", "mars") {
+		t.Error(`Contains("Hello, world", "mars") = true; want false`)
+	}
+}
+
+func TestStartWith(t *testing.T) {
+	if !StartWith("Hello, world", "Hello") {
+		t.Error(`StartWith("Hello, world", "Hello") = false; want true`)
+	}
+	if StartWith("Hello, world", "world") {
+		t.Error(`StartWith("Hello, world", "world") = true; want false`)
+	}
+}
+
+func TestEndWith(t *testing.T) {
+	if !EndWith("Hello, world", "world") {
+		t.Error(`EndWith("Hello, world", "world") = false; want true`)
+	}
+	if EndWith("Hello, world", "Hello") {
+		t.Error(`EndWith("Hello, world", "Hello") = true; want false`)
 	}
 }

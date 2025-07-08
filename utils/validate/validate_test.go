@@ -56,6 +56,55 @@ func TestIsNilOrEmpty(t *testing.T) {
 	}
 }
 
+func TestIsNilOrZero(t *testing.T) {
+	var (
+		nilIntPointer   *int
+		nilFloatPointer *float64
+	)
+
+	var (
+		zeroInt = 0
+		i       = 42
+	)
+
+	var (
+		zeroFloat = float64(0)
+		f         = 3.14
+	)
+
+	tests := []struct {
+		name string
+		v    interface{}
+		want bool
+	}{
+		{"Nil interface", nil, true},
+		{"Nil int pointer", nilIntPointer, true},
+		{"Nil float pointer", nilFloatPointer, true},
+		{"Zero int value", 0, true},
+		{"Non-zero int value", 100, false},
+		{"Zero int pointer", &zeroInt, true},
+		{"Non-zero int pointer", &i, false},
+		{"Zero float value", 0.0, true},
+		{"Non-zero float value", 1.23, false},
+		{"Zero float pointer", &zeroFloat, true},
+		{"Non-zero float pointer", &f, false},
+		{"Zero uint value", uint(0), true},
+		{"Non-zero uint value", uint(55), false},
+		{"Zero int64 value", int64(0), true},
+		{"Non-zero int64 value", int64(-1), false},
+		{"Unsupported type (string)", "hello", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := IsNilOrZero(tt.v)
+			if got != tt.want {
+				t.Errorf("IsNilOrZero(%v) = %v, want %v", tt.v, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestIsErrorOrEmpty(t *testing.T) {
 	errSample := errors.New("some error")
 	tests := []struct {
@@ -183,6 +232,141 @@ func TestIsValidPhoneNumber(t *testing.T) {
 			result := IsValidPhoneNumber(tt.phone, tt.size)
 			if result != tt.expected {
 				t.Errorf("IsValidPhoneNumber(%q, %d) = %v; want %v", tt.phone, tt.size, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestPatterns(t *testing.T) {
+	tests := []struct {
+		name     string
+		fn       func(string) bool
+		input    string
+		expected bool
+	}{
+		{"Email valid", IsEmail, "test@example.com", true},
+		{"Email invalid", IsEmail, "invalid@", false},
+
+		{"Phone valid", IsPhoneNumber, "0123456789", true},
+		{"Phone invalid", IsPhoneNumber, "123456789", false},
+
+		{"UUID valid", IsUUID, "550e8400-e29b-41d4-a716-446655440000", true},
+		{"UUID invalid", IsUUID, "550e8400", false},
+
+		{"Date valid", IsDate, "2024-12-31", true},
+		{"Date invalid", IsDate, "31-12-2024", false},
+
+		{"IPv4 valid", IsIPv4, "192.168.1.1", true},
+		{"IPv4 invalid", IsIPv4, "999.999.999.999", false},
+
+		{"AlphaNumeric valid", IsAlphaNumeric, "abc123", true},
+		{"AlphaNumeric invalid", IsAlphaNumeric, "abc 123", false},
+
+		{"VietnamID CMND", IsVietnamID, "123456789", true},
+		{"VietnamID CCCD", IsVietnamID, "123456789012", true},
+		{"VietnamID invalid", IsVietnamID, "12345678", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.fn(tt.input)
+			if result != tt.expected {
+				t.Errorf("Got %v, want %v for input %q", result, tt.expected, tt.input)
+			}
+		})
+	}
+}
+
+func TestIsStrongPassword(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected bool
+	}{
+		{"P@ssw0rd", true},
+		{"Strong1!", true},
+		{"My$ecret9", true},
+
+		{"password", false},
+		{"Passw0rd", false},
+		{"12345678!", false},
+		{"PASSWORD1!", false},
+		{"password1!", false},
+		{"Pa1!", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			result := IsStrongPassword(tt.input, 8)
+			if result != tt.expected {
+				t.Errorf("IsStrongPassword(%q) = %v; want %v", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestIsValidFileName(t *testing.T) {
+	tests := []struct {
+		name       string
+		filename   string
+		allowedExt []string
+		want       bool
+	}{
+		{
+			name:       "Valid txt file",
+			filename:   "report.txt",
+			allowedExt: []string{"txt", "csv"},
+			want:       true,
+		},
+		{
+			name:       "Valid CSV file",
+			filename:   "data-file_2023.csv",
+			allowedExt: []string{"csv"},
+			want:       true,
+		},
+		{
+			name:       "Invalid extension",
+			filename:   "archive.7z",
+			allowedExt: []string{"zip"},
+			want:       false,
+		},
+		{
+			name:       "No extension",
+			filename:   "readme",
+			allowedExt: []string{"txt"},
+			want:       false,
+		},
+		{
+			name:       "Ends with dot",
+			filename:   "file.",
+			allowedExt: []string{"txt"},
+			want:       false,
+		},
+		{
+			name:       "Uppercase extension",
+			filename:   "presentation.PDF",
+			allowedExt: []string{"pdf"},
+			want:       true,
+		},
+		{
+			name:       "Extension with number",
+			filename:   "archive.v2",
+			allowedExt: []string{"v2"},
+			want:       true,
+		},
+		{
+			name:       "Pattern mismatch",
+			filename:   "bad*name.txt",
+			allowedExt: []string{"txt"},
+			want:       false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := IsValidFileName(tt.filename, tt.allowedExt)
+			if got != tt.want {
+				t.Errorf("IsValidFileName(%q, %v) = %v, want %v",
+					tt.filename, tt.allowedExt, got, tt.want)
 			}
 		})
 	}

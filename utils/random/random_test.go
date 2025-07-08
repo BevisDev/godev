@@ -18,7 +18,7 @@ func TestGenUUID(t *testing.T) {
 	}
 }
 
-func TestRandIntInRange(t *testing.T) {
+func TestRandInt(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		val := RandInt(5, 10)
 		assert.GreaterOrEqual(t, val, 5)

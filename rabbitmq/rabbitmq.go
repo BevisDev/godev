@@ -25,6 +25,7 @@ type RabbitMQ struct {
 	TimeoutSec int
 }
 
+// defaultTimeoutSec defines the default timeout (in seconds) for rabbitmq operations.
 const defaultTimeoutSec = 10
 
 // NewRabbitMQ creates a new RabbitMQ client using the provided configuration.
