@@ -1,10 +1,5 @@
 package types
 
-// KindDB type
-type KindDB int
-
-type DBJSONTemplate string
-
 const (
 	TemplateJSONArray  DBJSONTemplate = "array"
 	TemplateJSONObject DBJSONTemplate = "object"

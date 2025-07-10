@@ -3,6 +3,7 @@ package str
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/BevisDev/godev/types"
 	"github.com/shopspring/decimal"
 	"golang.org/x/text/unicode/norm"
 	"reflect"
@@ -82,28 +83,56 @@ func ToString(value any) string {
 	return fmt.Sprintf("%+v", val.Interface())
 }
 
-func ToInt64(s string) int64 {
-	i, err := strconv.ParseInt(s, 10, 64)
-	if err != nil {
-		return 0
+// ToInt parses a string to any signed integer type (int, int16, ...).
+func ToInt[T types.SignedInteger](s string) T {
+	var zero T
+	var bitSize int
+
+	switch any(zero).(type) {
+	case int:
+		i, err := strconv.Atoi(s)
+		if err != nil {
+			return zero
+		}
+		return T(i)
+	case int8:
+		bitSize = 8
+	case int16:
+		bitSize = 16
+	case int32:
+		bitSize = 32
+	case int64:
+		bitSize = 64
+	default:
+		return zero
 	}
-	return i
+
+	i, err := strconv.ParseInt(s, 10, bitSize)
+	if err != nil {
+		return zero
+	}
+	return T(i)
 }
 
-func ToInt(str string) int {
-	i, err := strconv.Atoi(str)
-	if err != nil {
-		return 0
-	}
-	return i
-}
+// ToFloat parses a string to float32 or float64.
+func ToFloat[T types.SignedFloat](str string) T {
+	var zero T
+	var bitSize int
 
-func ToFloat(str string) float64 {
-	f, err := strconv.ParseFloat(str, 64)
-	if err != nil {
-		return 0.0
+	switch any(zero).(type) {
+	case float32:
+		bitSize = 32
+	case float64:
+		bitSize = 64
+	default:
+		return zero
 	}
-	return f
+
+	f, err := strconv.ParseFloat(str, bitSize)
+	if err != nil {
+		return zero
+	}
+	return T(f)
 }
 
 // RemoveAccents converts a Unicode string to its equivalent without diacritical marks.

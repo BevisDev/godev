@@ -1,6 +1,7 @@
 package str
 
 import (
+	"github.com/BevisDev/godev/types"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -68,66 +69,144 @@ func TestToString(t *testing.T) {
 	}
 }
 
-func TestToInt64(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		expected int64
-	}{
-		{"Valid positive number", "12345", 12345},
-		{"Valid negative number", "-67890", -67890},
-		{"Zero", "0", 0},
-		{"Invalid string", "abc", 0},
-		{"Empty string", "", 0},
-		{"Float as string", "3.14", 0},
-		{"Too large for int64", "9999999999999999999999999", 0},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := ToInt64(tt.input)
-			if result != tt.expected {
-				t.Errorf("ToInt64(%q) = %d; want %d", tt.input, result, tt.expected)
-			}
-		})
-	}
-}
-
 func TestToInt(t *testing.T) {
-	tests := []struct {
+	type testCase[T types.SignedInteger] struct {
 		input    string
-		expected int
-	}{
+		expected T
+	}
+
+	tests := []testCase[int]{
 		{"42", 42},
 		{"0", 0},
 		{"-123", -123},
-		{"abc", 0},
-		{"", 0},
-		{"9999999999", 9999999999},
+		{"abc", 0}, // invalid string → fallback 0
+		{"", 0},    // empty string → fallback 0
 	}
 
 	for _, tt := range tests {
-		result := ToInt(tt.input)
-		assert.Equal(t, tt.expected, result, "ToInt(%s) should be %d", tt.input, tt.expected)
+		result := ToInt[int](tt.input)
+		assert.Equal(t, tt.expected, result, "ToInt[int](%q)", tt.input)
 	}
 }
 
-func TestToFloat(t *testing.T) {
+func TestToInt_Int8(t *testing.T) {
+	type testCase struct {
+		input    string
+		expected int8
+	}
+	tests := []testCase{
+		{"127", 127},   // max int8
+		{"-128", -128}, // min int8
+		{"0", 0},
+		{"42", 42},
+		{"128", 0},  // overflow
+		{"-129", 0}, // underflow
+		{"abc", 0},  // invalid
+		{"", 0},     // empty string
+	}
+
+	for _, tt := range tests {
+		result := ToInt[int8](tt.input)
+		assert.Equal(t, tt.expected, result, "ToInt[int8](%q)", tt.input)
+	}
+}
+
+func TestToInt_Int16(t *testing.T) {
+	type testCase struct {
+		input    string
+		expected int16
+	}
+	tests := []testCase{
+		{"123", 123},
+		{"-32768", -32768},
+		{"32767", 32767},
+		{"32768", 0},  // overflow
+		{"-32769", 0}, // underflow
+		{"abc", 0},    // invalid
+	}
+
+	for _, tt := range tests {
+		result := ToInt[int16](tt.input)
+		assert.Equal(t, tt.expected, result, "ToInt[int16](%q)", tt.input)
+	}
+}
+
+func TestToInt_Int32(t *testing.T) {
+	type testCase struct {
+		input    string
+		expected int32
+	}
+	tests := []testCase{
+		{"123456", 123456},
+		{"2147483647", 2147483647},   // max int32
+		{"-2147483648", -2147483648}, // min int32
+		{"2147483648", 0},            // overflow
+		{"abc", 0},                   // invalid
+	}
+
+	for _, tt := range tests {
+		result := ToInt[int32](tt.input)
+		assert.Equal(t, tt.expected, result, "ToInt[int32](%q)", tt.input)
+	}
+}
+
+func TestToInt_Int32_Overflow(t *testing.T) {
+	result := ToInt[int32]("9999999999")
+	assert.Equal(t, int32(0), result, "should fallback to 0 due to overflow")
+}
+
+func TestToInt_Int64(t *testing.T) {
+	type testCase struct {
+		input    string
+		expected int64
+	}
+	tests := []testCase{
+		{"9223372036854775807", 9223372036854775807},   // max int64
+		{"-9223372036854775808", -9223372036854775808}, // min int64
+		{"9223372036854775808", 0},                     // overflow
+		{"abc", 0},                                     // invalid
+	}
+
+	for _, tt := range tests {
+		result := ToInt[int64](tt.input)
+		assert.Equal(t, tt.expected, result, "ToInt[int64](%q)", tt.input)
+	}
+}
+
+func TestToFloat64(t *testing.T) {
 	tests := []struct {
 		input    string
 		expected float64
 	}{
 		{"3.14", 3.14},
-		{"0", 0},
+		{"0", 0.0},
 		{"-2.718", -2.718},
-		{"abc", 0.0},
-		{"", 0.0},
-		{"1e10", 1e10},
+		{"abc", 0.0},   // invalid → fallback 0
+		{"", 0.0},      // empty → fallback 0
+		{"1e10", 1e10}, // scientific notation
 	}
 
 	for _, tt := range tests {
-		result := ToFloat(tt.input)
-		assert.InDelta(t, tt.expected, result, 0.0001, "ToFloat(%s) should be approx %.4f", tt.input, tt.expected)
+		result := ToFloat[float64](tt.input)
+		assert.InDelta(t, tt.expected, result, 0.0001, "ToFloat[float64](%q)", tt.input)
+	}
+}
+
+func TestToFloat32(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected float32
+	}{
+		{"3.14", 3.14},
+		{"0", 0.0},
+		{"-2.5", -2.5},
+		{"abc", 0.0},
+		{"1.2e3", 1200.0},
+	}
+
+	for _, tt := range tests {
+		result := ToFloat[float32](tt.input)
+		assert.InDelta(t, tt.expected, result, 0.001, "ToFloat[float32](%q)", tt.input)
 	}
 }
 
