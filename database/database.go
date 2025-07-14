@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/BevisDev/godev/types"
 	"github.com/BevisDev/godev/utils"
+	"github.com/BevisDev/godev/utils/str"
 	"github.com/BevisDev/godev/utils/validate"
 	"github.com/jmoiron/sqlx"
 	"log"
@@ -218,7 +219,7 @@ func (d *Database) MustBePtr(dest interface{}) (err error) {
 // the auto-generated ID after an INSERT statement.
 // If the database kind is unsupported, the original query is returned unchanged.
 func (d *Database) AppendReturningId(query string) string {
-	endSemiColon := strings.HasSuffix(query, ";")
+	endSemiColon := str.EndWith(query, ";")
 
 	switch d.kindDB {
 	case types.SqlServer:

@@ -320,7 +320,8 @@ func Contains(s, subStr string) bool {
 //
 //	StartWith("Hello, world", "Hello") → true
 func StartWith(s, subStr string) bool {
-	return strings.HasPrefix(s, subStr)
+	trimmed := strings.TrimLeftFunc(s, unicode.IsSpace)
+	return strings.HasPrefix(trimmed, subStr)
 }
 
 // EndWith reports whether the string s ends with substring subStr.
@@ -329,5 +330,6 @@ func StartWith(s, subStr string) bool {
 //
 //	EndWith("Hello, world", "world") → true
 func EndWith(s, subStr string) bool {
-	return strings.HasSuffix(s, subStr)
+	trimmed := strings.TrimRightFunc(s, unicode.IsSpace)
+	return strings.HasSuffix(trimmed, subStr)
 }

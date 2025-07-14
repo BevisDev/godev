@@ -370,7 +370,7 @@ func (l *AppLogger) LogResponse(resp *ResponseLogger) {
 
 func (l *AppLogger) LogExtRequest(req *RequestLogger) {
 	l.Logger.WithOptions(
-		zap.AddCallerSkip(2)).Info(
+		zap.AddCallerSkip(3)).Info(
 		"[===== REQUEST EXTERNAL INFO =====]",
 		zap.String(consts.State, req.State),
 		zap.String(consts.Url, req.URL),
@@ -384,7 +384,7 @@ func (l *AppLogger) LogExtRequest(req *RequestLogger) {
 
 func (l *AppLogger) LogExtResponse(resp *ResponseLogger) {
 	l.Logger.WithOptions(
-		zap.AddCallerSkip(2)).Info(
+		zap.AddCallerSkip(3)).Info(
 		"[===== RESPONSE EXTERNAL INFO =====]",
 		zap.String(consts.State, resp.State),
 		zap.Int(consts.Status, resp.Status),

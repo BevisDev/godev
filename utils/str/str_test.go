@@ -446,18 +446,44 @@ func TestContains(t *testing.T) {
 }
 
 func TestStartWith(t *testing.T) {
-	if !StartWith("Hello, world", "Hello") {
+	// positive
+	if !StartWith("   Hello, world", "Hello") {
 		t.Error(`StartWith("Hello, world", "Hello") = false; want true`)
 	}
+
+	// has white space or tab
+	if !StartWith("   Hello, world", "Hello") {
+		t.Error(`StartWith("Hello, world", "Hello") = false; want true`)
+	}
+
+	// has break line
+	if !StartWith("\t\nHello, world", "Hello") {
+		t.Error(`StartWith("Hello, world", "Hello") = false; want true`)
+	}
+
+	// negative
 	if StartWith("Hello, world", "world") {
 		t.Error(`StartWith("Hello, world", "world") = true; want false`)
 	}
 }
 
 func TestEndWith(t *testing.T) {
+	// positive
 	if !EndWith("Hello, world", "world") {
 		t.Error(`EndWith("Hello, world", "world") = false; want true`)
 	}
+
+	// has white space or tab
+	if !StartWith("Hello, world    ", "Hello") {
+		t.Error(`StartWith("Hello, world", "Hello") = false; want true`)
+	}
+
+	// has break line
+	if !StartWith("Hello, world\n\t", "Hello") {
+		t.Error(`StartWith("Hello, world", "Hello") = false; want true`)
+	}
+
+	// negative
 	if EndWith("Hello, world", "Hello") {
 		t.Error(`EndWith("Hello, world", "Hello") = true; want false`)
 	}
