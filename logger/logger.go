@@ -51,6 +51,28 @@ type ConfigLogger struct {
 
 	// Filename is the base name of the log file (e.g., "app.log").
 	Filename string
+
+	// CallerConfig defines the number of caller stack frames to skip
+	// when logging for different request/response contexts.
+	// Useful for configuring zap.AddCallerSkip(...) dynamically.
+	CallerConfig CallerConfig
+}
+
+type CallerConfig struct {
+	// Request defines caller skip config for internal/external request logs.
+	Request SkipGroup
+
+	// Response defines caller skip config for internal/external response logs.
+	Response SkipGroup
+}
+
+// SkipGroup holds the caller skip values for internal and external contexts.
+type SkipGroup struct {
+	// Internal number of caller frames to skip for internal log calls.
+	Internal int
+
+	// External number of caller frames to skip for external log calls.
+	External int
 }
 
 type RequestLogger struct {
@@ -73,6 +95,14 @@ type ResponseLogger struct {
 
 type AppLogger struct {
 	Logger *zap.Logger
+
+	// CallerSkipConfig defines the number of caller stack frames to skip
+	// when logging for different request/response contexts.
+	// Useful for configuring zap.AddCallerSkip(...) dynamically.
+	CallerConfig CallerConfig
+
+	// Profile indicates the runtime profile (e.g., "dev", "prod") and can affect logging format/output
+	Profile string
 }
 
 // NewLogger initializes and returns a new application logger (`*AppLogger`) using the Zap logging library.
@@ -103,7 +133,11 @@ func NewLogger(cf *ConfigLogger) *AppLogger {
 	appWrite := writeSync(cf)
 	appCore := zapcore.NewCore(encoder, appWrite, zapcore.InfoLevel)
 	zapLogger = zap.New(appCore, zap.AddCaller())
-	return &AppLogger{Logger: zapLogger}
+	return &AppLogger{
+		Logger:       zapLogger,
+		Profile:      cf.Profile,
+		CallerConfig: cf.CallerConfig,
+	}
 }
 
 func getEncoderLog(cf *ConfigLogger) zapcore.Encoder {
@@ -344,7 +378,7 @@ func (l *AppLogger) Fatal(state, msg string, args ...interface{}) {
 
 func (l *AppLogger) LogRequest(req *RequestLogger) {
 	l.Logger.WithOptions(
-		zap.AddCallerSkip(1)).Info(
+		zap.AddCallerSkip(l.CallerConfig.Request.Internal)).Info(
 		"[===== REQUEST INFO =====]",
 		zap.String(consts.State, req.State),
 		zap.String(consts.Url, req.URL),
@@ -358,7 +392,7 @@ func (l *AppLogger) LogRequest(req *RequestLogger) {
 
 func (l *AppLogger) LogResponse(resp *ResponseLogger) {
 	l.Logger.WithOptions(
-		zap.AddCallerSkip(1)).Info(
+		zap.AddCallerSkip(l.CallerConfig.Response.Internal)).Info(
 		"[===== RESPONSE INFO =====]",
 		zap.String(consts.State, resp.State),
 		zap.Int(consts.Status, resp.Status),
@@ -370,7 +404,7 @@ func (l *AppLogger) LogResponse(resp *ResponseLogger) {
 
 func (l *AppLogger) LogExtRequest(req *RequestLogger) {
 	l.Logger.WithOptions(
-		zap.AddCallerSkip(3)).Info(
+		zap.AddCallerSkip(l.CallerConfig.Request.External)).Info(
 		"[===== REQUEST EXTERNAL INFO =====]",
 		zap.String(consts.State, req.State),
 		zap.String(consts.Url, req.URL),
@@ -384,7 +418,7 @@ func (l *AppLogger) LogExtRequest(req *RequestLogger) {
 
 func (l *AppLogger) LogExtResponse(resp *ResponseLogger) {
 	l.Logger.WithOptions(
-		zap.AddCallerSkip(3)).Info(
+		zap.AddCallerSkip(l.CallerConfig.Response.External)).Info(
 		"[===== RESPONSE EXTERNAL INFO =====]",
 		zap.String(consts.State, resp.State),
 		zap.Int(consts.Status, resp.Status),
