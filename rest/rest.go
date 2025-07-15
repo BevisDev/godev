@@ -154,6 +154,9 @@ func (r *RestClient) restTemplate(c context.Context, method string, req *Request
 	urlStr := r.buildURL(req.URL, req.Query, req.Params)
 
 	// serialize body
+	// If form-data, encodes BodyForm as URL-encoded string.
+	// If Body is []byte, use it directly and log as "[binary body]".
+	// Otherwise, marshal Body to JSON and convert to string for logging.
 	if isFormData {
 		formValues := url.Values{}
 		for k, v := range req.BodyForm {
@@ -174,6 +177,7 @@ func (r *RestClient) restTemplate(c context.Context, method string, req *Request
 	// log request
 	startTime := time.Now()
 	if isLog {
+		// Use structured logging
 		reqLogger := &logger.RequestLogger{
 			State:  state,
 			URL:    req.URL,
@@ -191,6 +195,7 @@ func (r *RestClient) restTemplate(c context.Context, method string, req *Request
 		}
 		r.logger.LogExtRequest(reqLogger)
 	} else {
+		// Use simple stdout log
 		var sb strings.Builder
 		sb.WriteString("========== REST REQUEST INFO ==========\n")
 		sb.WriteString(fmt.Sprintf(consts.State+": %s\n", state))
@@ -227,14 +232,14 @@ func (r *RestClient) restTemplate(c context.Context, method string, req *Request
 		return err
 	}
 
-	// build header
+	// Set headers based on content type
 	if isFormData {
 		r.buildHeaders(request, req.Header, consts.ApplicationFormData)
 	} else {
 		r.buildHeaders(request, req.Header, consts.ApplicationJSON)
 	}
 
-	// execute request
+	// Execute the HTTP request
 	return r.execute(request, req, startTime, state)
 }
 
@@ -310,6 +315,7 @@ func (r *RestClient) execute(request *http.Request, req *Request, startTime time
 		}
 	}()
 
+	// No body in response
 	if !hasBody {
 		if isLog {
 			respLogger.Body = "no body response"
@@ -319,7 +325,7 @@ func (r *RestClient) execute(request *http.Request, req *Request, startTime time
 		return nil
 	}
 
-	// check body
+	// Return raw bytes if expected
 	if b, ok := req.Result.(*[]byte); ok {
 		if response.StatusCode >= 400 {
 			return &HttpError{
@@ -334,7 +340,6 @@ func (r *RestClient) execute(request *http.Request, req *Request, startTime time
 	// log body
 	if !utils.SkipContentType(response.Header.Get(consts.ContentType)) &&
 		!SkipAPI(request.URL.Path, r.SkipLogAPIs) {
-		respBodyStr = str.ToString(respBodyBytes)
 		if isLog {
 			respLogger.Body = respBodyStr
 		} else {

@@ -542,13 +542,13 @@ func (d *Database) SaveSafe(ctx context.Context, query string, args interface{})
 // InsertReturningId executes an INSERT query and returns the generated ID.
 func (d *Database) InsertReturningId(c context.Context, query string, args ...interface{}) (id int, err error) {
 	// append query returning id
-	appendQuery := d.AppendReturningId(query)
+	//appendQuery := d.AppendReturningId(query)
 
 	ctx, cancel := utils.CreateCtxTimeout(c, d.TimeoutSec)
 	defer cancel()
 
 	// exec
-	id, err = d.ExecReturningId(ctx, appendQuery, args...)
+	id, err = d.ExecReturningId(ctx, query, args...)
 	return
 }
 
