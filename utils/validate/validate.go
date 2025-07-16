@@ -117,19 +117,6 @@ func IsTimedOut(err error) bool {
 	return errors.Is(err, context.DeadlineExceeded)
 }
 
-func IsValidPhoneNumber(phone string, size int) bool {
-	length := len(phone)
-	if length != size {
-		return false
-	}
-	for _, r := range phone {
-		if !unicode.IsDigit(r) {
-			return false
-		}
-	}
-	return true
-}
-
 // Matches checks whether the input string `s` matches the given regular expression pattern.
 //
 // If the pattern is invalid, it safely returns false.
@@ -196,6 +183,20 @@ func IsAlphaNumeric(s string) bool {
 
 func IsVietnamID(s string) bool {
 	return Matches(s, consts.VNIDNumber)
+}
+
+func IsNumeric(s string, size int) bool {
+	if s == "" || len(s) != size {
+		return false
+	}
+
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+
+	return true
 }
 
 func IsStrongPassword(s string, size int) bool {

@@ -210,30 +210,47 @@ func TestIsTimedOut(t *testing.T) {
 	}
 }
 
-func TestIsValidPhoneNumber(t *testing.T) {
+func TestIsNumeric(t *testing.T) {
 	tests := []struct {
-		name     string
-		phone    string
-		size     int
-		expected bool
+		input string
+		size  int
+		want  bool
 	}{
-		{"ValidPhone", "0123456789", 10, true},
-		{"TooShort", "01234", 10, false},
-		{"TooLong", "012345678901", 10, false},
-		{"ContainsLetter", "01234abc89", 10, false},
-		{"EmptyString", "", 0, true},
-		{"Valid11Digits", "01234567890", 11, true},
-		{"AllLetters", "abcdefghij", 10, false},
-		{"SpecialChars", "01234-7890", 10, false},
+		// check valid phone number
+		{"0123456789", 10, true},
+		{"01234", 10, false},
+		{"012345678901", 10, false},
+		{"01234abc89", 10, false},
+
+		// check string
+		{"", 0, false},
+		{"    ", 4, false},
+		{"01234567890", 11, true},
+		{"abcdefghij", 10, false},
+		{"01234-7890", 10, false},
+
+		// Valid cases
+		{"012345678901", 12, true},
+		{"123456789", 9, true},
+
+		// Invalid length
+		{"12345678", 9, false},
+		{"0123456789012", 12, false},
+
+		// Contains non-numeric characters
+		{"12345678a901", 12, false},
+		{"abcdefghi", 9, false},
+		{"1234 56789", 9, false},
+
+		// Empty
+		{"", 12, false},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := IsValidPhoneNumber(tt.phone, tt.size)
-			if result != tt.expected {
-				t.Errorf("IsValidPhoneNumber(%q, %d) = %v; want %v", tt.phone, tt.size, result, tt.expected)
-			}
-		})
+		got := IsNumeric(tt.input, tt.size)
+		if got != tt.want {
+			t.Errorf("IsValidID(%q, %d) = %v; want %v", tt.input, tt.size, got, tt.want)
+		}
 	}
 }
 
