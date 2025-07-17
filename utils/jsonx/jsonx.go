@@ -3,7 +3,6 @@ package jsonx
 import (
 	"encoding/json"
 	"errors"
-	"github.com/BevisDev/godev/utils/str"
 	"github.com/BevisDev/godev/utils/validate"
 )
 
@@ -31,7 +30,7 @@ func ToJSON(v any) string {
 	if err != nil {
 		return "{}"
 	}
-	return str.ToString(jsonBytes)
+	return string(jsonBytes)
 }
 
 func ToStruct(jsonStr string, entry interface{}) error {
