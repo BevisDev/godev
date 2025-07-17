@@ -3,8 +3,13 @@ package crypto
 import (
 	"crypto/hmac"
 	"crypto/md5"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/sha256"
+	"crypto/x509"
 	"encoding/hex"
+	"encoding/pem"
+	"os"
 	"testing"
 )
 
@@ -31,7 +36,11 @@ func TestBase64EncodeDecode(t *testing.T) {
 	original := "Test string 123!@#"
 
 	encoded := EncodeBase64(original)
-	decoded := DecodeBase64(encoded)
+
+	decoded, err := DecodeBase64(encoded)
+	if err != nil {
+		t.Fatalf("DecodeBase64 returned error: %v", err)
+	}
 
 	if decoded != original {
 		t.Errorf("DecodeBase64(EncodeBase64(%q)) = %q; want %q", original, decoded, original)
@@ -65,5 +74,93 @@ func TestHmacSha256(t *testing.T) {
 
 	if result != expectedHash {
 		t.Errorf("HmacSha256 = %v; want %v", result, expectedHash)
+	}
+}
+
+// Mocks a temporary private key file for testing
+func writeTempPrivateKeyFile(t *testing.T, key *rsa.PrivateKey) string {
+	t.Helper()
+
+	keyBytes := x509.MarshalPKCS1PrivateKey(key)
+	pemBlock := &pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: keyBytes,
+	}
+	pemData := pem.EncodeToMemory(pemBlock)
+
+	tmpFile, err := os.CreateTemp("", "test-private-*.pem")
+	if err != nil {
+		t.Fatalf("failed to create temp private key file: %v", err)
+	}
+	defer tmpFile.Close()
+
+	if _, err := tmpFile.Write(pemData); err != nil {
+		t.Fatalf("failed to write private key: %v", err)
+	}
+
+	return tmpFile.Name()
+}
+
+func TestRSAEncryptionFlow(t *testing.T) {
+	// 1. Generate key pair
+	privKey, err := rsa.GenerateKey(rand.Reader, 4096)
+	if err != nil {
+		t.Fatalf("failed to generate RSA key: %v", err)
+	}
+	pubKey := &privKey.PublicKey
+
+	// 2. Write private key to temp file
+	privFilePath := writeTempPrivateKeyFile(t, privKey)
+	defer os.Remove(privFilePath)
+
+	// 3. Read private key back
+	readKey, err := ReadPrivateKey(privFilePath)
+	if err != nil {
+		t.Fatalf("failed to read private key: %v", err)
+	}
+
+	// 4. Encrypt plaintext
+	plaintext := "secure message"
+	cipherText, err := EncryptOAEP(pubKey, plaintext)
+	if err != nil {
+		t.Fatalf("encryption failed: %v", err)
+	}
+
+	// 5. Decrypt ciphertext
+	decrypted, err := DecryptOAEP(readKey, cipherText)
+	if err != nil {
+		t.Fatalf("decryption failed: %v", err)
+	}
+
+	// 6. Validate
+	if decrypted != plaintext {
+		t.Errorf("decryption mismatch: got %q, want %q", decrypted, plaintext)
+	}
+}
+
+func TestEncryptDecryptPKCS1v15(t *testing.T) {
+	// Generate test RSA key pair
+	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("failed to generate RSA key: %v", err)
+	}
+
+	pubKey := &privKey.PublicKey
+	original := "This is a test message"
+
+	// Encrypt
+	encrypted, err := EncryptPKCS1v15(pubKey, original)
+	if err != nil {
+		t.Fatalf("encryption failed: %v", err)
+	}
+
+	// Decrypt
+	decrypted, err := DecryptPKCS1v15(privKey, encrypted)
+	if err != nil {
+		t.Fatalf("decryption failed: %v", err)
+	}
+
+	if decrypted != original {
+		t.Errorf("Decrypted text mismatch. Got %q, want %q", decrypted, original)
 	}
 }

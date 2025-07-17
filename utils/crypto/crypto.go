@@ -18,26 +18,53 @@ import (
 	"os"
 )
 
-// EncryptAES encrypts the given plaintext string using AES encryption in CFB mode,
-// with the provided key. A random IV is generated for each encryption, and the
-// result is returned as a base64-encoded string.
-//
-// Parameters:
-//   - plaintext: the string to encrypt.
-//   - key: the AES key (must be 16, 24, or 32 bytes long for AES-128, AES-192, or AES-256).
-//
-// Returns:
-//   - The base64-encoded ciphertext (IV + encrypted data).
-//   - An error if encryption fails.
-//
-// Example:
-//
-//	key := []byte("examplekey123456") // 16 bytes
-//	encrypted, err := EncryptAES("Hello, world!", key)
-//	if err != nil {
-//	    log.Fatal(err)
-//	}
-//	fmt.Println("Encrypted:", encrypted)
+// EncodeBase64 encodes the input string to a Base64-encoded string.
+func EncodeBase64(str string) string {
+	return EncodeBase64Bytes([]byte(str))
+}
+
+// DecodeBase64 decodes a Base64-encoded string into its original content.
+func DecodeBase64(str string) (string, error) {
+	data, err := DecodeBase64Bytes(str)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+// EncodeBase64Bytes encodes a byte slice to a Base64-encoded string.
+func EncodeBase64Bytes(data []byte) string {
+	return base64.StdEncoding.EncodeToString(data)
+}
+
+// DecodeBase64Bytes decodes a base64-encoded string and returns raw bytes.
+// Returns an error if decoding fails.
+func DecodeBase64Bytes(s string) ([]byte, error) {
+	return base64.StdEncoding.DecodeString(s)
+}
+
+// HexSha256 returns the SHA-256 hash of the input string, encoded as a hexadecimal string.
+func HexSha256(str string) string {
+	hash := sha256.Sum256([]byte(str))
+	return hex.EncodeToString(hash[:])
+}
+
+// HexMd5 returns the MD5 hash of the input string, encoded as a hexadecimal string.
+func HexMd5(str string) string {
+	hash := md5.Sum([]byte(str))
+	return hex.EncodeToString(hash[:])
+}
+
+// HmacSha256 computes the HMAC-SHA256 of a message using the provided secret key.
+func HmacSha256(message, secret string) string {
+	key := []byte(secret)
+	h := hmac.New(sha256.New, key)
+	h.Write([]byte(message))
+	hash := h.Sum(nil)
+	return hex.EncodeToString(hash)
+}
+
+// EncryptAES encrypts plaintext using AES in CFB mode and returns base64-encoded ciphertext.
 func EncryptAES(plaintext string, key []byte) (string, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -52,31 +79,12 @@ func EncryptAES(plaintext string, key []byte) (string, error) {
 
 	stream := cipher.NewCFBEncrypter(block, iv)
 	stream.XORKeyStream(ciphertext[aes.BlockSize:], []byte(plaintext))
-	return base64.StdEncoding.EncodeToString(ciphertext), nil
+	return EncodeBase64Bytes(ciphertext), nil
 }
 
-// DecryptAES decrypts the given base64-encoded ciphertext string using AES encryption in CFB mode,
-// with the provided key. The ciphertext must include the IV (initialization vector) prepended.
-//
-// Parameters:
-//   - ciphertext: the base64-encoded string containing IV + encrypted data.
-//   - key: the AES key (must be 16, 24, or 32 bytes long).
-//
-// Returns:
-//   - The decrypted plaintext string.
-//   - An error if decryption fails.
-//
-// Example:
-//
-//	key := []byte("examplekey123456") // 16 bytes
-//	encrypted, _ := EncryptAES("Hello, world!", key)
-//	plaintext, err := DecryptAES(encrypted, key)
-//	if err != nil {
-//	    log.Fatal(err)
-//	}
-//	fmt.Println("Decrypted:", plaintext)
+// DecryptAES decrypts base64-encoded ciphertext using AES in CFB mode.
 func DecryptAES(ciphertext string, key []byte) (string, error) {
-	data, err := base64.StdEncoding.DecodeString(ciphertext)
+	data, err := DecodeBase64Bytes(ciphertext)
 	if err != nil {
 		return "", err
 	}
@@ -107,7 +115,7 @@ func DecryptAES(ciphertext string, key []byte) (string, error) {
 //	-----END PUBLIC KEY-----
 //
 // Parameters:
-//   - filePath: path to the PEM-encoded public key file.
+//   - path: path to the PEM-encoded public key file.
 //
 // Returns:
 //   - *rsa.PublicKey if parsing succeeds.
@@ -120,8 +128,8 @@ func DecryptAES(ciphertext string, key []byte) (string, error) {
 //	    log.Fatal(err)
 //	}
 //	fmt.Println("Public key modulus size:", pubKey.N.BitLen())
-func ReadPublicKey(filePath string) (*rsa.PublicKey, error) {
-	pubKeyBytes, err := os.ReadFile(filePath)
+func ReadPublicKey(path string) (*rsa.PublicKey, error) {
+	pubKeyBytes, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("could not read public key file: %w", err)
 	}
@@ -144,59 +152,87 @@ func ReadPublicKey(filePath string) (*rsa.PublicKey, error) {
 	return rsaPub, nil
 }
 
-// EncodeBase64 encodes the input string to a Base64-encoded string.
+// ReadPrivateKey reads an RSA private key from a PEM-encoded file.
+//
+// The function expects the file to contain a PEM block in PKCS#1 format,
+// such as:
+//
+//	-----BEGIN RSA PRIVATE KEY-----
+//	...base64 data...
+//	-----END RSA PRIVATE KEY-----
+//
+// Parameters:
+//   - path: path to the PEM-encoded private key file.
+//
+// Returns:
+//   - *rsa.PrivateKey if parsing succeeds.
+//   - An error if reading, decoding, or parsing fails.
 //
 // Example:
 //
-//	EncodeBase64("hello") -> "aGVsbG8="
-func EncodeBase64(str string) string {
-	return base64.StdEncoding.EncodeToString([]byte(str))
-}
-
-// DecodeBase64 decodes a Base64-encoded string to its original content.
-// If decoding fails, it returns an empty string.
-//
-// Example:
-//
-//	DecodeBase64("aGVsbG8=") -> "hello"
-func DecodeBase64(str string) string {
-	data, err := base64.StdEncoding.DecodeString(str)
+//	privKey, err := ReadPrivateKey("private.key")
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	fmt.Println("Private key modulus size:", privKey.N.BitLen())
+func ReadPrivateKey(path string) (*rsa.PrivateKey, error) {
+	data, err := os.ReadFile(path)
 	if err != nil {
-		return ""
+		return nil, fmt.Errorf("could not read private key file: %w", err)
 	}
-	return string(data)
+
+	block, _ := pem.Decode(data)
+	if block == nil {
+		return nil, fmt.Errorf("failed to parse PEM block containing the private key")
+	}
+
+	return x509.ParsePKCS1PrivateKey(block.Bytes)
 }
 
-// HexSha256 returns the SHA-256 hash of the input string, encoded as a hexadecimal string.
-//
-// Example:
-//
-//	HexSha256("hello") -> "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
-func HexSha256(str string) string {
-	hash := sha256.Sum256([]byte(str))
-	return hex.EncodeToString(hash[:])
+// EncryptPKCS1v15 encrypts plaintext using RSA PKCS#1 v1.5 and returns base64-encoded ciphertext.
+func EncryptPKCS1v15(pub *rsa.PublicKey, plainText string) (string, error) {
+	encryptedBytes, err := rsa.EncryptPKCS1v15(rand.Reader, pub, []byte(plainText))
+	if err != nil {
+		return "", fmt.Errorf("PKCS1 encryption failed: %w", err)
+	}
+	return EncodeBase64Bytes(encryptedBytes), nil
 }
 
-// HexMd5 returns the MD5 hash of the input string, encoded as a hexadecimal string.
-//
-// Example:
-//
-//	HexMd5("hello") -> "5d41402abc4b2a76b9719d911017c592"
-func HexMd5(str string) string {
-	hash := md5.Sum([]byte(str))
-	return hex.EncodeToString(hash[:])
+// DecryptPKCS1v15 decrypts a base64-encoded ciphertext using RSA PKCS#1 v1.5.
+func DecryptPKCS1v15(priv *rsa.PrivateKey, cipherTextB64 string) (string, error) {
+	cipherBytes, err := DecodeBase64Bytes(cipherTextB64)
+	if err != nil {
+		return "", fmt.Errorf("base64 decode failed: %w", err)
+	}
+
+	plainBytes, err := rsa.DecryptPKCS1v15(rand.Reader, priv, cipherBytes)
+	if err != nil {
+		return "", fmt.Errorf("PKCS1 decryption failed: %w", err)
+	}
+
+	return string(plainBytes), nil
 }
 
-// HmacSha256 computes the HMAC-SHA256 of a message using the provided secret key.
-// The result is encoded as a hexadecimal string.
-//
-// Example:
-//
-//	HmacSha256("my message", "my secret")
-func HmacSha256(message, secret string) string {
-	key := []byte(secret)
-	h := hmac.New(sha256.New, key)
-	h.Write([]byte(message))
-	hash := h.Sum(nil)
-	return hex.EncodeToString(hash)
+// EncryptOAEP encrypts plaintext using RSA-OAEP with SHA-256 and returns base64-encoded ciphertext.
+func EncryptOAEP(pub *rsa.PublicKey, plainText string) (string, error) {
+	hash := sha256.New()
+	encryptedBytes, err := rsa.EncryptOAEP(hash, rand.Reader, pub, []byte(plainText), nil)
+	if err != nil {
+		return "", err
+	}
+	return EncodeBase64Bytes(encryptedBytes), nil
+}
+
+// DecryptOAEP decrypts a base64-encoded RSA-OAEP ciphertext using SHA-256.
+func DecryptOAEP(priv *rsa.PrivateKey, cipherTextB64 string) (string, error) {
+	hash := sha256.New()
+	cipherBytes, err := DecodeBase64Bytes(cipherTextB64)
+	if err != nil {
+		return "", err
+	}
+	decryptedBytes, err := rsa.DecryptOAEP(hash, rand.Reader, priv, cipherBytes, nil)
+	if err != nil {
+		return "", err
+	}
+	return string(decryptedBytes), nil
 }
