@@ -3,6 +3,7 @@ package rest
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"github.com/BevisDev/godev/consts"
 	"github.com/BevisDev/godev/utils/datetime"
@@ -143,6 +144,10 @@ func (r *RestClient) Delete(c context.Context, req *Request) error {
 // Returns:
 //   - error if request creation or execution fails.
 func (r *RestClient) restTemplate(c context.Context, method string, req *Request) error {
+	if req.Result == nil {
+		return errors.New("result is nil")
+	}
+
 	var (
 		state      = utils.GetState(c)
 		reqBody    []byte
@@ -170,7 +175,7 @@ func (r *RestClient) restTemplate(c context.Context, method string, req *Request
 			bodyStr = "[binary body]"
 		default:
 			reqBody = jsonx.ToJSONBytes(req.Body)
-			bodyStr = str.ToString(reqBody)
+			bodyStr = string(reqBody)
 		}
 	}
 
@@ -179,10 +184,10 @@ func (r *RestClient) restTemplate(c context.Context, method string, req *Request
 	if isLog {
 		// Use structured logging
 		reqLogger := &logger.RequestLogger{
-			State:  state,
-			URL:    req.URL,
-			Method: method,
-			Time:   startTime,
+			State:       state,
+			URL:         req.URL,
+			Method:      method,
+			RequestTime: startTime,
 		}
 		if !validate.IsNilOrEmpty(req.Query) {
 			reqLogger.Query = str.ToString(req.Query)
@@ -202,7 +207,7 @@ func (r *RestClient) restTemplate(c context.Context, method string, req *Request
 		sb.WriteString(fmt.Sprintf(consts.Url+": %s\n", urlStr))
 		sb.WriteString(fmt.Sprintf(consts.Query+": %v\n", req.Query))
 		sb.WriteString(fmt.Sprintf(consts.Method+": %s\n", method))
-		sb.WriteString(fmt.Sprintf(consts.Time+": %s\n", datetime.ToString(startTime, datetime.DateTimeOffset)))
+		sb.WriteString(fmt.Sprintf(consts.RequestTime+": %s\n", datetime.ToString(startTime, datetime.DateTimeOffset)))
 		if !r.SkipLogHeader {
 			sb.WriteString(fmt.Sprintf(consts.Header+": %s\n", req.Header))
 		}
@@ -280,7 +285,7 @@ func (r *RestClient) execute(request *http.Request, req *Request, startTime time
 
 	hasBody := !validate.IsNilOrEmpty(respBodyBytes)
 	if hasBody {
-		respBodyStr = str.ToString(respBodyBytes)
+		respBodyStr = string(respBodyBytes)
 	}
 
 	// log response
@@ -315,7 +320,7 @@ func (r *RestClient) execute(request *http.Request, req *Request, startTime time
 		}
 	}()
 
-	// No body in response
+	// don't body in response
 	if !hasBody {
 		if isLog {
 			respLogger.Body = "no body response"
@@ -354,9 +359,6 @@ func (r *RestClient) execute(request *http.Request, req *Request, startTime time
 		}
 	}
 
-	if req.Result == nil {
-		return nil
-	}
 	return jsonx.JSONBytesToStruct(respBodyBytes, req.Result)
 }
 

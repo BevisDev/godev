@@ -152,13 +152,13 @@ func TestLogRequest(t *testing.T) {
 	appLogger := &AppLogger{Logger: tLogger}
 
 	req := &RequestLogger{
-		State:  "REQ_TEST",
-		URL:    "/api/test",
-		Time:   time.Now(),
-		Method: "GET",
-		Query:  "id=1",
-		Header: map[string]string{"Authorization": "Bearer token"},
-		Body:   jsonx.ToJSON(map[string]string{"data": "value"}),
+		State:       "REQ_TEST",
+		URL:         "/api/test",
+		RequestTime: time.Now(),
+		Method:      "GET",
+		Query:       "id=1",
+		Header:      map[string]string{"Authorization": "Bearer token"},
+		Body:        jsonx.ToJSON(map[string]string{"data": "value"}),
 	}
 
 	appLogger.LogRequest(req)

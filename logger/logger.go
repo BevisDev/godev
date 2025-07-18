@@ -76,13 +76,13 @@ type SkipGroup struct {
 }
 
 type RequestLogger struct {
-	State  string
-	URL    string
-	Time   time.Time
-	Query  string
-	Method string
-	Header any
-	Body   string
+	State       string
+	URL         string
+	RequestTime time.Time
+	Query       string
+	Method      string
+	Header      any
+	Body        string
 }
 
 type ResponseLogger struct {
@@ -215,6 +215,7 @@ func getFilename(dir, fileName string, isSplit bool) string {
 
 func (l *AppLogger) logApp(level zapcore.Level, state string, msg string, args ...interface{}) {
 	if l.Logger == nil {
+		log.Fatalln("logger is nil")
 		return
 	}
 
@@ -377,12 +378,17 @@ func (l *AppLogger) Fatal(state, msg string, args ...interface{}) {
 }
 
 func (l *AppLogger) LogRequest(req *RequestLogger) {
+	if l.Logger == nil {
+		log.Fatalln("logger is nil")
+		return
+	}
+
 	l.Logger.WithOptions(
 		zap.AddCallerSkip(l.CallerConfig.Request.Internal)).Info(
 		"[===== REQUEST INFO =====]",
 		zap.String(consts.State, req.State),
 		zap.String(consts.Url, req.URL),
-		zap.Time(consts.Time, req.Time),
+		zap.Time(consts.RequestTime, req.RequestTime),
 		zap.String(consts.Method, req.Method),
 		zap.String(consts.Query, req.Query),
 		zap.Any(consts.Header, req.Header),
@@ -391,6 +397,11 @@ func (l *AppLogger) LogRequest(req *RequestLogger) {
 }
 
 func (l *AppLogger) LogResponse(resp *ResponseLogger) {
+	if l.Logger == nil {
+		log.Fatalln("logger is nil")
+		return
+	}
+
 	l.Logger.WithOptions(
 		zap.AddCallerSkip(l.CallerConfig.Response.Internal)).Info(
 		"[===== RESPONSE INFO =====]",
@@ -403,12 +414,17 @@ func (l *AppLogger) LogResponse(resp *ResponseLogger) {
 }
 
 func (l *AppLogger) LogExtRequest(req *RequestLogger) {
+	if l.Logger == nil {
+		log.Fatalln("logger is nil")
+		return
+	}
+
 	l.Logger.WithOptions(
 		zap.AddCallerSkip(l.CallerConfig.Request.External)).Info(
 		"[===== REQUEST EXTERNAL INFO =====]",
 		zap.String(consts.State, req.State),
 		zap.String(consts.Url, req.URL),
-		zap.Time(consts.Time, req.Time),
+		zap.Time(consts.RequestTime, req.RequestTime),
 		zap.String(consts.Method, req.Method),
 		zap.String(consts.Query, req.Query),
 		zap.Any(consts.Header, req.Header),
