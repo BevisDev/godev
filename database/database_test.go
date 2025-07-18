@@ -2,8 +2,10 @@ package database
 
 import (
 	"context"
+	"database/sql"
 	"database/sql/driver"
 	"fmt"
+	"github.com/BevisDev/godev/types"
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
@@ -64,69 +66,116 @@ func TestDatabase_Save(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-func TestInsertMany_Users(t *testing.T) {
-	db, mock := newTestDB(t)
-	ctx := context.Background()
+func TestInsertBulk_Users(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("failed to create sqlmock: %v", err)
+	}
+	defer db.Close()
 
+	// Tạo Database instance với sqlx
+	sqlxDB := sqlx.NewDb(db, "sqlmock")
+	d := &Database{
+		DB:         sqlxDB,
+		kindDB:     types.SqlServer,
+		TimeoutSec: 30,
+	}
+
+	ctx := context.Background()
 	table := "users"
 	colNames := []string{"name", "email"}
-	users := []User{
+	users := []struct {
+		Name  string
+		Email string
+	}{
 		{Name: "Alice", Email: "alice@example.com"},
 		{Name: "Bob", Email: "bob@example.com"},
 	}
 
+	// Chuẩn bị args
 	var args []interface{}
 	for _, u := range users {
 		args = append(args, u.Name, u.Email)
 	}
-
 	size := len(users)
 
-	// Build expected query
+	// Tạo expected query
 	var placeholders []string
 	for i := 0; i < size; i++ {
 		var row []string
 		for j := 1; j <= len(colNames); j++ {
-			row = append(row, fmt.Sprintf("@p%d", i*len(colNames)+j))
+			row = append(row, d.FormatRow(i*len(colNames)+j))
 		}
 		placeholders = append(placeholders, "("+strings.Join(row, ", ")+")")
 	}
+	expectedQuery := regexp.QuoteMeta(fmt.Sprintf("INSERT INTO %s (%s) VALUES %s",
+		table, strings.Join(colNames, ", "), strings.Join(placeholders, ", ")))
 
-	mockPlaceholder := make([]string, size)
-	for i := 0; i < size; i++ {
-		mockPlaceholder[i] = "(?, ?)"
-	}
-
+	// Chuẩn bị driver args
 	var driverArgs []driver.Value
 	for _, arg := range args {
 		driverArgs = append(driverArgs, arg)
 	}
-	expectedQuery := "INSERT INTO users (name, email) VALUES (@p1, @p2), (@p3, @p4)"
 
+	// Thiết lập mock
 	mock.ExpectBegin()
-	mock.ExpectExec(regexp.QuoteMeta(expectedQuery)).
+	mock.ExpectExec(expectedQuery).
 		WithArgs(driverArgs...).
-		WillReturnResult(sqlmock.NewResult(1, 2))
+		WillReturnResult(sqlmock.NewResult(1, int64(size)))
 	mock.ExpectCommit()
 
-	err := db.InsertMany(ctx, table, size, colNames, args...)
+	// Thực thi test
+	err = d.InsertBulk(ctx, table, size, colNames, args...)
 	assert.NoError(t, err)
+
+	// Kiểm tra tất cả kỳ vọng của mock
 	assert.NoError(t, mock.ExpectationsWereMet())
+
+	// Test trường hợp lỗi: số lượng args không khớp
+	err = d.InsertBulk(ctx, table, size, colNames, args[1:]...) // Truyền thiếu args
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "expected")
 }
 
-func TestDatabase_InsertedId(t *testing.T) {
-	db, mock := newTestDB(t)
+func TestDatabase_ExecReturningId(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("failed to create sqlmock: %v", err)
+	}
+	defer db.Close()
+
+	// Tạo Database instance với sqlx
+	sqlxDB := sqlx.NewDb(db, "sqlmock")
+	d := &Database{
+		DB:         sqlxDB,
+		kindDB:     types.SqlServer, // Giả định SQL Server
+		TimeoutSec: 30,
+	}
 
 	ctx := context.Background()
+	query := "INSERT INTO users (name) OUTPUT INSERTED.id VALUES (?)"
+	name := "Alice"
 
-	mock.ExpectBegin()
-	mock.ExpectQuery("INSERT INTO users").
-		WithArgs("Alice").
+	// Thiết lập mock
+	mock.ExpectQuery(regexp.QuoteMeta(query)).
+		WithArgs(name).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(123))
-	mock.ExpectCommit()
 
-	id, err := db.InsertedId(ctx, "INSERT INTO users (name) OUTPUT INSERTED.ID VALUES (?)", "Alice")
+	// Thực thi test
+	id, err := d.ExecReturningId(ctx, query, name)
 	assert.NoError(t, err)
 	assert.Equal(t, 123, id)
+
+	// Kiểm tra tất cả kỳ vọng của mock
 	assert.NoError(t, mock.ExpectationsWereMet())
+
+	// Test trường hợp lỗi: query thất bại
+	mock.ExpectQuery(regexp.QuoteMeta(query)).
+		WithArgs(name).
+		WillReturnError(sql.ErrNoRows)
+
+	id, err = d.ExecReturningId(ctx, query, name)
+	assert.Error(t, err)
+	assert.Equal(t, 0, id)
+	assert.True(t, d.IsNoResult(err), "expected sql.ErrNoRows")
 }

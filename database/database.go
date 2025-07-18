@@ -7,10 +7,11 @@ import (
 	"fmt"
 	"github.com/BevisDev/godev/types"
 	"github.com/BevisDev/godev/utils"
-	"github.com/BevisDev/godev/utils/str"
 	"github.com/BevisDev/godev/utils/validate"
 	"github.com/jmoiron/sqlx"
 	"log"
+	"net/url"
+	"runtime/debug"
 	"strings"
 	"time"
 )
@@ -152,15 +153,36 @@ func newConnection(cf *ConfigDB) (*sqlx.DB, error) {
 	case types.SqlServer:
 		connStr = fmt.Sprintf("sqlserver://%s:%s@%s:%d?database=%s",
 			cf.Username, cf.Password, cf.Host, cf.Port, cf.Schema)
+		if len(cf.Params) > 0 {
+			params := url.Values{}
+			for k, v := range cf.Params {
+				params.Add(k, v)
+			}
+			connStr += "&" + params.Encode()
+		}
 	case types.Postgres:
 		connStr = fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
 			cf.Username, cf.Password, cf.Host, cf.Port, cf.Schema)
+		if len(cf.Params) > 0 {
+			params := url.Values{}
+			for k, v := range cf.Params {
+				params.Add(k, v)
+			}
+			connStr += "&" + params.Encode()
+		}
 	case types.Oracle:
 		connStr = fmt.Sprintf("%s/%s@%s:%d/%s",
 			cf.Username, cf.Password, cf.Host, cf.Port, cf.Schema)
 	case types.MySQL:
 		connStr = fmt.Sprintf("%s:%s@tcp(%s:%d)/%s",
 			cf.Username, cf.Password, cf.Host, cf.Port, cf.Schema)
+		if len(cf.Params) > 0 {
+			params := url.Values{}
+			for k, v := range cf.Params {
+				params.Add(k, v)
+			}
+			connStr += "?" + params.Encode()
+		}
 	default:
 		return nil, errors.New("unsupported database kind " + cf.Kind.String())
 	}
@@ -168,7 +190,7 @@ func newConnection(cf *ConfigDB) (*sqlx.DB, error) {
 	// connect
 	db, err = sqlx.Connect(cf.Kind.GetDriver(), connStr)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
 	// set pool
@@ -187,8 +209,9 @@ func newConnection(cf *ConfigDB) (*sqlx.DB, error) {
 
 	// ping check connection
 	if err = db.Ping(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("ping database failed: %w", err)
 	}
+
 	log.Printf("connect db %s success \n", cf.Schema)
 	return db, nil
 }
@@ -213,33 +236,6 @@ func (d *Database) MustBePtr(dest interface{}) (err error) {
 		return errors.New("must be a pointer")
 	}
 	return
-}
-
-// AppendReturningId appends a database-specific clause to retrieve
-// the auto-generated ID after an INSERT statement.
-// If the database kind is unsupported, the original query is returned unchanged.
-func (d *Database) AppendReturningId(query string) string {
-	endSemiColon := str.EndWith(query, ";")
-
-	switch d.kindDB {
-	case types.SqlServer:
-		if !endSemiColon {
-			query = query + ";"
-		}
-		return query + "\nSELECT SCOPE_IDENTITY();"
-
-	case types.MySQL:
-		if !endSemiColon {
-			query = query + ";"
-		}
-		return query + "\nSELECT LAST_INSERT_ID();"
-
-	case types.Postgres:
-		return query + " RETURNING id;"
-
-	default:
-		return query
-	}
 }
 
 // GetTemplate returns a database-specific SQL template string for rendering JSON output,
@@ -284,7 +280,7 @@ func (d *Database) GetTemplate(template types.DBJSONTemplate) string {
 		if types.TemplateJSONArray == template {
 			return types.PostgresJSONArrayTemplate
 		}
-		return types.MSSQLJSONObjectTemplate
+		return types.PostgresJSONObjectTemplate
 
 	default:
 		return ""
@@ -383,7 +379,7 @@ func (d *Database) RunTx(c context.Context, level sql.IsolationLevel, fn func(ct
 	defer func() {
 		if p := recover(); p != nil {
 			_ = tx.Rollback()
-			err = fmt.Errorf("panic recovered in tx %v", p)
+			err = fmt.Errorf("panic recovered in transaction: %v\n%s", p, debug.Stack())
 		}
 		if err != nil {
 			_ = tx.Rollback()
@@ -481,8 +477,12 @@ func (d *Database) ExecuteSafe(ctx context.Context, query string, args ...interf
 // Returns the generated ID and any error encountered.
 func (d *Database) ExecReturningId(ctx context.Context, query string, args ...interface{}) (id int, err error) {
 	d.ViewQuery(query)
-	err = d.DB.QueryRowContext(ctx, query, args...).Scan(&id)
+	err = d.DB.QueryRowxContext(ctx, query, args...).Scan(&id)
 	return
+}
+
+func (d *Database) Prepare(ctx context.Context, query string) (*sqlx.Stmt, error) {
+	return d.DB.PreparexContext(ctx, query)
 }
 
 // Save executes a query with named parameters.
@@ -539,17 +539,44 @@ func (d *Database) SaveSafe(ctx context.Context, query string, args interface{})
 	})
 }
 
-// InsertReturningId executes an INSERT query and returns the generated ID.
-func (d *Database) InsertReturningId(c context.Context, query string, args ...interface{}) (id int, err error) {
-	// append query returning id
-	//appendQuery := d.AppendReturningId(query)
+// InsertReturning executes an INSERT query and scans the result into dest.
+//
+// Usage:
+//   - If dest is *int: the query must return a single ID column.
+//   - If dest is a struct pointer: the query must return all the columns
+//     (e.g., using `OUTPUT INSERTED.*` or `RETURNING *`).
+//
+// Database-specific notes:
+//   - SQL Server:
+//   - Use "OUTPUT INSERTED.id" for ID only.
+//   - Use "OUTPUT INSERTED.*" for the full inserted row.
+//   - PostgreSQL:
+//   - Use "RETURNING id" for ID only.
+//   - Use "RETURNING *" for the full inserted row.
+//   - MySQL:
+//   - Does not support OUTPUT or RETURNING directly.
+//   - To get the last inserted ID, run "SELECT LAST_INSERT_ID()" after insert.
+//   - For full row fetch, you must re-query manually using the returned ID.
+//
+// The function automatically determines whether to use `Scan` (for int)
+// or `StructScan` (for structs) based on the type of dest.
+func (d *Database) InsertReturning(c context.Context, query string, dest interface{}, args ...interface{}) error {
+	if err := d.MustBePtr(dest); err != nil {
+		return err
+	}
+	d.ViewQuery(query)
 
 	ctx, cancel := utils.CreateCtxTimeout(c, d.TimeoutSec)
 	defer cancel()
 
-	// exec
-	id, err = d.ExecReturningId(ctx, query, args...)
-	return
+	row := d.DB.QueryRowxContext(ctx, query, args...)
+
+	switch dest.(type) {
+	case *int:
+		return row.Scan(dest)
+	default:
+		return row.StructScan(dest)
+	}
 }
 
 // InsertBulk inserts multiple rows into the given table using bulk INSERT.
@@ -571,6 +598,10 @@ func (d *Database) InsertBulk(ctx context.Context, table string, size int, colNa
 	sizeCol := len(colNames)
 	if sizeCol <= 0 {
 		return errors.New("size column must be greater than 0")
+	}
+
+	if len(args) != size*sizeCol {
+		return fmt.Errorf("expected %d arguments, got %d", size*sizeCol, len(args))
 	}
 
 	if len(args) > MaxParams {
@@ -616,13 +647,23 @@ func (d *Database) InsertBulk(ctx context.Context, table string, size int, colNa
 //	err := db.InsertMany(ctx, query, entities)
 //
 // Note: The fields in each entity must match the named parameters in the query.
-func (d *Database) InsertMany(ctx context.Context, query string, entities []interface{}) (err error) {
+func (d *Database) InsertMany(ctx context.Context, query string, entities []interface{}) error {
+	const batchSize = 1000
 	d.ViewQuery(query)
+
 	return d.RunTx(ctx, sql.LevelDefault, func(ctx context.Context, tx *sqlx.Tx) error {
-		for _, e := range entities {
-			_, err = tx.NamedExecContext(ctx, query, e)
-			if err != nil {
-				return err
+		for i := 0; i < len(entities); i += batchSize {
+			end := i + batchSize
+			if end > len(entities) {
+				end = len(entities)
+			}
+			
+			batch := entities[i:end]
+			for _, e := range batch {
+				_, err := tx.NamedExecContext(ctx, query, e)
+				if err != nil {
+					return err
+				}
 			}
 		}
 		return nil

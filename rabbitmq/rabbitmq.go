@@ -5,9 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/BevisDev/godev/consts"
-	"github.com/BevisDev/godev/utils/jsonx"
-
 	"github.com/BevisDev/godev/utils"
+	"github.com/BevisDev/godev/utils/jsonx"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -16,7 +15,7 @@ type RabbitMQConfig struct {
 	Port       int    // RabbitMQ server port
 	Username   string // Username for authentication
 	Password   string // Password for authentication
-	TimeoutSec int    // Timeout in seconds for message operations
+	TimeoutSec int    // TimeoutSec in seconds for message operations
 }
 
 type RabbitMQ struct {
@@ -25,8 +24,13 @@ type RabbitMQ struct {
 	TimeoutSec int
 }
 
-// defaultTimeoutSec defines the default timeout (in seconds) for rabbitmq operations.
-const defaultTimeoutSec = 10
+const (
+	// defaultTimeoutSec defines the default timeout (in seconds) for rabbitmq operations.
+	defaultTimeoutSec = 10
+
+	// maxMessageSize max size message
+	maxMessageSize = 50000
+)
 
 // NewRabbitMQ creates a new RabbitMQ client using the provided configuration.
 //
@@ -93,9 +97,21 @@ func (r *RabbitMQ) DeclareQueue(queueName string) (amqp.Queue, error) {
 	)
 }
 
+func (r *RabbitMQ) Ack(d amqp.Delivery) error {
+	return d.Ack(false)
+}
+
+func (r *RabbitMQ) Nack(d amqp.Delivery, requeue bool) error {
+	return d.Nack(false, requeue)
+}
+
 func (r *RabbitMQ) Publish(c context.Context, queueName string, message interface{}) error {
+	if err := c.Err(); err != nil {
+		return err
+	}
+
 	json := jsonx.ToJSONBytes(message)
-	if len(json) > 50000 {
+	if len(json) > maxMessageSize {
 		return fmt.Errorf("message is too large: %d", len(json))
 	}
 
@@ -124,7 +140,7 @@ func (r *RabbitMQ) Publish(c context.Context, queueName string, message interfac
 	return nil
 }
 
-func (r *RabbitMQ) Subscribe(queueName string, handler func(amqp.Delivery)) error {
+func (r *RabbitMQ) Subscribe(ctx context.Context, queueName string, handler func(amqp.Delivery)) error {
 	q, err := r.DeclareQueue(queueName)
 	if err != nil {
 		return err
@@ -144,8 +160,16 @@ func (r *RabbitMQ) Subscribe(queueName string, handler func(amqp.Delivery)) erro
 	}
 
 	go func() {
-		for msg := range msgs {
-			handler(msg)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case msg, ok := <-msgs:
+				if !ok {
+					return
+				}
+				handler(msg)
+			}
 		}
 	}()
 
