@@ -29,6 +29,7 @@ func newTestDB(t *testing.T) (*Database, sqlmock.Sqlmock) {
 	return &Database{
 		DB:         sqlxDB,
 		TimeoutSec: 5,
+		kindDB:     types.SqlServer,
 	}, mock
 }
 
@@ -67,19 +68,8 @@ func TestDatabase_Save(t *testing.T) {
 }
 
 func TestInsertBulk_Users(t *testing.T) {
-	db, mock, err := sqlmock.New()
-	if err != nil {
-		t.Fatalf("failed to create sqlmock: %v", err)
-	}
-	defer db.Close()
-
-	// Tạo Database instance với sqlx
-	sqlxDB := sqlx.NewDb(db, "sqlmock")
-	d := &Database{
-		DB:         sqlxDB,
-		kindDB:     types.SqlServer,
-		TimeoutSec: 30,
-	}
+	d, mock := newTestDB(t)
+	defer d.Close()
 
 	ctx := context.Background()
 	table := "users"
@@ -99,7 +89,7 @@ func TestInsertBulk_Users(t *testing.T) {
 	}
 	size := len(users)
 
-	// Tạo expected query
+	// Tạo expected query với placeholder MSSQL (@p1, @p2, ...)
 	var placeholders []string
 	for i := 0; i < size; i++ {
 		var row []string
@@ -111,21 +101,21 @@ func TestInsertBulk_Users(t *testing.T) {
 	expectedQuery := regexp.QuoteMeta(fmt.Sprintf("INSERT INTO %s (%s) VALUES %s",
 		table, strings.Join(colNames, ", "), strings.Join(placeholders, ", ")))
 
-	// Chuẩn bị driver args
+	// Chuẩn bị driver args (sqlmock yêu cầu driver.Value)
 	var driverArgs []driver.Value
 	for _, arg := range args {
 		driverArgs = append(driverArgs, arg)
 	}
 
-	// Thiết lập mock
+	// Thiết lập mock kỳ vọng
 	mock.ExpectBegin()
 	mock.ExpectExec(expectedQuery).
 		WithArgs(driverArgs...).
 		WillReturnResult(sqlmock.NewResult(1, int64(size)))
 	mock.ExpectCommit()
 
-	// Thực thi test
-	err = d.InsertBulk(ctx, table, size, colNames, args...)
+	// Thực thi test thành công
+	err := d.InsertBulk(ctx, table, size, colNames, args...)
 	assert.NoError(t, err)
 
 	// Kiểm tra tất cả kỳ vọng của mock
@@ -138,19 +128,8 @@ func TestInsertBulk_Users(t *testing.T) {
 }
 
 func TestDatabase_ExecReturningId(t *testing.T) {
-	db, mock, err := sqlmock.New()
-	if err != nil {
-		t.Fatalf("failed to create sqlmock: %v", err)
-	}
-	defer db.Close()
-
-	// Tạo Database instance với sqlx
-	sqlxDB := sqlx.NewDb(db, "sqlmock")
-	d := &Database{
-		DB:         sqlxDB,
-		kindDB:     types.SqlServer, // Giả định SQL Server
-		TimeoutSec: 30,
-	}
+	d, mock := newTestDB(t)
+	defer d.Close()
 
 	ctx := context.Background()
 	query := "INSERT INTO users (name) OUTPUT INSERTED.id VALUES (?)"

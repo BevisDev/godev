@@ -585,7 +585,7 @@ func (d *Database) InsertReturning(c context.Context, query string, dest interfa
 //
 // Params:
 //   - table:     Table name.
-//   - size:      Number of rows to insert.
+//   - row:      Number of rows to insert.
 //   - colNames:  Columns to insert (must match args order).
 //   - args:      values to insert
 //
@@ -594,42 +594,67 @@ func (d *Database) InsertReturning(c context.Context, query string, dest interfa
 //	colNames := []string{"name", "email"}
 //	args := []interface{}{"Alice", "alice@example.com", "Bob", "bob@example.com"}
 //	err := db.InsertBulk(ctx, "users", 2, colNames, args...)
-func (d *Database) InsertBulk(ctx context.Context, table string, size int, colNames []string, args ...interface{}) error {
-	sizeCol := len(colNames)
-	if sizeCol <= 0 {
+func (d *Database) InsertBulk(ctx context.Context, table string, row int, colNames []string, args ...interface{}) error {
+	col := len(colNames)
+	if col <= 0 {
 		return errors.New("size column must be greater than 0")
 	}
 
-	if len(args) != size*sizeCol {
-		return fmt.Errorf("expected %d arguments, got %d", size*sizeCol, len(args))
+	if len(args) != row*col {
+		return fmt.Errorf("expected %d arguments, got %d", row*col, len(args))
 	}
 
-	if len(args) > MaxParams {
-		return errors.New("args exceed the maximum params")
-	}
+	return d.RunTx(ctx, sql.LevelDefault, func(ctx context.Context, tx *sqlx.Tx) error {
+		if len(args) > MaxParams {
+			batchRow := MaxParams / col
+			for start := 0; start < row; start += batchRow {
+				end := start + batchRow
+				if end > row {
+					end = row
+				}
 
+				batchArgs := args[start*col : end*col]
+				if err := d.InsertBatch(ctx, tx, table, colNames, col, end-start, batchArgs); err != nil {
+					tx.Rollback()
+					return err
+				}
+			}
+		} else {
+			if err := d.InsertBatch(ctx, tx, table, colNames, col, row, args); err != nil {
+				tx.Rollback()
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func (d *Database) InsertBatch(ctx context.Context, tx *sqlx.Tx,
+	table string, colNames []string,
+	col int, row int, args []interface{},
+) error {
+	// Build a placeholder row for each record
+	// Example for MSSQL: (@p1, @p2), (@p3, @p4), ...
 	var placeholders []string
-	for i := 0; i < size; i++ {
-		// Build a placeholder row for each record
-		// Example for MSSQL: (@p1, @p2), (@p3, @p4), ...
-		var row []string
-		for j := 1; j <= sizeCol; j++ {
-			row = append(row, d.FormatRow(i*sizeCol+j))
+	for i := 0; i < row; i++ {
+		var paramRow []string
+		for j := 1; j <= col; j++ {
+			paramRow = append(paramRow, d.FormatRow(i*col+j))
 		}
 		// Add this row's placeholders to the list
-		placeholders = append(placeholders, "("+strings.Join(row, ", ")+")")
+		placeholders = append(placeholders, "("+strings.Join(paramRow, ", ")+")")
 	}
 
 	// Join column names into comma-separated string
 	// Example: "name, email, age"
-	cols := strings.Join(colNames, ", ")
+	colsJoin := strings.Join(colNames, ", ")
 
 	// Join all row placeholder groups into final VALUES string
 	// Example: "(?, ?), (?, ?), (?, ?)"
 	placeholderStr := strings.Join(placeholders, ", ")
+	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES %s", table, colsJoin, placeholderStr)
 
-	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES %s", table, cols, placeholderStr)
-	return d.ExecuteTx(ctx, query, args...)
+	return d.Execute(ctx, query, tx, args...)
 }
 
 // InsertMany inserts multiple records into the database using a parameterized
@@ -657,7 +682,7 @@ func (d *Database) InsertMany(ctx context.Context, query string, entities []inte
 			if end > len(entities) {
 				end = len(entities)
 			}
-			
+
 			batch := entities[i:end]
 			for _, e := range batch {
 				_, err := tx.NamedExecContext(ctx, query, e)
