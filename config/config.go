@@ -160,6 +160,13 @@ func ReadValue(target interface{}, cfMap map[string]string) error {
 			continue
 		}
 
+		if field.Kind() == reflect.Struct {
+			if err := ReadValue(field.Addr().Interface(), cfMap); err != nil {
+				return err
+			}
+			continue
+		}
+
 		if val, ok := cfMap[key]; ok {
 			switch field.Kind() {
 			case reflect.String:

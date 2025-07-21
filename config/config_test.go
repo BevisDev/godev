@@ -36,6 +36,21 @@ type TestConfig struct {
 	Threshold []float64 `config:"threshold"`
 }
 
+type NestedConfig struct {
+	ServerConfig Server `config:"server"`
+}
+
+type Server struct {
+	Name           string   `config:"name"`
+	Profile        string   `config:"profile"`
+	TrustedProxies []string `config:"trustedProxies"`
+	Port           string   `config:"port"`
+	Version        string   `config:"version"`
+	ClientTimeout  int      `config:"clientTimeout"`
+	ServerTimeout  int      `config:"serverTimeout"`
+	RequestTimeout int      `config:"requestTimeout"`
+}
+
 func setupEnv(vars map[string]string) func() {
 	for k, v := range vars {
 		os.Setenv(k, v)
@@ -249,5 +264,44 @@ func TestReadValue_InvalidCases(t *testing.T) {
 	// Expect Age=0 vì parse lỗi
 	if cfg2.Age != 0 {
 		t.Errorf("expected Age=0 for invalid int, got %d", cfg2.Age)
+	}
+}
+
+func TestReadValue_NestedStruct(t *testing.T) {
+	cfg := &NestedConfig{}
+	cfMap := map[string]string{
+		"name":           "AppServer",
+		"profile":        "dev",
+		"trustedProxies": "10.0.0.1,10.0.0.2",
+		"port":           "8080",
+		"version":        "1.0.0",
+		"clientTimeout":  "30",
+		"serverTimeout":  "60",
+		"requestTimeout": "90",
+	}
+
+	if err := ReadValue(cfg, cfMap); err != nil {
+		t.Fatalf("ReadValue failed: %v", err)
+	}
+
+	if cfg.ServerConfig.Name != "AppServer" {
+		t.Errorf("expected Name=AppServer, got %s", cfg.ServerConfig.Name)
+	}
+	if cfg.ServerConfig.Port != "8080" {
+		t.Errorf("expected Port=8080, got %s", cfg.ServerConfig.Port)
+	}
+	if len(cfg.ServerConfig.TrustedProxies) != 2 ||
+		cfg.ServerConfig.TrustedProxies[0] != "10.0.0.1" ||
+		cfg.ServerConfig.TrustedProxies[1] != "10.0.0.2" {
+		t.Errorf("unexpected TrustedProxies: %#v", cfg.ServerConfig.TrustedProxies)
+	}
+	if cfg.ServerConfig.ClientTimeout != 30 {
+		t.Errorf("expected ClientTimeout=30, got %d", cfg.ServerConfig.ClientTimeout)
+	}
+	if cfg.ServerConfig.ServerTimeout != 60 {
+		t.Errorf("expected ServerTimeout=60, got %d", cfg.ServerConfig.ServerTimeout)
+	}
+	if cfg.ServerConfig.RequestTimeout != 90 {
+		t.Errorf("expected RequestTimeout=90, got %d", cfg.ServerConfig.RequestTimeout)
 	}
 }
