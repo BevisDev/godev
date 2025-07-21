@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"errors"
 	"fmt"
 	"github.com/BevisDev/godev/types"
 	"github.com/DATA-DOG/go-sqlmock"
@@ -157,4 +158,54 @@ func TestDatabase_ExecReturningId(t *testing.T) {
 	assert.Error(t, err)
 	assert.Equal(t, 0, id)
 	assert.True(t, d.IsNoResult(err), "expected sql.ErrNoRows")
+}
+
+func TestInsertBulk_RollbackOnError(t *testing.T) {
+	d, mock := newTestDB(t)
+	defer d.Close()
+
+	ctx := context.Background()
+	table := "users"
+	colNames := []string{"name", "email"}
+	args := []interface{}{"Alice", "alice@mail.com"}
+
+	mock.ExpectBegin()
+
+	// Mock lỗi Exec
+	q := buildExpectedInsertQuery(d, table, colNames, 1)
+	mock.ExpectExec(regexp.QuoteMeta(q)).
+		WithArgs(toDriver(args)...).
+		WillReturnError(errors.New("insert failed"))
+
+	// Transaction rollback
+	mock.ExpectRollback()
+
+	err := d.InsertBulk(ctx, table, 1, colNames, args...)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "insert failed")
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+// Helper để build query giống InsertBatch
+func buildExpectedInsertQuery(d *Database, table string, colNames []string, row int) string {
+	var placeholders []string
+	col := len(colNames)
+	for i := 0; i < row; i++ {
+		var paramRow []string
+		for j := 1; j <= col; j++ {
+			paramRow = append(paramRow, d.FormatRow(i*col+j))
+		}
+		placeholders = append(placeholders, "("+strings.Join(paramRow, ", ")+")")
+	}
+	colsJoin := strings.Join(colNames, ", ")
+	return fmt.Sprintf("INSERT INTO %s (%s) VALUES %s", table, colsJoin, strings.Join(placeholders, ", "))
+}
+
+// Helper để convert args sang driver.Value
+func toDriver(args []interface{}) []driver.Value {
+	values := make([]driver.Value, len(args))
+	for i, v := range args {
+		values[i] = v
+	}
+	return values
 }

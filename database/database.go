@@ -615,13 +615,11 @@ func (d *Database) InsertBulk(ctx context.Context, table string, row int, colNam
 
 				batchArgs := args[start*col : end*col]
 				if err := d.InsertBatch(ctx, tx, table, colNames, col, end-start, batchArgs); err != nil {
-					tx.Rollback()
 					return err
 				}
 			}
 		} else {
 			if err := d.InsertBatch(ctx, tx, table, colNames, col, row, args); err != nil {
-				tx.Rollback()
 				return err
 			}
 		}
