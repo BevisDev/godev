@@ -2,9 +2,11 @@ package config
 
 import (
 	"errors"
+	"github.com/BevisDev/godev/utils/str"
 	"github.com/BevisDev/godev/utils/validate"
 	"github.com/spf13/viper"
 	"os"
+	"reflect"
 	"strings"
 )
 
@@ -133,4 +135,91 @@ func processValue(value interface{}) interface{} {
 		replaceEnvVars(v)
 	}
 	return value
+}
+
+func ReadValue(target interface{}, cfMap map[string]string) error {
+	rv := reflect.ValueOf(target)
+	if rv.Kind() != reflect.Ptr || rv.IsNil() {
+		return errors.New("target must be a non-nil pointer to a struct")
+	}
+
+	v := rv.Elem()
+	if v.Kind() != reflect.Struct {
+		return errors.New("target must point to a struct")
+	}
+
+	t := v.Type()
+	for i := 0; i < v.NumField(); i++ {
+		field := v.Field(i)
+		if !field.CanSet() {
+			continue
+		}
+
+		key := t.Field(i).Tag.Get("config")
+		if key == "" {
+			continue
+		}
+
+		if val, ok := cfMap[key]; ok {
+			switch field.Kind() {
+			case reflect.String:
+				field.SetString(val)
+
+			case reflect.Int, reflect.Int32, reflect.Int64:
+				n := str.ToInt[int64](val)
+				field.SetInt(n)
+
+			case reflect.Float32:
+				f := str.ToFloat[float32](val)
+				field.SetFloat(float64(f))
+
+			case reflect.Float64:
+				f := str.ToFloat[float64](val)
+				field.SetFloat(f)
+
+			case reflect.Bool:
+				lower := strings.ToLower(strings.TrimSpace(val))
+				switch lower {
+				case "true", "1", "yes", "y":
+					field.SetBool(true)
+				default:
+					field.SetBool(false)
+				}
+
+			case reflect.Slice:
+				parts := strings.Split(val, ",")
+				for j := range parts {
+					parts[j] = strings.TrimSpace(parts[j])
+				}
+				elemKind := field.Type().Elem().Kind()
+
+				switch elemKind {
+				case reflect.String:
+					field.Set(reflect.ValueOf(parts))
+
+				case reflect.Int, reflect.Int32, reflect.Int64:
+					var nums []int
+					for _, p := range parts {
+						n := str.ToInt[int](p)
+						nums = append(nums, n)
+					}
+					field.Set(reflect.ValueOf(nums))
+
+				case reflect.Float32, reflect.Float64:
+					var floats []float64
+					for _, p := range parts {
+						f := str.ToFloat[float64](p)
+						floats = append(floats, f)
+					}
+					field.Set(reflect.ValueOf(floats))
+				default:
+					continue
+				}
+			default:
+				continue
+			}
+		}
+	}
+
+	return nil
 }

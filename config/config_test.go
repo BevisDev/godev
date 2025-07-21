@@ -25,6 +25,17 @@ type TestConfigStruct struct {
 	} `mapstructure:"RedisAPP"`
 }
 
+type TestConfig struct {
+	Name      string    `config:"name"`
+	Age       int       `config:"age"`
+	Rate32    float32   `config:"rate32"`
+	Rate64    float64   `config:"rate64"`
+	Active    bool      `config:"active"`
+	Tags      []string  `config:"tags"`
+	Numbers   []int     `config:"numbers"`
+	Threshold []float64 `config:"threshold"`
+}
+
 func setupEnv(vars map[string]string) func() {
 	for k, v := range vars {
 		os.Setenv(k, v)
@@ -155,4 +166,88 @@ func TestNewConfig_ReplaceEnv(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "expanded-app", cfg.AppName)
 	assert.Equal(t, 8080, cfg.Port)
+}
+
+func equalSlice[T comparable](a, b []T) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func TestReadValue_AllTypes(t *testing.T) {
+	cfg := &TestConfig{}
+
+	cfMap := map[string]string{
+		"name":      "Alice",
+		"age":       "30",
+		"rate32":    "1.23",
+		"rate64":    "4.56",
+		"active":    "true",
+		"tags":      "red, green ,blue",
+		"numbers":   "1,2,3,4",
+		"threshold": "0.1,0.5,1.5",
+	}
+
+	err := ReadValue(cfg, cfMap)
+	if err != nil {
+		t.Fatalf("ReadValue failed: %v", err)
+	}
+
+	// Check từng field
+	if cfg.Name != "Alice" {
+		t.Errorf("expected Name=Alice, got %s", cfg.Name)
+	}
+	if cfg.Age != 30 {
+		t.Errorf("expected Age=30, got %d", cfg.Age)
+	}
+	if cfg.Rate32 < 1.229 || cfg.Rate32 > 1.231 { // float32 tolerance
+		t.Errorf("expected Rate32 ~1.23, got %f", cfg.Rate32)
+	}
+	if cfg.Rate64 != 4.56 {
+		t.Errorf("expected Rate64=4.56, got %f", cfg.Rate64)
+	}
+	if !cfg.Active {
+		t.Errorf("expected Active=true, got false")
+	}
+	if !equalSlice(cfg.Tags, []string{"red", "green", "blue"}) {
+		t.Errorf("expected Tags [red green blue], got %#v", cfg.Tags)
+	}
+	if !equalSlice(cfg.Numbers, []int{1, 2, 3, 4}) {
+		t.Errorf("expected Numbers [1 2 3 4], got %#v", cfg.Numbers)
+	}
+	if !equalSlice(cfg.Threshold, []float64{0.1, 0.5, 1.5}) {
+		t.Errorf("expected Threshold [0.1 0.5 1.5], got %#v", cfg.Threshold)
+	}
+}
+
+func TestReadValue_InvalidCases(t *testing.T) {
+	// Case 1: target không phải pointer
+	cfg := TestConfig{}
+	cfMap := map[string]string{}
+	if err := ReadValue(cfg, cfMap); err == nil {
+		t.Errorf("expected error when target is not pointer")
+	}
+
+	// Case 2: target nil
+	var cfgNil *TestConfig
+	if err := ReadValue(cfgNil, cfMap); err == nil {
+		t.Errorf("expected error when target is nil")
+	}
+
+	// Case 3: parse lỗi (age = abc)
+	cfg2 := &TestConfig{}
+	cfMap2 := map[string]string{"age": "abc"}
+	if err := ReadValue(cfg2, cfMap2); err != nil {
+		t.Errorf("unexpected error for invalid int: %v", err)
+	}
+	// Expect Age=0 vì parse lỗi
+	if cfg2.Age != 0 {
+		t.Errorf("expected Age=0 for invalid int, got %d", cfg2.Age)
+	}
 }
