@@ -176,11 +176,7 @@ func ReadValue(target interface{}, cfMap map[string]string) error {
 				n := str.ToInt[int64](val)
 				field.SetInt(n)
 
-			case reflect.Float32:
-				f := str.ToFloat[float32](val)
-				field.SetFloat(float64(f))
-
-			case reflect.Float64:
+			case reflect.Float32, reflect.Float64:
 				f := str.ToFloat[float64](val)
 				field.SetFloat(f)
 

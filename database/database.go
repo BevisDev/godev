@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"runtime/debug"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -72,7 +73,7 @@ type ConfigDB struct {
 //   - kindDB: the type of database (e.g., mysql, postgres, sqlserver).
 type Database struct {
 	// DB is the initialized sqlx.DB connection.
-	DB *sqlx.DB
+	db *sqlx.DB
 
 	// TimeoutSec specifies the default timeout for queries, in seconds.
 	TimeoutSec int
@@ -83,6 +84,9 @@ type Database struct {
 	// kindDB stores the database type.
 	// For example: sqlserver, postgres, mysql.
 	kindDB types.KindDB
+
+	config *ConfigDB
+	mu     sync.RWMutex
 }
 
 const (
@@ -130,7 +134,8 @@ func NewDB(cf *ConfigDB) (*Database, error) {
 		showQuery:  cf.ShowQuery,
 		TimeoutSec: cf.TimeoutSec,
 		kindDB:     cf.Kind,
-		DB:         db,
+		db:         db,
+		config:     cf,
 	}, err
 }
 
@@ -217,7 +222,47 @@ func newConnection(cf *ConfigDB) (*sqlx.DB, error) {
 }
 
 func (d *Database) Close() {
-	d.DB.Close()
+	if d.db != nil {
+		_ = d.db.Close()
+	}
+}
+
+func (d *Database) GetDB() (*sqlx.DB, error) {
+	//d.mu.RLock()
+	//if d.db != nil && d.db.Ping() == nil {
+	//	defer d.mu.RUnlock()
+	//	return d.db, nil
+	//}
+	//d.mu.RUnlock()
+	//
+	//d.mu.Lock()
+	//defer d.mu.Unlock()
+	//
+	//if err := d.Reconnect(); err != nil {
+	//	return nil, fmt.Errorf("failed to get DB: %w", err)
+	//}
+	return d.db, nil
+}
+
+func (d *Database) Reconnect() error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	if d.db != nil {
+		if err := d.db.Close(); err != nil {
+			log.Printf("failed to close old connection: %v", err)
+		}
+		d.db = nil
+	}
+
+	newDB, err := newConnection(d.config)
+	if err != nil {
+		return fmt.Errorf("failed to reconnect: %w", err)
+	}
+
+	d.db = newDB
+	log.Printf("database %s reconnected successfully", d.config.Schema)
+	return nil
 }
 
 func (d *Database) ViewQuery(query string) {
@@ -287,11 +332,34 @@ func (d *Database) GetTemplate(template types.DBJSONTemplate) string {
 	}
 }
 
+// FormatRow returns a database-specific placeholder for a given parameter index,
+// used when dynamically constructing bulk insert queries or custom SQL.
+//
+// Behavior:
+//   - For MySQL: always returns "?" (since MySQL uses anonymous placeholders)
+//   - For Postgres: returns "$1", "$2", etc.
+//   - For MSSQL: returns "@p1", "@p2", etc.
+//
+// This allows dynamically building row placeholders such as:
+//
+//	"(?, ?, ?)" or "($1, $2, $3)" depending on the database in use.
+//
+// Example:
+//
+//	fmt.Sprintf("INSERT INTO users (id, name) VALUES (%s)", d.FormatRow(1))
+func (d *Database) FormatRow(idx int) string {
+	var p = d.kindDB.GetPlaceHolder()
+	if types.MySQL == d.kindDB {
+		return p
+	}
+	return fmt.Sprintf("%s%d", p, idx)
+}
+
 // RebindQuery prepares a SQL query and its arguments for execution,
 // applying the correct placeholder format based on the database dialect.
 //
 // - For queries containing an IN clause, it uses sqlx.In() to expand slice arguments.
-// - Then, it's rebinding the query using d.DB.Rebind() to match the database's placeholder style.
+// - Then, it's rebinding the query using d.db.Rebind() to match the database's placeholder style.
 //
 // Example:
 //
@@ -314,33 +382,16 @@ func (d *Database) RebindQuery(query string, args ...interface{}) (string, []int
 			return query, args, err
 		}
 	}
-	query = d.DB.Rebind(query)
+
+	db, err := d.GetDB()
+	if err != nil {
+		return query, args, err
+	}
+
+	query = db.Rebind(query)
 
 	d.ViewQuery(query)
 	return query, args, err
-}
-
-// FormatRow returns a database-specific placeholder for a given parameter index,
-// used when dynamically constructing bulk insert queries or custom SQL.
-//
-// Behavior:
-//   - For MySQL: always returns "?" (since MySQL uses anonymous placeholders)
-//   - For Postgres: returns "$1", "$2", etc.
-//   - For MSSQL: returns "@p1", "@p2", etc.
-//
-// This allows dynamically building row placeholders such as:
-//
-//	"(?, ?, ?)" or "($1, $2, $3)" depending on the database in use.
-//
-// Example:
-//
-//	fmt.Sprintf("INSERT INTO users (id, name) VALUES (%s)", d.FormatRow(1))
-func (d *Database) FormatRow(idx int) string {
-	var p = d.kindDB.GetPlaceHolder()
-	if types.MySQL == d.kindDB {
-		return p
-	}
-	return fmt.Sprintf("%s%d", p, idx)
 }
 
 // RunTx executes a function within a database transaction with a given isolation level.
@@ -365,11 +416,16 @@ func (d *Database) FormatRow(idx int) string {
 //	if err != nil {
 //	    log.Fatalf("transaction failed: %v", err)
 //	}
-func (d *Database) RunTx(c context.Context, level sql.IsolationLevel, fn func(ctx context.Context, tx *sqlx.Tx) error) (err error) {
+func (d *Database) RunTx(c context.Context, level sql.IsolationLevel, fn func(ctx context.Context, tx *sqlx.Tx) error) error {
 	ctx, cancel := utils.CreateCtxTimeout(c, d.TimeoutSec)
 	defer cancel()
 
-	tx, err := d.DB.BeginTxx(ctx, &sql.TxOptions{
+	db, err := d.GetDB()
+	if err != nil {
+		return err
+	}
+
+	tx, err := db.BeginTxx(ctx, &sql.TxOptions{
 		Isolation: level,
 	})
 	if err != nil {
@@ -389,7 +445,7 @@ func (d *Database) RunTx(c context.Context, level sql.IsolationLevel, fn func(ct
 	}()
 
 	err = fn(ctx, tx)
-	return
+	return err
 }
 
 // GetList executes a query and scans all resulting rows into dest.
@@ -409,10 +465,15 @@ func (d *Database) GetList(c context.Context, dest interface{}, query string, ar
 	ctx, cancel := utils.CreateCtxTimeout(c, d.TimeoutSec)
 	defer cancel()
 
-	if validate.IsNilOrEmpty(newArgs) {
-		return d.DB.SelectContext(ctx, dest, query)
+	db, err := d.GetDB()
+	if err != nil {
+		return err
 	}
-	return d.DB.SelectContext(ctx, dest, query, newArgs...)
+
+	if validate.IsNilOrEmpty(newArgs) {
+		return db.SelectContext(ctx, dest, query)
+	}
+	return db.SelectContext(ctx, dest, query, newArgs...)
 }
 
 // GetAny executes a query and scans a single result into dest.
@@ -433,23 +494,35 @@ func (d *Database) GetAny(c context.Context, dest interface{}, query string, arg
 	ctx, cancel := utils.CreateCtxTimeout(c, d.TimeoutSec)
 	defer cancel()
 
-	if validate.IsNilOrEmpty(newArgs) {
-		return d.DB.GetContext(ctx, dest, query)
+	db, err := d.GetDB()
+	if err != nil {
+		return err
 	}
-	return d.DB.GetContext(ctx, dest, query, newArgs...)
+
+	if validate.IsNilOrEmpty(newArgs) {
+		return db.GetContext(ctx, dest, query)
+	}
+	return db.GetContext(ctx, dest, query, newArgs...)
 }
 
 // Execute runs the given SQL query with optional arguments.
 // If a transaction is provided, the query runs within it.
 // Otherwise, it executes directly on the database.
-func (d *Database) Execute(ctx context.Context, query string, tx *sqlx.Tx, args ...interface{}) (err error) {
+func (d *Database) Execute(ctx context.Context, query string, tx *sqlx.Tx, args ...interface{}) error {
 	d.ViewQuery(query)
+	var err error
+
 	if tx == nil {
-		_, err = d.DB.ExecContext(ctx, query, args...)
+		db, err := d.GetDB()
+		if err != nil {
+			return err
+		}
+		_, err = db.ExecContext(ctx, query, args...)
 	} else {
 		_, err = tx.ExecContext(ctx, query, args...)
 	}
-	return
+
+	return err
 }
 
 // ExecuteTx runs the query in a new transaction with default isolation level.
@@ -477,12 +550,23 @@ func (d *Database) ExecuteSafe(ctx context.Context, query string, args ...interf
 // Returns the generated ID and any error encountered.
 func (d *Database) ExecReturningId(ctx context.Context, query string, args ...interface{}) (id int, err error) {
 	d.ViewQuery(query)
-	err = d.DB.QueryRowxContext(ctx, query, args...).Scan(&id)
+
+	db, err := d.GetDB()
+	if err != nil {
+		return
+	}
+
+	err = db.QueryRowxContext(ctx, query, args...).Scan(&id)
 	return
 }
 
 func (d *Database) Prepare(ctx context.Context, query string) (*sqlx.Stmt, error) {
-	return d.DB.PreparexContext(ctx, query)
+	db, err := d.GetDB()
+	if err != nil {
+		return nil, err
+	}
+
+	return db.PreparexContext(ctx, query)
 }
 
 // Save executes a query with named parameters.
@@ -494,12 +578,34 @@ func (d *Database) Prepare(ctx context.Context, query string) (*sqlx.Stmt, error
 // Returns any error encountered during execution.
 func (d *Database) Save(ctx context.Context, tx *sqlx.Tx, query string, args interface{}) (err error) {
 	d.ViewQuery(query)
+
 	if tx == nil {
-		_, err = d.DB.NamedExecContext(ctx, query, args)
+		db, err := d.GetDB()
+		if err != nil {
+			return err
+		}
+		_, err = db.NamedExecContext(ctx, query, args)
 	} else {
 		_, err = tx.NamedExecContext(ctx, query, args)
 	}
 	return
+}
+
+// InsertOrUpdate executes an SQL statement to insert a new record or update an existing one.
+//
+// It delegates the actual execution to the Save method, which handles building
+// and executing the query with the provided arguments.
+//
+// Parameters:
+//   - ctx: Context used to control cancellation and timeouts for the database operation.
+//   - query: The SQL query string, typically containing parameter placeholders (e.g., `?` or `$1`).
+//   - args: The arguments to bind to the query placeholders. Can be a struct, map, or slice,
+//     depending on the underlying Save method implementation.
+//
+// Returns:
+//   - error: An error if the database operation fails, otherwise nil.
+func (d *Database) InsertOrUpdate(ctx context.Context, query string, args interface{}) error {
+	return d.Save(ctx, nil, query, args)
 }
 
 // SaveTx executes an INSERT or UPDATE SQL statement within a transaction,
@@ -569,10 +675,15 @@ func (d *Database) InsertReturning(c context.Context, query string, dest interfa
 	ctx, cancel := utils.CreateCtxTimeout(c, d.TimeoutSec)
 	defer cancel()
 
-	row := d.DB.QueryRowxContext(ctx, query, args...)
+	db, err := d.GetDB()
+	if err != nil {
+		return err
+	}
+
+	row := db.QueryRowxContext(ctx, query, args...)
 
 	switch dest.(type) {
-	case *int:
+	case *int, *int64:
 		return row.Scan(dest)
 	default:
 		return row.StructScan(dest)

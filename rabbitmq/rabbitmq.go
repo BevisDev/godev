@@ -5,29 +5,26 @@ import (
 	"errors"
 	"fmt"
 	"github.com/BevisDev/godev/consts"
-	"github.com/BevisDev/godev/utils"
 	"github.com/BevisDev/godev/utils/jsonx"
 	amqp "github.com/rabbitmq/amqp091-go"
+	"strings"
 )
 
 type RabbitMQConfig struct {
-	Host       string // RabbitMQ server host
-	Port       int    // RabbitMQ server port
-	Username   string // Username for authentication
-	Password   string // Password for authentication
-	TimeoutSec int    // TimeoutSec in seconds for message operations
+	Host     string // RabbitMQ server host
+	Port     int    // RabbitMQ server port
+	Username string // Username for authentication
+	Password string // Password for authentication
+	VHost    string // VHost Virtual host
 }
 
 type RabbitMQ struct {
-	connection *amqp.Connection
+	config     *RabbitMQConfig
+	Connection *amqp.Connection
 	Channel    *amqp.Channel
-	TimeoutSec int
 }
 
 const (
-	// defaultTimeoutSec defines the default timeout (in seconds) for rabbitmq operations.
-	defaultTimeoutSec = 10
-
 	// maxMessageSize max size message
 	maxMessageSize = 50000
 )
@@ -57,32 +54,33 @@ func NewRabbitMQ(config *RabbitMQConfig) (*RabbitMQ, error) {
 	if config == nil {
 		return nil, errors.New("config is nil")
 	}
-	if config.TimeoutSec == 0 {
-		config.TimeoutSec = defaultTimeoutSec
-	}
 
-	conn, err := amqp.Dial(fmt.Sprintf("amqp://%s:%s@%s:%d/",
-		config.Username, config.Password, config.Host, config.Port))
+	conn, err := amqp.Dial(
+		fmt.Sprintf("amqp://%s:%s@%s:%d/%s",
+			config.Username, config.Password, config.Host, config.Port, config.VHost),
+	)
 	if err != nil {
 		return nil, err
 	}
+
 	ch, err := conn.Channel()
 	if err != nil {
 		return nil, err
 	}
+
 	return &RabbitMQ{
-		connection: conn,
+		config:     config,
+		Connection: conn,
 		Channel:    ch,
-		TimeoutSec: config.TimeoutSec,
 	}, nil
 }
 
 func (r *RabbitMQ) Close() {
 	if r.Channel != nil {
-		r.Channel.Close()
+		_ = r.Channel.Close()
 	}
-	if r.connection != nil {
-		r.connection.Close()
+	if r.Connection != nil {
+		_ = r.Connection.Close()
 	}
 }
 
@@ -105,49 +103,58 @@ func (r *RabbitMQ) Nack(d amqp.Delivery, requeue bool) error {
 	return d.Nack(false, requeue)
 }
 
-func (r *RabbitMQ) Publish(c context.Context, queueName string, message interface{}) error {
-	if err := c.Err(); err != nil {
-		return err
+// Publish sends a message to the specified RabbitMQ queue.
+// It supports various message types (string, []byte, numbers, or JSON-serializable objects).
+// Returns an error if the message is too large, or publishing fails
+func (r *RabbitMQ) Publish(ctx context.Context, queueName string, message interface{}) error {
+	var (
+		body        []byte
+		contentType string
+	)
+	switch v := message.(type) {
+	case []byte:
+		body = v
+		contentType = consts.TextPlain
+
+	case string:
+		body = []byte(v)
+		trimmed := strings.TrimSpace(v)
+		if strings.HasPrefix(trimmed, "{") || strings.HasPrefix(trimmed, "[") {
+			contentType = consts.ApplicationJSON
+		} else {
+			contentType = consts.TextPlain
+		}
+
+	case int, int64, float64, bool:
+		body = []byte(fmt.Sprint(v))
+		contentType = consts.TextPlain
+
+	default:
+		body = jsonx.ToJSONBytes(v)
+		contentType = consts.ApplicationJSON
+	}
+	if len(body) > maxMessageSize {
+		return fmt.Errorf("message is too large: %d", len(body))
 	}
 
-	json := jsonx.ToJSONBytes(message)
-	if len(json) > maxMessageSize {
-		return fmt.Errorf("message is too large: %d", len(json))
-	}
+	// Assume queue is already declared during initialization
+	// If needed, add a check for queue existence instead of declaring it every time
 
-	ctx, cancel := utils.CreateCtxTimeout(c, r.TimeoutSec)
-	defer cancel()
-
-	q, err := r.DeclareQueue(queueName)
-	if err != nil {
-		return err
-	}
-
-	err = r.Channel.PublishWithContext(
-		ctx,
+	return r.Channel.PublishWithContext(ctx,
 		"",
-		q.Name,
+		queueName,
 		false,
 		false,
 		amqp.Publishing{
-			ContentType: consts.ApplicationJSON,
-			Body:        json,
+			ContentType: contentType,
+			Body:        body,
 		},
 	)
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
-func (r *RabbitMQ) Subscribe(ctx context.Context, queueName string, handler func(amqp.Delivery)) error {
-	q, err := r.DeclareQueue(queueName)
-	if err != nil {
-		return err
-	}
-
-	msgs, err := r.Channel.Consume(
-		q.Name,
+func (r *RabbitMQ) Consume(ctx context.Context, queueName string, handler func(amqp.Delivery)) error {
+	msgs, err := r.Channel.ConsumeWithContext(ctx,
+		queueName,
 		"",
 		false,
 		false,
@@ -160,16 +167,8 @@ func (r *RabbitMQ) Subscribe(ctx context.Context, queueName string, handler func
 	}
 
 	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case msg, ok := <-msgs:
-				if !ok {
-					return
-				}
-				handler(msg)
-			}
+		for msg := range msgs {
+			handler(msg)
 		}
 	}()
 
