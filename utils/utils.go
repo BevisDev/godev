@@ -24,6 +24,10 @@ func GetState(ctx context.Context) string {
 	return state
 }
 
+func SetState(ctx context.Context, state string) context.Context {
+	return context.WithValue(ctx, consts.State, state)
+}
+
 func CreateCtx() context.Context {
 	return context.WithValue(context.Background(), consts.State, random.RandUUID())
 }

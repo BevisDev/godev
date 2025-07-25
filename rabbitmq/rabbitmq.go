@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/BevisDev/godev/consts"
+	"github.com/BevisDev/godev/utils"
 	"github.com/BevisDev/godev/utils/jsonx"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"strings"
@@ -27,6 +28,10 @@ type RabbitMQ struct {
 const (
 	// maxMessageSize max size message
 	maxMessageSize = 50000
+
+	// xstate is the header key used to store the RequestID (or trace ID)
+	// when publishing, and consumers to retrieve it for logging or tracing.
+	xstate = "x-state"
 )
 
 // NewRabbitMQ creates a new RabbitMQ client using the provided configuration.
@@ -84,8 +89,8 @@ func (r *RabbitMQ) Close() {
 	}
 }
 
-func (r *RabbitMQ) DeclareQueue(queueName string) (amqp.Queue, error) {
-	return r.Channel.QueueDeclare(
+func (r *RabbitMQ) DeclareQueue(queueName string) error {
+	_, err := r.Channel.QueueDeclare(
 		queueName,
 		true,
 		false,
@@ -93,6 +98,7 @@ func (r *RabbitMQ) DeclareQueue(queueName string) (amqp.Queue, error) {
 		false,
 		nil,
 	)
+	return err
 }
 
 func (r *RabbitMQ) Ack(d amqp.Delivery) error {
@@ -140,6 +146,7 @@ func (r *RabbitMQ) Publish(ctx context.Context, queueName string, message interf
 	// Assume queue is already declared during initialization
 	// If needed, add a check for queue existence instead of declaring it every time
 
+	var state = utils.GetState(ctx)
 	return r.Channel.PublishWithContext(ctx,
 		"",
 		queueName,
@@ -148,11 +155,15 @@ func (r *RabbitMQ) Publish(ctx context.Context, queueName string, message interf
 		amqp.Publishing{
 			ContentType: contentType,
 			Body:        body,
+			Headers: amqp.Table{
+				"x-state": state,
+			},
 		},
 	)
 }
 
-func (r *RabbitMQ) Consume(ctx context.Context, queueName string, handler func(amqp.Delivery)) error {
+func (r *RabbitMQ) Consume(ctx context.Context, queueName string,
+	handler func(ctx context.Context, msg amqp.Delivery)) error {
 	msgs, err := r.Channel.ConsumeWithContext(ctx,
 		queueName,
 		"",
@@ -167,8 +178,25 @@ func (r *RabbitMQ) Consume(ctx context.Context, queueName string, handler func(a
 	}
 
 	go func() {
-		for msg := range msgs {
-			handler(msg)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case msg, ok := <-msgs:
+				if !ok {
+					return
+				}
+
+				var newCtx = utils.CreateCtx()
+				if raw, ok := msg.Headers[xstate]; ok {
+					if s, ok := raw.(string); ok {
+						newCtx = utils.SetState(newCtx, s)
+					}
+				}
+
+				// Handle message
+				handler(newCtx, msg)
+			}
 		}
 	}()
 
