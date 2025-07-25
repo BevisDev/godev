@@ -101,14 +101,6 @@ func (r *RabbitMQ) DeclareQueue(queueName string) error {
 	return err
 }
 
-func (r *RabbitMQ) Ack(d amqp.Delivery) error {
-	return d.Ack(false)
-}
-
-func (r *RabbitMQ) Nack(d amqp.Delivery, requeue bool) error {
-	return d.Nack(false, requeue)
-}
-
 // Publish sends a message to the specified RabbitMQ queue.
 // It supports various message types (string, []byte, numbers, or JSON-serializable objects).
 // Returns an error if the message is too large, or publishing fails
