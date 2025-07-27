@@ -155,15 +155,15 @@ func ReadValue(target interface{}, cfMap map[string]string) error {
 			continue
 		}
 
-		key := t.Field(i).Tag.Get("config")
-		if key == "" {
-			continue
-		}
-
 		if field.Kind() == reflect.Struct {
 			if err := ReadValue(field.Addr().Interface(), cfMap); err != nil {
 				return err
 			}
+			continue
+		}
+
+		key := t.Field(i).Tag.Get("config")
+		if key == "" {
 			continue
 		}
 
