@@ -1,7 +1,7 @@
 package main
 
 // @title           Module Library
-// @version         1.3.9
+// @version         1.7.0
 // @termsOfService  https://github.com/BevisDev/godev
 
 // @contact.name   Truong Thanh Binh

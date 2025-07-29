@@ -28,8 +28,10 @@ type RedisCacheConfig struct {
 	TimeoutSec int    // Timeout for Redis operations in seconds
 }
 
-// defaultTimeoutSec defines the default timeout (in seconds) for redis operations.
-const defaultTimeoutSec = 5
+const (
+	// defaultTimeoutSec defines the default timeout (in seconds) for redis operations.
+	defaultTimeoutSec = 60
+)
 
 type RedisCache struct {
 	Client     *redis.Client

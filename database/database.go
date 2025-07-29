@@ -91,7 +91,7 @@ type Database struct {
 
 const (
 	// defaultTimeoutSec defines the default timeout (in seconds) for database operations.
-	defaultTimeoutSec = 30
+	defaultTimeoutSec = 60
 
 	// MaxParams defines the maximum number of parameters allowed
 	// To avoid hitting this hard limit, it's recommended to stay under 2000.

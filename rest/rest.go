@@ -21,7 +21,8 @@ import (
 	"github.com/BevisDev/godev/utils"
 )
 
-const defaultTimeoutSec = 30
+// defaultTimeoutSec defines the default timeout (in seconds) for rest client operations.
+const defaultTimeoutSec = 60
 
 // Request defines a standardized structure for making HTTP requests using RestClient.
 //
