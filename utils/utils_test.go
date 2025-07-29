@@ -39,8 +39,8 @@ func TestGetState_WhenCtxHasState(t *testing.T) {
 	}
 }
 
-func TestCreateCtx_ShouldReturnContextWithState(t *testing.T) {
-	ctx := CreateCtx()
+func TestNewCtx_ShouldReturnContextWithState(t *testing.T) {
+	ctx := NewCtx()
 	state := ctx.Value(consts.State)
 
 	if state == nil || state == "" {
@@ -48,8 +48,8 @@ func TestCreateCtx_ShouldReturnContextWithState(t *testing.T) {
 	}
 }
 
-func TestCreateCtxTimeout(t *testing.T) {
-	ctx, cancel := CreateCtxTimeout(nil, 1)
+func TestNewCtxTimeout(t *testing.T) {
+	ctx, cancel := NewCtxTimeout(nil, 1)
 	defer cancel()
 
 	select {
@@ -62,8 +62,8 @@ func TestCreateCtxTimeout(t *testing.T) {
 	}
 }
 
-func TestCreateCtxCancel(t *testing.T) {
-	ctx, cancel := CreateCtxCancel(nil)
+func TestNewCtxCancel(t *testing.T) {
+	ctx, cancel := NewCtxCancel(nil)
 	cancel()
 
 	select {

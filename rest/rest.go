@@ -218,7 +218,7 @@ func (r *RestClient) restTemplate(c context.Context, method string, req *Request
 		log.Println(sb.String())
 	}
 
-	ctx, cancel := utils.CreateCtxTimeout(c, r.TimeoutSec)
+	ctx, cancel := utils.NewCtxTimeout(c, r.TimeoutSec)
 	defer cancel()
 
 	// create request

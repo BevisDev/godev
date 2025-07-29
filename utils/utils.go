@@ -25,23 +25,26 @@ func GetState(ctx context.Context) string {
 }
 
 func SetState(ctx context.Context, state string) context.Context {
+	if ctx == nil {
+		return NewCtx()
+	}
 	return context.WithValue(ctx, consts.State, state)
 }
 
-func CreateCtx() context.Context {
+func NewCtx() context.Context {
 	return context.WithValue(context.Background(), consts.State, random.RandUUID())
 }
 
-func CreateCtxTimeout(ctx context.Context, timeoutSec int) (context.Context, context.CancelFunc) {
+func NewCtxTimeout(ctx context.Context, timeoutSec int) (context.Context, context.CancelFunc) {
 	if ctx == nil {
-		ctx = context.Background()
+		ctx = NewCtx()
 	}
 	return context.WithTimeout(ctx, time.Duration(timeoutSec)*time.Second)
 }
 
-func CreateCtxCancel(ctx context.Context) (context.Context, context.CancelFunc) {
+func NewCtxCancel(ctx context.Context) (context.Context, context.CancelFunc) {
 	if ctx == nil {
-		ctx = context.Background()
+		ctx = NewCtx()
 	}
 	return context.WithCancel(ctx)
 }

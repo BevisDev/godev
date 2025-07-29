@@ -417,7 +417,7 @@ func (d *Database) RebindQuery(query string, args ...interface{}) (string, []int
 //	    log.Fatalf("transaction failed: %v", err)
 //	}
 func (d *Database) RunTx(c context.Context, level sql.IsolationLevel, fn func(ctx context.Context, tx *sqlx.Tx) error) error {
-	ctx, cancel := utils.CreateCtxTimeout(c, d.TimeoutSec)
+	ctx, cancel := utils.NewCtxTimeout(c, d.TimeoutSec)
 	defer cancel()
 
 	db, err := d.GetDB()
@@ -462,7 +462,7 @@ func (d *Database) GetList(c context.Context, dest interface{}, query string, ar
 		return err
 	}
 
-	ctx, cancel := utils.CreateCtxTimeout(c, d.TimeoutSec)
+	ctx, cancel := utils.NewCtxTimeout(c, d.TimeoutSec)
 	defer cancel()
 
 	db, err := d.GetDB()
@@ -491,7 +491,7 @@ func (d *Database) GetAny(c context.Context, dest interface{}, query string, arg
 		return err
 	}
 
-	ctx, cancel := utils.CreateCtxTimeout(c, d.TimeoutSec)
+	ctx, cancel := utils.NewCtxTimeout(c, d.TimeoutSec)
 	defer cancel()
 
 	db, err := d.GetDB()
@@ -672,7 +672,7 @@ func (d *Database) InsertReturning(c context.Context, query string, dest interfa
 	}
 	d.ViewQuery(query)
 
-	ctx, cancel := utils.CreateCtxTimeout(c, d.TimeoutSec)
+	ctx, cancel := utils.NewCtxTimeout(c, d.TimeoutSec)
 	defer cancel()
 
 	db, err := d.GetDB()

@@ -169,24 +169,15 @@ func (r *RabbitMQ) Consume(ctx context.Context, queueName string,
 		return err
 	}
 
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case msg, ok := <-msgs:
-			if !ok {
-				return fmt.Errorf("channel closed")
+	for msg := range msgs {
+		newCtx := utils.NewCtx()
+		if raw, ok := msg.Headers[xstate]; ok {
+			if s, ok := raw.(string); ok {
+				newCtx = utils.SetState(newCtx, s)
 			}
-
-			var newCtx = utils.CreateCtx()
-			if raw, ok := msg.Headers[xstate]; ok {
-				if s, ok := raw.(string); ok {
-					newCtx = utils.SetState(newCtx, s)
-				}
-			}
-
-			// Handle message
-			handler(newCtx, msg)
 		}
+		handler(newCtx, msg)
 	}
+
+	return nil
 }

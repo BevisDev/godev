@@ -114,7 +114,7 @@ func (r *RedisCache) Setx(c context.Context, key string, value interface{}) erro
 //
 // Example: Set(ctx, "foo", "bar", 60) → key "foo" expires in 60 seconds
 func (r *RedisCache) Set(c context.Context, key string, value interface{}, expiredTimeSec int) (err error) {
-	ctx, cancel := utils.CreateCtxTimeout(c, r.TimeoutSec)
+	ctx, cancel := utils.NewCtxTimeout(c, r.TimeoutSec)
 	defer cancel()
 
 	rdb, err := r.GetRDB()
@@ -134,7 +134,7 @@ func (r *RedisCache) SetManyx(c context.Context, data map[string]string) error {
 		return nil
 	}
 
-	ctx, cancel := utils.CreateCtxTimeout(c, r.TimeoutSec)
+	ctx, cancel := utils.NewCtxTimeout(c, r.TimeoutSec)
 	defer cancel()
 
 	rdb, err := r.GetRDB()
@@ -156,7 +156,7 @@ func (r *RedisCache) SetMany(c context.Context, data map[string]string, expireSe
 		return nil
 	}
 
-	ctx, cancel := utils.CreateCtxTimeout(c, r.TimeoutSec)
+	ctx, cancel := utils.NewCtxTimeout(c, r.TimeoutSec)
 	defer cancel()
 
 	rdb, err := r.GetRDB()
@@ -196,7 +196,7 @@ func (r *RedisCache) Get(c context.Context, key string, result interface{}) (err
 		return errors.New("must be a pointer")
 	}
 
-	ctx, cancel := utils.CreateCtxTimeout(c, r.TimeoutSec)
+	ctx, cancel := utils.NewCtxTimeout(c, r.TimeoutSec)
 	defer cancel()
 	defer func() {
 		if r := recover(); r != nil {
@@ -249,7 +249,7 @@ func (r *RedisCache) Get(c context.Context, key string, result interface{}) (err
 //
 // Returns "" and nil error if the key does not exist.
 func (r *RedisCache) GetString(c context.Context, key string) (string, error) {
-	ctx, cancel := utils.CreateCtxTimeout(c, r.TimeoutSec)
+	ctx, cancel := utils.NewCtxTimeout(c, r.TimeoutSec)
 	defer cancel()
 
 	rdb, err := r.GetRDB()
@@ -270,7 +270,7 @@ func (r *RedisCache) GetString(c context.Context, key string) (string, error) {
 //
 // Returns nil if the key does not exist.
 func (r *RedisCache) Delete(c context.Context, key string) error {
-	ctx, cancel := utils.CreateCtxTimeout(c, r.TimeoutSec)
+	ctx, cancel := utils.NewCtxTimeout(c, r.TimeoutSec)
 	defer cancel()
 
 	rdb, err := r.GetRDB()
@@ -286,7 +286,7 @@ func (r *RedisCache) Delete(c context.Context, key string) error {
 // The result is a slice of interface{} values, in the same order as keys.
 // Missing keys will be returned as nil in the result slice.
 func (r *RedisCache) GetMany(c context.Context, keys []string) ([]interface{}, error) {
-	ctx, cancel := utils.CreateCtxTimeout(c, r.TimeoutSec)
+	ctx, cancel := utils.NewCtxTimeout(c, r.TimeoutSec)
 	defer cancel()
 
 	rdb, err := r.GetRDB()
@@ -306,7 +306,7 @@ func (r *RedisCache) GetMany(c context.Context, keys []string) ([]interface{}, e
 // Uses SCAN under the hood to avoid blocking. For each matching key, `GetString` is called.
 // Returns an error if any key retrieval fails.
 func (r *RedisCache) GetByPrefix(c context.Context, prefix string) ([]string, error) {
-	ctx, cancel := utils.CreateCtxTimeout(c, r.TimeoutSec)
+	ctx, cancel := utils.NewCtxTimeout(c, r.TimeoutSec)
 	defer cancel()
 
 	rdb, err := r.GetRDB()
@@ -342,7 +342,7 @@ func (r *RedisCache) GetByPrefix(c context.Context, prefix string) ([]string, er
 //
 // Returns true if the key exists, false otherwise.
 func (r *RedisCache) Exists(c context.Context, key string) (bool, error) {
-	ctx, cancel := utils.CreateCtxTimeout(c, r.TimeoutSec)
+	ctx, cancel := utils.NewCtxTimeout(c, r.TimeoutSec)
 	defer cancel()
 
 	rdb, err := r.GetRDB()
@@ -359,7 +359,7 @@ func (r *RedisCache) Exists(c context.Context, key string) (bool, error) {
 // The value will be converted to string using convertValue before sending.
 func (r *RedisCache) Publish(c context.Context, channel string, value interface{}) error {
 	msg := convertValue(value)
-	ctx, cancel := utils.CreateCtxTimeout(c, r.TimeoutSec)
+	ctx, cancel := utils.NewCtxTimeout(c, r.TimeoutSec)
 	defer cancel()
 
 	rdb, err := r.GetRDB()
