@@ -40,7 +40,7 @@ func TestGetState_WhenCtxHasState(t *testing.T) {
 }
 
 func TestNewCtx_ShouldReturnContextWithState(t *testing.T) {
-	ctx := NewCtx()
+	ctx := NewCtx(nil)
 	state := ctx.Value(consts.State)
 
 	if state == nil || state == "" {

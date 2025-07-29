@@ -54,15 +54,16 @@ const (
 //	    log.Fatal("Failed to initialize migration:", err)
 //	}
 func NewMigration(cf *MigrationConfig) (*Migration, error) {
-	m := Migration{
-		dir:  cf.Dir,
-		kind: cf.Kind,
-		db:   cf.DB,
+	// set default timeout
+	if cf.Timeout <= 0 {
+		cf.Timeout = defaultTimeout
 	}
 
-	// set default timeout
-	if cf.Timeout == 0 {
-		m.Timeout = cf.Timeout
+	m := Migration{
+		dir:     cf.Dir,
+		kind:    cf.Kind,
+		db:      cf.DB,
+		Timeout: cf.Timeout,
 	}
 
 	if err := m.Init(); err != nil {
@@ -118,6 +119,6 @@ func (m *Migration) Down(c context.Context, version int64) error {
 	if err != nil {
 		return err
 	}
-	
+
 	return m.Status()
 }

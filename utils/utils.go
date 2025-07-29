@@ -13,6 +13,13 @@ import (
 
 type M map[string]interface{}
 
+func NewCtx(ctx context.Context) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return context.WithValue(ctx, consts.State, random.RandUUID())
+}
+
 func GetState(ctx context.Context) string {
 	if ctx == nil {
 		return random.RandUUID()
@@ -24,27 +31,28 @@ func GetState(ctx context.Context) string {
 	return state
 }
 
-func SetState(ctx context.Context, state string) context.Context {
+func NewCtxWithState(ctx context.Context, state string) context.Context {
 	if ctx == nil {
-		return NewCtx()
+		ctx = NewCtx(nil)
 	}
-	return context.WithValue(ctx, consts.State, state)
-}
 
-func NewCtx() context.Context {
-	return context.WithValue(context.Background(), consts.State, random.RandUUID())
+	if state != "" {
+		ctx = context.WithValue(ctx, consts.State, state)
+	}
+
+	return ctx
 }
 
 func NewCtxTimeout(ctx context.Context, timeoutSec int) (context.Context, context.CancelFunc) {
 	if ctx == nil {
-		ctx = NewCtx()
+		ctx = NewCtx(nil)
 	}
 	return context.WithTimeout(ctx, time.Duration(timeoutSec)*time.Second)
 }
 
 func NewCtxCancel(ctx context.Context) (context.Context, context.CancelFunc) {
 	if ctx == nil {
-		ctx = NewCtx()
+		ctx = NewCtx(nil)
 	}
 	return context.WithCancel(ctx)
 }
