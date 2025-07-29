@@ -170,7 +170,7 @@ func (r *RabbitMQ) Consume(ctx context.Context, queueName string,
 	}
 
 	for msg := range msgs {
-		newCtx := utils.NewCtx()
+		newCtx := utils.NewCtx(nil)
 		if raw, ok := msg.Headers[xstate]; ok {
 			if s, ok := raw.(string); ok {
 				newCtx = utils.NewCtxWithState(newCtx, s)
