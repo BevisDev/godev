@@ -300,32 +300,32 @@ func TestParse_Pointer_CastFail(t *testing.T) {
 }
 
 func TestParseMap_Success(t *testing.T) {
-	m := M{
+	m := MapObject{
 		"user": User{Name: "Alice", Age: 30},
 	}
 
-	val, err := ParseMap[User]("user", m)
+	val, err := ParseValueMap[User]("user", m)
 
 	assert.NoError(t, err)
 	assert.Equal(t, "Alice", val.Name)
 	assert.Equal(t, 30, val.Age)
 }
 
-func TestParseMap_MissingKey(t *testing.T) {
-	m := M{}
+func TestParseValueMap_MissingKey(t *testing.T) {
+	m := MapObject{}
 
-	val, err := ParseMap[int]("notfound", m)
+	val, err := ParseValueMap[int]("notfound", m)
 
 	assert.Error(t, err)
 	assert.Equal(t, 0, val)
 }
 
-func TestParseMap_TypeMismatch(t *testing.T) {
-	m := M{
+func TestParseValueMap_TypeMismatch(t *testing.T) {
+	m := MapObject{
 		"age": "not-an-int",
 	}
 
-	val, err := ParseMap[int]("age", m)
+	val, err := ParseValueMap[int]("age", m)
 
 	assert.Error(t, err)
 	assert.Equal(t, 0, val)

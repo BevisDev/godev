@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-type M map[string]interface{}
+type MapObject map[string]interface{}
 
 func NewCtx(ctx context.Context) context.Context {
 	if ctx == nil {
@@ -167,7 +167,7 @@ func Parse[T any](obj interface{}) (T, error) {
 	return val, nil
 }
 
-func ParseMap[T any](key string, objMap M) (T, error) {
+func ParseValueMap[T any](key string, objMap MapObject) (T, error) {
 	var zero T
 
 	raw, ok := objMap[key]

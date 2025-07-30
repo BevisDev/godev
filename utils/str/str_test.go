@@ -210,6 +210,33 @@ func TestToFloat32(t *testing.T) {
 	}
 }
 
+func TestToBool(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected bool
+	}{
+		{"Valid true lowercase", "true", true},
+		{"Valid true uppercase", "TRUE", true},
+		{"Valid true mixedcase", "TrUe", false},
+		{"Valid false lowercase", "false", false},
+		{"Valid false uppercase", "FALSE", false},
+		{"Valid false mixedcase", "FaLsE", false},
+		{"Numeric 1 as true", "1", true},
+		{"Numeric 0 as false", "0", false},
+		{"Invalid string", "abc", false}, // expect false because ParseBool fails
+		{"Empty string", "", false},      // default false
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ToBool(tt.input)
+			if got != tt.expected {
+				t.Errorf("ToBool(%q) = %v, want %v", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
 func TestRemoveAccents(t *testing.T) {
 	tests := []struct {
 		input    string

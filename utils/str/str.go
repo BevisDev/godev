@@ -135,6 +135,28 @@ func ToFloat[T types.SignedFloat](str string) T {
 	return T(f)
 }
 
+// ToBool parses a string into a boolean value.
+//
+// It supports standard boolean literals ("true", "false") in any case,
+// as well as "1" (true) and "0" (false). If parsing fails, it returns false
+// instead of an error.
+//
+// Examples:
+//
+//	ToBool("true")  // true
+//	ToBool("FALSE") // false
+//	ToBool("1")     // true
+//	ToBool("abc")   // false (invalid string)
+//
+// It is case-insensitive and safe for invalid inputs.
+func ToBool(s string) bool {
+	b, err := strconv.ParseBool(s)
+	if err != nil {
+		return false
+	}
+	return b
+}
+
 // RemoveAccents converts a Unicode string to its equivalent without diacritical marks.
 //
 // It removes accents and diacritical marks (e.g., á → a, ü → u) and explicitly
