@@ -135,6 +135,11 @@ func (r *RabbitMQ) Publish(ctx context.Context, queueName string, message interf
 		return fmt.Errorf("message is too large: %d", len(body))
 	}
 
+	// Always declare the queue before publishing
+	if err := r.DeclareQueue(queueName); err != nil {
+		return fmt.Errorf("failed to declare queue: %w", err)
+	}
+
 	// Assume queue is already declared during initialization
 	// If needed, add a check for queue existence instead of declaring it every time
 
@@ -156,6 +161,12 @@ func (r *RabbitMQ) Publish(ctx context.Context, queueName string, message interf
 
 func (r *RabbitMQ) Consume(ctx context.Context, queueName string,
 	handler func(ctx context.Context, msg amqp.Delivery)) error {
+
+	//Always declare the queue before consuming
+	if err := r.DeclareQueue(queueName); err != nil {
+		return fmt.Errorf("failed to declare queue: %w", err)
+	}
+
 	msgs, err := r.Channel.ConsumeWithContext(ctx,
 		queueName,
 		"",
