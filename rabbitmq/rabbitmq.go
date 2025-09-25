@@ -29,9 +29,9 @@ const (
 	// maxMessageSize max size message
 	maxMessageSize = 50000
 
-	// xstate is the header key used to store the RequestID (or trace ID)
+	// Xstate is the header key used to store the RequestID (or trace ID)
 	// when publishing, and consumers to retrieve it for logging or tracing.
-	xstate = "x-state"
+	Xstate = "x-state"
 )
 
 // NewRabbitMQ creates a new RabbitMQ client using the provided configuration.
@@ -153,7 +153,7 @@ func (r *RabbitMQ) Publish(ctx context.Context, queueName string, message interf
 			ContentType: contentType,
 			Body:        body,
 			Headers: amqp.Table{
-				"x-state": state,
+				Xstate: state,
 			},
 		},
 	)
@@ -182,7 +182,7 @@ func (r *RabbitMQ) Consume(ctx context.Context, queueName string,
 
 	for msg := range msgs {
 		newCtx := utils.NewCtx(nil)
-		if raw, ok := msg.Headers[xstate]; ok {
+		if raw, ok := msg.Headers[Xstate]; ok {
 			if s, ok := raw.(string); ok {
 				newCtx = utils.NewCtxWithState(newCtx, s)
 			}

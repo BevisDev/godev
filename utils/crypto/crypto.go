@@ -20,12 +20,12 @@ import (
 
 // EncodeBase64 encodes the input string to a Base64-encoded string.
 func EncodeBase64(str string) string {
-	return EncodeBase64Bytes([]byte(str))
+	return base64.StdEncoding.EncodeToString([]byte(str))
 }
 
 // DecodeBase64 decodes a Base64-encoded string into its original content.
 func DecodeBase64(str string) (string, error) {
-	data, err := DecodeBase64Bytes(str)
+	data, err := base64.StdEncoding.DecodeString(str)
 	if err != nil {
 		return "", err
 	}
@@ -79,12 +79,12 @@ func EncryptAES(plaintext string, key []byte) (string, error) {
 
 	stream := cipher.NewCFBEncrypter(block, iv)
 	stream.XORKeyStream(ciphertext[aes.BlockSize:], []byte(plaintext))
-	return EncodeBase64Bytes(ciphertext), nil
+	return base64.StdEncoding.EncodeToString(ciphertext), nil
 }
 
 // DecryptAES decrypts base64-encoded ciphertext using AES in CFB mode.
 func DecryptAES(ciphertext string, key []byte) (string, error) {
-	data, err := DecodeBase64Bytes(ciphertext)
+	data, err := base64.StdEncoding.DecodeString(ciphertext)
 	if err != nil {
 		return "", err
 	}
@@ -95,13 +95,14 @@ func DecryptAES(ciphertext string, key []byte) (string, error) {
 	}
 
 	if len(data) < aes.BlockSize {
-		return "", errors.New("ciphertext quá ngắn")
+		return "", errors.New("ciphertext too short")
 	}
 
 	iv := data[:aes.BlockSize]
 	data = data[aes.BlockSize:]
 	stream := cipher.NewCFBDecrypter(block, iv)
 	stream.XORKeyStream(data, data)
+
 	return string(data), nil
 }
 
@@ -195,12 +196,12 @@ func EncryptPKCS1v15(pub *rsa.PublicKey, plainText string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("PKCS1 encryption failed: %w", err)
 	}
-	return EncodeBase64Bytes(encryptedBytes), nil
+	return base64.StdEncoding.EncodeToString(encryptedBytes), nil
 }
 
 // DecryptPKCS1v15 decrypts a base64-encoded ciphertext using RSA PKCS#1 v1.5.
 func DecryptPKCS1v15(priv *rsa.PrivateKey, cipherTextB64 string) (string, error) {
-	cipherBytes, err := DecodeBase64Bytes(cipherTextB64)
+	cipherBytes, err := base64.StdEncoding.DecodeString(cipherTextB64)
 	if err != nil {
 		return "", fmt.Errorf("base64 decode failed: %w", err)
 	}
@@ -216,23 +217,27 @@ func DecryptPKCS1v15(priv *rsa.PrivateKey, cipherTextB64 string) (string, error)
 // EncryptOAEP encrypts plaintext using RSA-OAEP with SHA-256 and returns base64-encoded ciphertext.
 func EncryptOAEP(pub *rsa.PublicKey, plainText string) (string, error) {
 	hash := sha256.New()
+
 	encryptedBytes, err := rsa.EncryptOAEP(hash, rand.Reader, pub, []byte(plainText), nil)
 	if err != nil {
 		return "", err
 	}
-	return EncodeBase64Bytes(encryptedBytes), nil
+
+	return base64.StdEncoding.EncodeToString(encryptedBytes), nil
 }
 
 // DecryptOAEP decrypts a base64-encoded RSA-OAEP ciphertext using SHA-256.
 func DecryptOAEP(priv *rsa.PrivateKey, cipherTextB64 string) (string, error) {
 	hash := sha256.New()
-	cipherBytes, err := DecodeBase64Bytes(cipherTextB64)
+	cipherBytes, err := base64.StdEncoding.DecodeString(cipherTextB64)
 	if err != nil {
 		return "", err
 	}
+
 	decryptedBytes, err := rsa.DecryptOAEP(hash, rand.Reader, priv, cipherBytes, nil)
 	if err != nil {
 		return "", err
 	}
+
 	return string(decryptedBytes), nil
 }
