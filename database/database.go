@@ -844,3 +844,16 @@ func (d *Database) UpdateManySafe(ctx context.Context, query string, entities []
 		return nil
 	})
 }
+
+func (d *Database) Query(table string) (QueryBuilder, error) {
+	db, err := d.GetDB()
+	if err != nil {
+		return QueryBuilder{}, err
+	}
+
+	return QueryBuilder{
+		db:     db,
+		table:  table,
+		kindDB: d.kindDB,
+	}, nil
+}
