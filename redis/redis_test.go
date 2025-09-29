@@ -18,7 +18,7 @@ type User struct {
 
 func TestRedisCache_SetAndGet(t *testing.T) {
 	rdb, mock := redismock.NewClientMock()
-	cache := &RedisCache{Client: rdb, TimeoutSec: 5}
+	cache := &RedisCache{client: rdb, timeout: 5}
 	ctx := context.Background()
 
 	mock.ExpectSet("key", "value", 0).SetVal("OK")
@@ -36,7 +36,7 @@ func TestRedisCache_SetAndGet(t *testing.T) {
 
 func TestRedisCache_Delete(t *testing.T) {
 	rdb, mock := redismock.NewClientMock()
-	cache := &RedisCache{Client: rdb, TimeoutSec: 5}
+	cache := &RedisCache{client: rdb, timeout: 5}
 	ctx := context.Background()
 
 	mock.ExpectDel("key").SetVal(1)
@@ -47,7 +47,7 @@ func TestRedisCache_Delete(t *testing.T) {
 
 func TestRedisCache_SetManyx(t *testing.T) {
 	rdb, mock := redismock.NewClientMock()
-	cache := &RedisCache{Client: rdb, TimeoutSec: 5}
+	cache := &RedisCache{client: rdb, timeout: 5}
 	ctx := context.Background()
 
 	data := map[string]string{
@@ -64,7 +64,7 @@ func TestRedisCache_SetManyx(t *testing.T) {
 
 func TestRedisCache_SetManyx_GetMany(t *testing.T) {
 	rdb, mock := redismock.NewClientMock()
-	cache := &RedisCache{Client: rdb, TimeoutSec: 5}
+	cache := &RedisCache{client: rdb, timeout: 5}
 	ctx := context.Background()
 
 	batch := map[string]string{"key1": "value1", "key2": "value2"}
@@ -81,7 +81,7 @@ func TestRedisCache_SetManyx_GetMany(t *testing.T) {
 
 func TestRedisCache_SetMany(t *testing.T) {
 	rdb, mock := redismock.NewClientMock()
-	cache := &RedisCache{Client: rdb, TimeoutSec: 5}
+	cache := &RedisCache{client: rdb, timeout: 5}
 	ctx := context.Background()
 
 	data := map[string]string{
@@ -100,7 +100,7 @@ func TestRedisCache_SetMany(t *testing.T) {
 
 func TestRedisCache_GetByPrefix(t *testing.T) {
 	rdb, mock := redismock.NewClientMock()
-	cache := &RedisCache{Client: rdb, TimeoutSec: 5}
+	cache := &RedisCache{client: rdb, timeout: 5}
 	ctx := context.Background()
 
 	mock.ExpectScan(0, "prefix*", int64(0)).SetVal([]string{"prefix1", "prefix2"}, 0)
@@ -115,7 +115,7 @@ func TestRedisCache_GetByPrefix(t *testing.T) {
 
 func TestRedisCache_Get_NotPointer(t *testing.T) {
 	rdb, _ := redismock.NewClientMock()
-	cache := &RedisCache{Client: rdb, TimeoutSec: 5}
+	cache := &RedisCache{client: rdb, timeout: 5}
 	ctx := context.Background()
 
 	err := cache.Get(ctx, "key", "not-pointer")
@@ -124,7 +124,7 @@ func TestRedisCache_Get_NotPointer(t *testing.T) {
 
 func TestRedisCache_IsNil(t *testing.T) {
 	rdb, _ := redismock.NewClientMock()
-	cache := &RedisCache{Client: rdb, TimeoutSec: 5}
+	cache := &RedisCache{client: rdb, timeout: 5}
 
 	assert.True(t, cache.IsNil(redis.Nil))
 	assert.False(t, cache.IsNil(errors.New("some error")))
@@ -132,7 +132,7 @@ func TestRedisCache_IsNil(t *testing.T) {
 
 func TestRedisCache_Publish(t *testing.T) {
 	rdb, mock := redismock.NewClientMock()
-	redisCache := &RedisCache{Client: rdb, TimeoutSec: 5}
+	redisCache := &RedisCache{client: rdb, timeout: 5}
 	ctx := context.Background()
 
 	channel := "test_channel"
@@ -148,7 +148,7 @@ func TestRedisCache_Publish(t *testing.T) {
 
 func TestRedisCache_Publish_JSON(t *testing.T) {
 	rdb, mock := redismock.NewClientMock()
-	redisCache := &RedisCache{Client: rdb, TimeoutSec: 5}
+	redisCache := &RedisCache{client: rdb, timeout: 5}
 	ctx := context.Background()
 
 	channel := "user_created"

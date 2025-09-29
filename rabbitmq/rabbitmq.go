@@ -8,21 +8,16 @@ import (
 	"github.com/BevisDev/godev/utils"
 	"github.com/BevisDev/godev/utils/jsonx"
 	amqp "github.com/rabbitmq/amqp091-go"
+	"log"
 	"strings"
+	"sync"
+	"time"
 )
 
-type RabbitMQConfig struct {
-	Host     string // RabbitMQ server host
-	Port     int    // RabbitMQ server port
-	Username string // Username for authentication
-	Password string // Password for authentication
-	VHost    string // VHost Virtual host
-}
-
 type RabbitMQ struct {
-	config     *RabbitMQConfig
-	Connection *amqp.Connection
-	Channel    *amqp.Channel
+	config     *Config
+	connection *amqp.Connection
+	mu         sync.RWMutex
 }
 
 const (
@@ -55,42 +50,108 @@ const (
 //	if err != nil {
 //	    log.Fatalf("failed to connect to RabbitMQ: %v", err)
 //	}
-func NewRabbitMQ(config *RabbitMQConfig) (*RabbitMQ, error) {
+func NewRabbitMQ(config *Config) (RabbitMQExec, error) {
 	if config == nil {
 		return nil, errors.New("config is nil")
 	}
 
+	r := &RabbitMQ{
+		config: config,
+	}
+
+	conn, err := r.Connect(config)
+	if err != nil {
+		return nil, err
+	}
+
+	r.connection = conn
+	return r, nil
+}
+
+func (r *RabbitMQ) Connect(cf *Config) (*amqp.Connection, error) {
 	conn, err := amqp.Dial(
 		fmt.Sprintf("amqp://%s:%s@%s:%d/%s",
-			config.Username, config.Password, config.Host, config.Port, config.VHost),
+			cf.Username, cf.Password, cf.Host, cf.Port, cf.VHost),
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	ch, err := conn.Channel()
+	return conn, nil
+}
+
+func (r *RabbitMQ) Close() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.connection != nil {
+		_ = r.connection.Close()
+		r.connection = nil
+	}
+}
+
+func (r *RabbitMQ) GetConnection() (*amqp.Connection, error) {
+	r.mu.RLock()
+
+	// return connection if not closed
+	if r.connection != nil && !r.connection.IsClosed() {
+		defer r.mu.RUnlock()
+		return r.connection, nil
+	}
+
+	r.mu.RUnlock()
+
+	// reconnect only one go routine
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	var (
+		conn *amqp.Connection
+		err  error
+	)
+	for i := 0; i < 5; i++ {
+		conn, err = r.Connect(r.config)
+		if err == nil {
+			log.Println("reconnect RabbitMQ success")
+			break
+		}
+
+		sleep := time.Second * time.Duration(1<<i)
+		log.Printf("failed to reconnect RabbitMQ: %v, retrying in %s...", err, sleep)
+		time.Sleep(sleep)
+	}
+	if conn == nil {
+		return nil, err
+	}
+
+	r.connection = conn
+	return conn, nil
+}
+
+func (r *RabbitMQ) GetChannel() (*amqp.Channel, error) {
+	conn, err := r.GetConnection()
 	if err != nil {
 		return nil, err
 	}
 
-	return &RabbitMQ{
-		config:     config,
-		Connection: conn,
-		Channel:    ch,
-	}, nil
-}
-
-func (r *RabbitMQ) Close() {
-	if r.Channel != nil {
-		_ = r.Channel.Close()
-	}
-	if r.Connection != nil {
-		_ = r.Connection.Close()
-	}
+	return conn.Channel()
 }
 
 func (r *RabbitMQ) DeclareQueue(queueName string) error {
-	_, err := r.Channel.QueueDeclare(
+	ch, err := r.GetChannel()
+	if err != nil {
+		return err
+	}
+	defer ch.Close()
+
+	if err := r.DeclareQueueWithChannel(ch, queueName); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *RabbitMQ) DeclareQueueWithChannel(channel *amqp.Channel, queueName string) error {
+	_, err := channel.QueueDeclare(
 		queueName,
 		true,
 		false,
@@ -98,13 +159,20 @@ func (r *RabbitMQ) DeclareQueue(queueName string) error {
 		false,
 		nil,
 	)
-	return err
+	if err != nil {
+		return fmt.Errorf("error declare queue %s, err = %w", queueName, err)
+	}
+	return nil
 }
 
-// Publish sends a message to the specified RabbitMQ queue.
-// It supports various message types (string, []byte, numbers, or JSON-serializable objects).
-// Returns an error if the message is too large, or publishing fails
 func (r *RabbitMQ) Publish(ctx context.Context, queueName string, message interface{}) error {
+	// Declare a NEW Channel for this specific operation.
+	ch, err := r.GetChannel()
+	if err != nil {
+		return fmt.Errorf("failed to get channel: %w", err)
+	}
+	defer ch.Close()
+
 	var (
 		body        []byte
 		contentType string
@@ -135,16 +203,13 @@ func (r *RabbitMQ) Publish(ctx context.Context, queueName string, message interf
 		return fmt.Errorf("message is too large: %d", len(body))
 	}
 
-	// Always declare the queue before publishing
-	if err := r.DeclareQueue(queueName); err != nil {
+	// always declare the queue before publishing
+	if err := r.DeclareQueueWithChannel(ch, queueName); err != nil {
 		return fmt.Errorf("failed to declare queue: %w", err)
 	}
 
-	// Assume queue is already declared during initialization
-	// If needed, add a check for queue existence instead of declaring it every time
-
 	var state = utils.GetState(ctx)
-	return r.Channel.PublishWithContext(ctx,
+	return ch.PublishWithContext(ctx,
 		"",
 		queueName,
 		false,
@@ -161,13 +226,19 @@ func (r *RabbitMQ) Publish(ctx context.Context, queueName string, message interf
 
 func (r *RabbitMQ) Consume(ctx context.Context, queueName string,
 	handler func(ctx context.Context, msg amqp.Delivery)) error {
+	// Declare a NEW Channel for this specific operation.
+	ch, err := r.GetChannel()
+	if err != nil {
+		return fmt.Errorf("failed to get channel: %w", err)
+	}
+	defer ch.Close()
 
-	//Always declare the queue before consuming
-	if err := r.DeclareQueue(queueName); err != nil {
+	// always declare the queue before consuming
+	if err := r.DeclareQueueWithChannel(ch, queueName); err != nil {
 		return fmt.Errorf("failed to declare queue: %w", err)
 	}
 
-	msgs, err := r.Channel.ConsumeWithContext(ctx,
+	msgs, err := ch.ConsumeWithContext(ctx,
 		queueName,
 		"",
 		false,
@@ -181,10 +252,10 @@ func (r *RabbitMQ) Consume(ctx context.Context, queueName string,
 	}
 
 	for msg := range msgs {
-		newCtx := utils.NewCtx(nil)
+		newCtx := utils.NewCtx()
 		if raw, ok := msg.Headers[Xstate]; ok {
 			if s, ok := raw.(string); ok {
-				newCtx = utils.NewCtxWithState(newCtx, s)
+				newCtx = utils.SetValueCtx(newCtx, consts.State, s)
 			}
 		}
 		handler(newCtx, msg)

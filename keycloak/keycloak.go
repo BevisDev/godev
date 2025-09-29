@@ -7,18 +7,10 @@ import (
 )
 
 type KeyCloak struct {
-	Client       *gocloak.GoCloak
-	Realm        string
-	ClientId     string
-	ClientSecret string
-}
-
-type Request struct {
-	Host         string
-	Port         int
-	Realm        string
-	ClientId     string
-	ClientSecret string
+	client       *gocloak.GoCloak
+	realm        string
+	clientId     string
+	clientSecret string
 }
 
 // NewKeyCloak creates a new KeyCloak client connected to the specified host and port.
@@ -33,27 +25,31 @@ type Request struct {
 //	if err != nil {
 //	    log.Fatalf("login failed: %v", err)
 //	}
-func NewKeyCloak(r *Request) *KeyCloak {
+func NewKeyCloak(r *Request) KeyCloakExec {
 	return &KeyCloak{
-		Client:       gocloak.NewClient(fmt.Sprintf("%s:%d", r.Host, r.Port)),
-		Realm:        r.Realm,
-		ClientId:     r.ClientId,
-		ClientSecret: r.ClientSecret,
+		client:       gocloak.NewClient(fmt.Sprintf("%s:%d", r.Host, r.Port)),
+		realm:        r.Realm,
+		clientId:     r.ClientId,
+		clientSecret: r.ClientSecret,
 	}
 }
 
+func (k *KeyCloak) GetClient() *gocloak.GoCloak {
+	return k.client
+}
+
 func (k *KeyCloak) Login(ctx context.Context) (*gocloak.JWT, error) {
-	return k.Client.LoginClient(ctx, k.ClientId, k.ClientSecret, k.Realm)
+	return k.client.LoginClient(ctx, k.clientId, k.clientSecret, k.realm)
 }
 
 func (k *KeyCloak) VerifyToken(ctx context.Context, token string) (*gocloak.IntroSpectTokenResult, error) {
-	return k.Client.RetrospectToken(ctx, token, k.ClientId, k.ClientSecret, k.Realm)
+	return k.client.RetrospectToken(ctx, token, k.clientId, k.clientSecret, k.realm)
 }
 
 func (k *KeyCloak) GetUserInfo(ctx context.Context, token string) (*gocloak.UserInfo, error) {
-	return k.Client.GetUserInfo(ctx, token, k.Realm)
+	return k.client.GetUserInfo(ctx, token, k.realm)
 }
 
 func (k *KeyCloak) RevokeToken(ctx context.Context, token string) error {
-	return k.Client.RevokeToken(ctx, k.Realm, k.ClientId, k.ClientSecret, token)
+	return k.client.RevokeToken(ctx, k.realm, k.clientId, k.clientSecret, token)
 }

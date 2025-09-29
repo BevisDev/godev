@@ -72,7 +72,7 @@ type Config struct {
 //		  Path:       "./configs",
 //		  ConfigType: "yaml",
 //		  Dest:       &appConfig,
-//		  Profile:    profile,
+//		  profile:    profile,
 //		})
 //		if err != nil {
 //		  log.Fatalf("failed to load config: %v", err)

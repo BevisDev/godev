@@ -15,6 +15,15 @@ type User struct {
 	Age  int
 }
 
+func TestNewCtx_ShouldReturnContextWithState(t *testing.T) {
+	ctx := NewCtx()
+	state := ctx.Value(consts.State)
+
+	if state == nil || state == "" {
+		t.Error("Expected state in context")
+	}
+}
+
 func TestGetState_WhenCtxNil(t *testing.T) {
 	state := GetState(nil)
 	if state == "" {
@@ -39,15 +48,6 @@ func TestGetState_WhenCtxHasState(t *testing.T) {
 	}
 }
 
-func TestNewCtx_ShouldReturnContextWithState(t *testing.T) {
-	ctx := NewCtx(nil)
-	state := ctx.Value(consts.State)
-
-	if state == nil || state == "" {
-		t.Error("Expected state in context")
-	}
-}
-
 func TestNewCtxTimeout(t *testing.T) {
 	ctx, cancel := NewCtxTimeout(nil, 1)
 	defer cancel()
@@ -58,7 +58,7 @@ func TestNewCtxTimeout(t *testing.T) {
 			t.Errorf("Expected DeadlineExceeded, got %v", ctx.Err())
 		}
 	case <-time.After(2 * time.Second):
-		t.Error("Timeout context did not expire")
+		t.Error("timeout context did not expire")
 	}
 }
 
@@ -240,7 +240,7 @@ func TestIgnoreContentTypeLog(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := SkipContentType(tt.contentType); got != tt.want {
-				t.Errorf("SkipContentType(%q) = %v, want %v", tt.contentType, got, tt.want)
+				t.Errorf("skipContentType(%q) = %v, want %v", tt.contentType, got, tt.want)
 			}
 		})
 	}
