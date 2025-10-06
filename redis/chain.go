@@ -3,7 +3,6 @@ package redis
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/BevisDev/godev/utils"
 	"github.com/BevisDev/godev/utils/jsonx"
@@ -18,6 +17,7 @@ type Chain[T any] struct {
 	channel    string
 	prefix     string
 	value      interface{}
+	values     []interface{}
 	batches    map[string]interface{}
 	expiration time.Duration
 }
@@ -28,62 +28,66 @@ func With[T any](cache *RedisCache) ChainExec[T] {
 	}
 }
 
+func withChain[T any](cache *RedisCache) *Chain[T] {
+	return &Chain[T]{
+		RedisCache: cache,
+	}
+}
+
 func (c *Chain[T]) Key(k string) ChainExec[T] {
-	clone := c
-	clone.key = k
-	return clone
+	c.key = k
+	return c
 }
 
 func (c *Chain[T]) Keys(keys ...string) ChainExec[T] {
-	clone := c
-	clone.keys = keys
-	return clone
+	c.keys = keys
+	return c
 }
 
 func (c *Chain[T]) Value(v interface{}) ChainExec[T] {
-	clone := c
-	clone.value = c.convertValue(v)
-	return clone
+	c.value = c.convertValue(v)
+	return c
+}
+
+func (c *Chain[T]) Values(values ...interface{}) ChainExec[T] {
+	for _, v := range values {
+		c.values = append(c.values, v)
+	}
+	return c
 }
 
 func (c *Chain[T]) Put(k string, v interface{}) ChainExec[T] {
-	clone := c
-
-	if clone.batches == nil {
-		clone.batches = make(map[string]interface{})
+	if c.batches == nil {
+		c.batches = make(map[string]interface{})
 	}
-	clone.batches[k] = c.convertValue(v)
-	return clone
+	c.batches[k] = c.convertValue(v)
+	return c
 }
 
 func (c *Chain[T]) Batch(b map[string]interface{}) ChainExec[T] {
-	clone := c
-
-	if clone.batches == nil {
-		clone.batches = make(map[string]interface{})
+	if c.batches == nil {
+		c.batches = make(map[string]interface{})
 	}
 
 	for k, v := range b {
-		clone.batches[k] = c.convertValue(v)
+		c.batches[k] = c.convertValue(v)
 	}
-	return clone
+	return c
 }
 
 func (c *Chain[T]) Expire(n int, unit string) ChainExec[T] {
-	clone := c
-
 	switch unit {
 	case "s", "sec", "second", "seconds":
-		clone.expiration = time.Duration(n) * time.Second
+		c.expiration = time.Duration(n) * time.Second
 	case "m", "min", "minute", "minutes":
-		clone.expiration = time.Duration(n) * time.Minute
+		c.expiration = time.Duration(n) * time.Minute
 	case "h", "hr", "hour", "hours":
-		clone.expiration = time.Duration(n) * time.Hour
+		c.expiration = time.Duration(n) * time.Hour
 	default:
-		clone.expiration = time.Duration(n) * time.Second
+		c.expiration = time.Duration(n) * time.Second
 	}
 
-	return clone
+	return c
 }
 
 func (c *Chain[T]) convertValue(value interface{}) interface{} {
@@ -106,32 +110,21 @@ func (c *Chain[T]) convertValue(value interface{}) interface{} {
 }
 
 func (c *Chain[T]) Channel(channel string) ChainExec[T] {
-	clone := c
-	clone.channel = channel
-	return clone
+	c.channel = channel
+	return c
 }
 
 func (c *Chain[T]) Prefix(prefix string) ChainExec[T] {
-	clone := c
-	clone.prefix = prefix
-	return clone
-}
-
-func (c *Chain[T]) required(skipValue bool) error {
-	if c.key == "" {
-		return errors.New("key is required")
-	}
-
-	if !skipValue && c.value == nil {
-		return errors.New("value is required")
-	}
-
-	return nil
+	c.prefix = prefix
+	return c
 }
 
 func (c *Chain[T]) Set(ct context.Context) error {
-	if err := c.required(false); err != nil {
-		return err
+	if c.key == "" {
+		return ErrMissingKey
+	}
+	if c.value == nil {
+		return ErrMissingValue
 	}
 
 	rdb := c.GetRDB()
@@ -141,9 +134,24 @@ func (c *Chain[T]) Set(ct context.Context) error {
 	return rdb.Set(ctx, c.key, c.value, c.expiration).Err()
 }
 
+func (c *Chain[T]) SetIfNotExists(ct context.Context) (bool, error) {
+	if c.key == "" {
+		return false, ErrMissingKey
+	}
+	if c.value == nil {
+		return false, ErrMissingValue
+	}
+
+	rdb := c.GetRDB()
+	ctx, cancel := utils.NewCtxTimeout(ct, c.TimeoutSec)
+	defer cancel()
+
+	return rdb.SetNX(ctx, c.key, c.value, c.expiration).Result()
+}
+
 func (c *Chain[T]) SetMany(ct context.Context) error {
 	if validate.IsNilOrEmpty(c.batches) {
-		return errors.New("batch is required")
+		return ErrMissingPushOrBatch
 	}
 
 	rdb := c.GetRDB()
@@ -164,8 +172,8 @@ func (c *Chain[T]) SetMany(ct context.Context) error {
 
 func (c *Chain[T]) Get(ct context.Context) (*T, error) {
 	var err error
-	if err = c.required(true); err != nil {
-		return nil, err
+	if c.key == "" {
+		return nil, ErrMissingKey
 	}
 
 	defer func() {
@@ -200,7 +208,7 @@ func (c *Chain[T]) Get(ct context.Context) (*T, error) {
 
 func (c *Chain[T]) GetMany(ct context.Context) ([]*T, error) {
 	if validate.IsNilOrEmpty(c.keys) {
-		return nil, errors.New("keys is required")
+		return nil, ErrMissingKeys
 	}
 
 	rdb := c.GetRDB()
@@ -246,7 +254,7 @@ func (c *Chain[T]) GetMany(ct context.Context) ([]*T, error) {
 
 func (c *Chain[T]) GetByPrefix(ct context.Context) ([]*T, error) {
 	if c.prefix == "" {
-		return nil, errors.New("prefix is required")
+		return nil, ErrMissingPrefix
 	}
 
 	rdb := c.GetRDB()
@@ -283,8 +291,8 @@ func (c *Chain[T]) GetByPrefix(ct context.Context) ([]*T, error) {
 }
 
 func (c *Chain[T]) Delete(ct context.Context) error {
-	if err := c.required(true); err != nil {
-		return err
+	if c.key == "" {
+		return ErrMissingKey
 	}
 
 	rdb := c.GetRDB()
@@ -295,8 +303,8 @@ func (c *Chain[T]) Delete(ct context.Context) error {
 }
 
 func (c *Chain[T]) Exists(ct context.Context) (bool, error) {
-	if err := c.required(true); err != nil {
-		return false, err
+	if c.key == "" {
+		return false, ErrMissingKey
 	}
 
 	rdb := c.GetRDB()
@@ -313,10 +321,10 @@ func (c *Chain[T]) Exists(ct context.Context) (bool, error) {
 
 func (c *Chain[T]) Publish(ct context.Context) error {
 	if c.channel == "" {
-		return errors.New("channel is required")
+		return ErrMissingChannel
 	}
 	if c.value == nil {
-		return errors.New("value is required")
+		return ErrMissingValue
 	}
 
 	rdb := c.GetRDB()
@@ -328,7 +336,7 @@ func (c *Chain[T]) Publish(ct context.Context) error {
 
 func (c *Chain[T]) Subscribe(ctx context.Context, handler func(msg string)) error {
 	if c.channel == "" {
-		return errors.New("channel is required")
+		return ErrMissingChannel
 	}
 
 	rdb := c.GetRDB()

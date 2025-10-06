@@ -15,6 +15,17 @@ type User struct {
 	Name string `json:"name"`
 }
 
+type Status string
+
+const (
+	StatusPending   Status = "pending"
+	StatusCompleted Status = "completed"
+)
+
+func (s Status) String() string {
+	return string(s)
+}
+
 func TestRedisCache_SetAndGet(t *testing.T) {
 	rdb, mock := redismock.NewClientMock()
 	cache := &RedisCache{
@@ -132,7 +143,6 @@ func TestRedisCache_Publish_JSON(t *testing.T) {
 
 	channel := "user_created"
 
-	// Struct để publish
 	user := User{
 		ID:   1,
 		Name: "Alice",
@@ -149,5 +159,67 @@ func TestRedisCache_Publish_JSON(t *testing.T) {
 		Publish(ctx)
 	assert.NoError(t, err)
 
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestSetIfNotExists(t *testing.T) {
+	ctx := context.Background()
+
+	rdb, mock := redismock.NewClientMock()
+	cache := &RedisCache{
+		client: rdb,
+		Config: &Config{
+			TimeoutSec: 5,
+		},
+	}
+
+	chain := With[string](cache).Key("mykey")
+
+	// if key is not exists return true
+	mock.ExpectSetNX("mykey", "hello", 0).SetVal(true)
+
+	chain.Value("hello")
+	ok, err := chain.SetIfNotExists(ctx)
+	assert.NoError(t, err)
+	assert.True(t, ok)
+	assert.NoError(t, mock.ExpectationsWereMet())
+
+	// key is existed return false
+	mock.ExpectSetNX("mykey", "world", 0).SetVal(false)
+
+	chain.Value("world")
+	ok, err = chain.SetIfNotExists(ctx)
+	assert.NoError(t, err)
+	assert.False(t, ok)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestSetIfNotExists_EnumValue(t *testing.T) {
+	ctx := context.Background()
+	rdb, mock := redismock.NewClientMock()
+	cache := &RedisCache{
+		client: rdb,
+		Config: &Config{
+			TimeoutSec: 5,
+		},
+	}
+	chain := With[Status](cache)
+
+	// if key is not exists return true
+	chain.Key("statusKey").Value(StatusPending.String())
+	mock.ExpectSetNX("statusKey", StatusPending.String(), 0).SetVal(true)
+
+	ok, err := chain.SetIfNotExists(ctx)
+	assert.NoError(t, err)
+	assert.True(t, ok)
+	assert.NoError(t, mock.ExpectationsWereMet())
+
+	// key is existed return false
+	chain.Key("statusKey").Value(StatusCompleted.String())
+	mock.ExpectSetNX("statusKey", StatusCompleted.String(), 0).SetVal(false)
+
+	ok, err = chain.SetIfNotExists(ctx)
+	assert.NoError(t, err)
+	assert.False(t, ok)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }

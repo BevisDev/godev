@@ -1,4 +1,4 @@
-# RedisCache Package
+# redis Package
 
 The `redis` package provides a convenient Redis client for Go, supporting basic operations such
 as `GET`, `SET`, `MSET`, `DELETE`, `SCAN`, `EXISTS`, as well as pub/sub features.  

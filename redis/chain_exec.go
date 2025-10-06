@@ -11,8 +11,11 @@ type ChainExec[T any] interface {
 	// Keys specifies multiple keys for bulk operations
 	Keys(keys ...string) ChainExec[T]
 
-	// Value specifies the value to be stored with the key
+	// Value specifies single the value to be stored with the key
 	Value(v interface{}) ChainExec[T]
+
+	// Values specifies multiple values to be stored with the key
+	Values(values ...interface{}) ChainExec[T]
 
 	// Expire sets the Time-To-Live (TTL) for the key.
 	// n is the time duration, and unit specifies the scale (e.g., "s" for seconds).
@@ -32,6 +35,10 @@ type ChainExec[T any] interface {
 
 	// Set sets a Redis key to the given value with an optional expiration time (in seconds).
 	Set(c context.Context) error
+
+	// SetIfNotExists sets the value of the key only if the key does not already exist.
+	// Returns true if the value was set, false if the key already exists.
+	SetIfNotExists(ct context.Context) (bool, error)
 
 	// SetMany sets multiple Redis keys with the same expiration time
 	SetMany(ct context.Context) error
