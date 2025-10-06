@@ -23,89 +23,12 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
-// ConfigLogger defines the configuration options for setting up the application logger.
-//
-// It supports file-based logging with rotation (via lumberjack) and optional
-// profile-based behavior (e.g., dev/prod).
-type ConfigLogger struct {
-	// Profile indicates the runtime profile (e.g., "dev", "prod") and can affect logging format/output
-	Profile string
-
-	// MaxSize is the maximum size (in megabytes) of the log file before it gets rotated.
-	MaxSize int
-
-	// MaxBackups is the maximum number of old log files to retain.
-	MaxBackups int
-
-	// MaxAge is the maximum number of days to retain old log files.
-	MaxAge int
-
-	// Compress determines whether rotated log files are compressed using gzip.
-	Compress bool
-
-	// IsSplit indicates whether to split log files by day or by module (depending on implementation).
-	IsSplit bool
-
-	// DirName is the directory path where logs will be stored.
-	DirName string
-
-	// Filename is the base name of the log file (e.g., "app.log").
-	Filename string
-
-	// CallerConfig defines the number of caller stack frames to skip
-	// when logging for different request/response contexts.
-	// Useful for configuring zap.AddCallerSkip(...) dynamically.
-	CallerConfig CallerConfig
-}
-
-type CallerConfig struct {
-	// Request defines caller skip config for internal/external request logs.
-	Request SkipGroup
-
-	// Response defines caller skip config for internal/external response logs.
-	Response SkipGroup
-}
-
-// SkipGroup holds the caller skip values for internal and external contexts.
-type SkipGroup struct {
-	// Internal number of caller frames to skip for internal log calls.
-	Internal int
-
-	// External number of caller frames to skip for external log calls.
-	External int
-}
-
-type RequestLogger struct {
-	State       string
-	URL         string
-	RequestTime time.Time
-	Query       string
-	Method      string
-	Header      any
-	Body        string
-}
-
-type ResponseLogger struct {
-	State       string
-	DurationSec time.Duration
-	Status      int
-	Header      any
-	Body        string
-}
-
 type AppLogger struct {
-	Logger *zap.Logger
-
-	// CallerSkipConfig defines the number of caller stack frames to skip
-	// when logging for different request/response contexts.
-	// Useful for configuring zap.AddCallerSkip(...) dynamically.
-	CallerConfig CallerConfig
-
-	// Profile indicates the runtime profile (e.g., "dev", "prod") and can affect logging format/output
-	Profile string
+	*Config
+	logger *zap.Logger
 }
 
-// NewLogger initializes and returns a new application logger (`*AppLogger`) using the Zap logging library.
+// New initializes and returns a new application logger (`*AppLogger`) using the Zap logging library.
 //
 // It configures the log encoder format (e.g., JSON or console), the log output (e.g., file path),
 // and log rotation settings based on the provided `ConfigLogger`.
@@ -115,8 +38,8 @@ type AppLogger struct {
 //
 // Example:
 //
-//	logger := NewLogger(&ConfigLogger{
-//	    Profile:    "prod",
+//	logger := New(&Config{
+//	    profile:    "prod",
 //	    MaxSize:    100,             // 100 MB per file
 //	    MaxBackups: 7,               // keep 7 rotated logs
 //	    MaxAge:     30,              // keep logs for 30 days
@@ -127,23 +50,27 @@ type AppLogger struct {
 //	})
 //
 //	logger.Info("Application started")
-func NewLogger(cf *ConfigLogger) *AppLogger {
+func New(cf *Config) Exec {
+	var l = &AppLogger{Config: cf}
+	encoder := l.getEncoderLog()
+	writer := l.writeSync()
+
 	var zapLogger *zap.Logger
-	encoder := getEncoderLog(cf)
-	appWrite := writeSync(cf)
-	appCore := zapcore.NewCore(encoder, appWrite, zapcore.InfoLevel)
+	appCore := zapcore.NewCore(encoder, writer, zapcore.InfoLevel)
 	zapLogger = zap.New(appCore, zap.AddCaller())
-	return &AppLogger{
-		Logger:       zapLogger,
-		Profile:      cf.Profile,
-		CallerConfig: cf.CallerConfig,
-	}
+	l.logger = zapLogger
+
+	return l
 }
 
-func getEncoderLog(cf *ConfigLogger) zapcore.Encoder {
+func (l *AppLogger) GetZap() *zap.Logger {
+	return l.logger
+}
+
+func (l *AppLogger) getEncoderLog() zapcore.Encoder {
 	var encodeConfig zapcore.EncoderConfig
 	// for prod
-	if cf.Profile == "prod" {
+	if l.Profile == "prod" {
 		encodeConfig = zap.NewProductionEncoderConfig()
 		// 1716714967.877995 -> 2024-12-19T20:04:31.255+0700
 		encodeConfig.EncodeTime = zapcore.ISO8601TimeEncoder
@@ -167,32 +94,32 @@ func getEncoderLog(cf *ConfigLogger) zapcore.Encoder {
 	encodeConfig.MessageKey = "message"
 
 	// for dev
-	if cf.Profile == "dev" {
+	if l.Profile == "dev" {
 		return zapcore.NewConsoleEncoder(encodeConfig)
 	}
 	return zapcore.NewJSONEncoder(encodeConfig)
 }
 
-func writeSync(cf *ConfigLogger) zapcore.WriteSyncer {
+func (l *AppLogger) writeSync() zapcore.WriteSyncer {
 	// handle profile dev
-	if cf.Profile == "dev" {
+	if l.Profile == "dev" {
 		return zapcore.AddSync(os.Stdout)
 	}
 
-	var fileName = getFilename(cf.DirName, cf.Filename, cf.IsSplit)
+	var fileName = getFilename(l.DirName, l.Filename, l.IsSplit)
 	lumberLogger := lumberjack.Logger{
 		Filename:   fileName,
-		MaxSize:    cf.MaxSize,
-		MaxBackups: cf.MaxBackups,
-		MaxAge:     cf.MaxAge,
-		Compress:   cf.Compress,
+		MaxSize:    l.MaxSize,
+		MaxBackups: l.MaxBackups,
+		MaxAge:     l.MaxAge,
+		Compress:   l.Compress,
 	}
 
 	// job runner to split log every day
-	if cf.IsSplit {
+	if l.IsSplit {
 		c := cron.New()
 		c.AddFunc("0 0 * * *", func() {
-			lumberLogger.Filename = getFilename(cf.DirName, cf.Filename, cf.IsSplit)
+			lumberLogger.Filename = getFilename(l.DirName, l.Filename, l.IsSplit)
 			err := lumberLogger.Rotate()
 			if err != nil {
 				log.Println(err)
@@ -213,8 +140,8 @@ func getFilename(dir, fileName string, isSplit bool) string {
 	return filepath.Join(dir, fileName)
 }
 
-func (l *AppLogger) logApp(level zapcore.Level, state string, msg string, args ...interface{}) {
-	if l.Logger == nil {
+func (l *AppLogger) log(level zapcore.Level, state string, msg string, args ...interface{}) {
+	if l.logger == nil {
 		log.Fatalln("logger is nil")
 		return
 	}
@@ -223,20 +150,24 @@ func (l *AppLogger) logApp(level zapcore.Level, state string, msg string, args .
 	var message = l.formatMessage(msg, args...)
 
 	// skip caller before
-	logging := l.Logger.WithOptions(zap.AddCallerSkip(2))
+	logging := l.logger.WithOptions(zap.AddCallerSkip(2))
+
+	// declare field
+	fields := []zap.Field{zap.String(consts.State, state)}
+
 	switch level {
 	case zapcore.InfoLevel:
-		logging.Info(message, zap.String(consts.State, state))
+		logging.Info(message, fields...)
 	case zapcore.WarnLevel:
-		logging.Warn(message, zap.String(consts.State, state))
+		logging.Warn(message, fields...)
 	case zapcore.ErrorLevel:
-		logging.Error(message, zap.String(consts.State, state))
+		logging.Error(message, fields...)
 	case zapcore.PanicLevel:
-		logging.Panic(message, zap.String(consts.State, state))
+		logging.Panic(message, fields...)
 	case zapcore.FatalLevel:
-		logging.Fatal(message, zap.String(consts.State, state))
+		logging.Fatal(message, fields...)
 	default:
-		logging.Info(message, zap.String(consts.State, state))
+		logging.Info(message, fields...)
 	}
 }
 
@@ -279,6 +210,7 @@ func (l *AppLogger) formatAny(v interface{}) string {
 		return "<nil>"
 	}
 
+	// -- error
 	if err, ok := v.(error); ok {
 		return err.Error()
 	}
@@ -299,6 +231,13 @@ func (l *AppLogger) formatAny(v interface{}) string {
 
 	// special type
 	switch val := v.(type) {
+	case string:
+		return val
+	case int, int8, int16, int32, int64,
+		uint, uint8, uint16, uint32, uint64,
+		float32, float64,
+		bool:
+		return fmt.Sprintf("%v", val)
 	case decimal.Decimal:
 		return val.String()
 	case time.Time:
@@ -352,38 +291,39 @@ func (l *AppLogger) formatAny(v interface{}) string {
 }
 
 func (l *AppLogger) Sync() {
-	if l.Logger != nil {
-		_ = l.Logger.Sync()
+	if l.logger != nil {
+		_ = l.logger.Sync()
+		l.logger = nil
 	}
 }
 
 func (l *AppLogger) Info(state, msg string, args ...interface{}) {
-	l.logApp(zapcore.InfoLevel, state, msg, args...)
+	l.log(zapcore.InfoLevel, state, msg, args...)
 }
 
 func (l *AppLogger) Error(state, msg string, args ...interface{}) {
-	l.logApp(zapcore.ErrorLevel, state, msg, args...)
+	l.log(zapcore.ErrorLevel, state, msg, args...)
 }
 
 func (l *AppLogger) Warn(state, msg string, args ...interface{}) {
-	l.logApp(zapcore.WarnLevel, state, msg, args...)
+	l.log(zapcore.WarnLevel, state, msg, args...)
 }
 
 func (l *AppLogger) Panic(state, msg string, args ...interface{}) {
-	l.logApp(zapcore.PanicLevel, state, msg, args...)
+	l.log(zapcore.PanicLevel, state, msg, args...)
 }
 
 func (l *AppLogger) Fatal(state, msg string, args ...interface{}) {
-	l.logApp(zapcore.FatalLevel, state, msg, args...)
+	l.log(zapcore.FatalLevel, state, msg, args...)
 }
 
 func (l *AppLogger) LogRequest(req *RequestLogger) {
-	if l.Logger == nil {
+	if l.logger == nil {
 		log.Fatalln("logger is nil")
 		return
 	}
 
-	l.Logger.WithOptions(
+	l.logger.WithOptions(
 		zap.AddCallerSkip(l.CallerConfig.Request.Internal)).Info(
 		"[===== REQUEST INFO =====]",
 		zap.String(consts.State, req.State),
@@ -397,12 +337,12 @@ func (l *AppLogger) LogRequest(req *RequestLogger) {
 }
 
 func (l *AppLogger) LogResponse(resp *ResponseLogger) {
-	if l.Logger == nil {
+	if l.logger == nil {
 		log.Fatalln("logger is nil")
 		return
 	}
 
-	l.Logger.WithOptions(
+	l.logger.WithOptions(
 		zap.AddCallerSkip(l.CallerConfig.Response.Internal)).Info(
 		"[===== RESPONSE INFO =====]",
 		zap.String(consts.State, resp.State),
@@ -414,12 +354,12 @@ func (l *AppLogger) LogResponse(resp *ResponseLogger) {
 }
 
 func (l *AppLogger) LogExtRequest(req *RequestLogger) {
-	if l.Logger == nil {
+	if l.logger == nil {
 		log.Fatalln("logger is nil")
 		return
 	}
 
-	l.Logger.WithOptions(
+	l.logger.WithOptions(
 		zap.AddCallerSkip(l.CallerConfig.Request.External)).Info(
 		"[===== REQUEST EXTERNAL INFO =====]",
 		zap.String(consts.State, req.State),
@@ -433,7 +373,7 @@ func (l *AppLogger) LogExtRequest(req *RequestLogger) {
 }
 
 func (l *AppLogger) LogExtResponse(resp *ResponseLogger) {
-	l.Logger.WithOptions(
+	l.logger.WithOptions(
 		zap.AddCallerSkip(l.CallerConfig.Response.External)).Info(
 		"[===== RESPONSE EXTERNAL INFO =====]",
 		zap.String(consts.State, resp.State),

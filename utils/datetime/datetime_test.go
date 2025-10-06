@@ -63,26 +63,27 @@ func TestAddTime(t *testing.T) {
 	base := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	tests := []struct {
-		kind     string
+		name     string
+		unit     Unit
 		value    int
 		expected time.Time
 	}{
-		{Nanosecond, 10, base.Add(10 * time.Nanosecond)},
-		{Millisecond, 10, base.Add(10 * time.Millisecond)},
-		{Second, 10, base.Add(10 * time.Second)},
-		{Minute, 5, base.Add(5 * time.Minute)},
-		{Hour, 2, base.Add(2 * time.Hour)},
-		{Day, 3, base.AddDate(0, 0, 3)},
-		{Month, 2, base.AddDate(0, 2, 0)},
-		{Year, 1, base.AddDate(1, 0, 0)},
-		{"invalid", 999, base},
+		{"Nanosecond", Nanosecond, 10, base.Add(10 * time.Nanosecond)},
+		{"Millisecond", Millisecond, 10, base.Add(10 * time.Millisecond)},
+		{"Second", Second, 10, base.Add(10 * time.Second)},
+		{"Minute", Minute, 5, base.Add(5 * time.Minute)},
+		{"Hour", Hour, 2, base.Add(2 * time.Hour)},
+		{"Day", Day, 3, base.AddDate(0, 0, 3)},
+		{"Month", Month, 2, base.AddDate(0, 2, 0)},
+		{"Year", Year, 1, base.AddDate(1, 0, 0)},
+		{"invalid", 0, 999, base},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.kind, func(t *testing.T) {
-			result := AddTime(base, tt.value, tt.kind)
+		t.Run(tt.name, func(t *testing.T) {
+			result := AddTime(base, tt.value, tt.unit)
 			if !result.Equal(tt.expected) {
-				t.Errorf("AddTime kind=%q = %v; want %v", tt.kind, result, tt.expected)
+				t.Errorf("AddTime kind=%q = %v; want %v", tt.unit, result, tt.expected)
 			}
 		})
 	}

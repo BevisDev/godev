@@ -2,36 +2,17 @@ package migration
 
 import (
 	"context"
-	"database/sql"
-	"github.com/BevisDev/godev/types"
 	"github.com/BevisDev/godev/utils"
 	"github.com/pressly/goose/v3"
 	"os"
 )
-
-// MigrationConfig holds database migration settings.
-//
-// Dir specifies the directory containing migration scripts.
-// Kind defines the type of database (e.g., Postgres, MySQL, SQLServer).
-// DB is the active database connection used for applying migrations.
-// Timeout sets the maximum duration (in seconds) allowed for each migration operation.
-type MigrationConfig struct {
-	Dir     string
-	Kind    types.KindDB
-	DB      *sql.DB
-	Timeout int
-}
 
 // Migration handles the setup and execution of database migrations using the Goose migration tool.
 //
 // It holds configuration for the migration directory, target database type, and the active *sql.DB connection.
 // The migration dialect and working directory are initialized via the Init method.
 type Migration struct {
-	dir     string
-	kind    types.KindDB
-	db      *sql.DB
-	Timeout int
-	config  *MigrationConfig
+	*Config
 }
 
 const (
@@ -39,32 +20,20 @@ const (
 	defaultTimeout = 60
 )
 
-// NewMigration creates a new Migration instance with the given migration directory,
+// New creates a new Migration instance with the given migration directory,
 // database kind, and sql.DB connection.
 //
 // It initializes the migration environment by setting the dialect and checking the
 // existence of the migration folder.
 //
 // Returns an error if initialization fails (e.g., missing directory or invalid dialect).
-//
-// Example:
-//
-//	m, err := NewMigration("./migrations", types.Postgres, db)
-//	if err != nil {
-//	    log.Fatal("Failed to initialize migration:", err)
-//	}
-func NewMigration(cf *MigrationConfig) (*Migration, error) {
+func New(cf *Config) (*Migration, error) {
 	// set default timeout
 	if cf.Timeout <= 0 {
 		cf.Timeout = defaultTimeout
 	}
 
-	m := Migration{
-		dir:     cf.Dir,
-		kind:    cf.Kind,
-		db:      cf.DB,
-		Timeout: cf.Timeout,
-	}
+	m := Migration{Config: cf}
 
 	if err := m.Init(); err != nil {
 		return nil, err
@@ -73,10 +42,10 @@ func NewMigration(cf *MigrationConfig) (*Migration, error) {
 }
 
 func (m *Migration) Init() error {
-	if err := goose.SetDialect(m.kind.GetDialect()); err != nil {
+	if err := goose.SetDialect(m.DBType.GetDialect()); err != nil {
 		return err
 	}
-	if _, err := os.Stat(m.dir); os.IsNotExist(err) {
+	if _, err := os.Stat(m.Dir); os.IsNotExist(err) {
 		return err
 	}
 	goose.SetTableName("db_version")
@@ -84,7 +53,7 @@ func (m *Migration) Init() error {
 }
 
 func (m *Migration) Status() error {
-	return goose.Status(m.db, m.dir)
+	return goose.Status(m.DB, m.Dir)
 }
 
 func (m *Migration) Up(c context.Context, version int64) error {
@@ -93,9 +62,9 @@ func (m *Migration) Up(c context.Context, version int64) error {
 
 	var err error
 	if version != 0 {
-		err = goose.UpToContext(ctx, m.db, m.dir, version)
+		err = goose.UpToContext(ctx, m.DB, m.Dir, version)
 	} else {
-		err = goose.UpContext(ctx, m.db, m.dir)
+		err = goose.UpContext(ctx, m.DB, m.Dir)
 	}
 
 	if err != nil {
@@ -111,9 +80,9 @@ func (m *Migration) Down(c context.Context, version int64) error {
 
 	var err error
 	if version != 0 {
-		err = goose.DownToContext(ctx, m.db, m.dir, version)
+		err = goose.DownToContext(ctx, m.DB, m.Dir, version)
 	} else {
-		err = goose.DownContext(ctx, m.db, m.dir)
+		err = goose.DownContext(ctx, m.DB, m.Dir)
 	}
 
 	if err != nil {

@@ -28,9 +28,9 @@ func newTestDB(t *testing.T) (*Database, sqlmock.Sqlmock) {
 	sqlxDB := sqlx.NewDb(db, "sqlmock")
 
 	return &Database{
-		DB:         sqlxDB,
-		TimeoutSec: 5,
-		kindDB:     types.SqlServer,
+		DB:      sqlxDB,
+		timeout: 5,
+		kindDB:  types.SqlServer,
 	}, mock
 }
 
