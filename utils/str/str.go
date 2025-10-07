@@ -6,6 +6,7 @@ import (
 	"github.com/BevisDev/godev/types"
 	"github.com/shopspring/decimal"
 	"golang.org/x/text/unicode/norm"
+	"math"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -86,53 +87,84 @@ func ToString(value any) string {
 // ToInt parses a string to any signed integer type (int, int16, ...).
 func ToInt[T types.SignedInteger](s string) T {
 	var zero T
-	var bitSize int
 
-	switch any(zero).(type) {
-	case int:
-		i, err := strconv.Atoi(s)
-		if err != nil {
-			return zero
-		}
-		return T(i)
-	case int8:
-		bitSize = 8
-	case int16:
-		bitSize = 16
-	case int32:
-		bitSize = 32
-	case int64:
-		bitSize = 64
-	default:
-		return zero
-	}
-
-	i, err := strconv.ParseInt(s, 10, bitSize)
+	i64, err := strconv.ParseInt(s, 10, 64)
 	if err != nil {
 		return zero
 	}
-	return T(i)
+
+	switch any(zero).(type) {
+	case int8:
+		if i64 < math.MinInt8 || i64 > math.MaxInt8 {
+			return zero
+		}
+		return T(int8(i64))
+	case int16:
+		if i64 < math.MinInt16 || i64 > math.MaxInt16 {
+			return zero
+		}
+		return T(int16(i64))
+	case int32:
+		if i64 < math.MinInt32 || i64 > math.MaxInt32 {
+			return zero
+		}
+		return T(int32(i64))
+	case int64:
+		return T(i64)
+	case int:
+		if i64 < int64(math.MinInt) || i64 > int64(math.MaxInt) {
+			return zero
+		}
+		return T(int(i64))
+	default:
+		return zero
+	}
+}
+
+// ToUint parses a string to any signed uint type (uint, uint16, ...).
+func ToUint[T types.SignedUint](s string) T {
+	var zero T
+	u64, err := strconv.ParseUint(s, 10, 64)
+	if err != nil {
+		return zero
+	}
+
+	switch any(zero).(type) {
+	case uint8:
+		if u64 > math.MaxUint8 {
+			return zero
+		}
+		return T(uint8(u64))
+	case uint16:
+		if u64 > math.MaxUint16 {
+			return zero
+		}
+		return T(uint16(u64))
+	case uint32:
+		if u64 > math.MaxUint32 {
+			return zero
+		}
+		return T(uint32(u64))
+	case uint64:
+		return T(u64)
+	case uint:
+		if u64 > uint64(math.MaxUint) {
+			return zero
+		}
+		return T(uint(u64))
+	default:
+		return zero
+	}
 }
 
 // ToFloat parses a string to float32 or float64.
 func ToFloat[T types.SignedFloat](str string) T {
 	var zero T
-	var bitSize int
-
-	switch any(zero).(type) {
-	case float32:
-		bitSize = 32
-	case float64:
-		bitSize = 64
-	default:
-		return zero
-	}
-
-	f, err := strconv.ParseFloat(str, bitSize)
+	f64, err := strconv.ParseFloat(str, 64) // parse sang float64 luôn
 	if err != nil {
 		return zero
 	}
-	return T(f)
+	return T(f64)
 }
 
 // ToBool parses a string into a boolean value.

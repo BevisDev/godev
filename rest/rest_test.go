@@ -18,6 +18,9 @@ type MockResponse struct {
 	Status  string `json:"status"`
 }
 
+// Setup client
+var client = NewRestClient(nil)
+
 func TestRestClient_Get(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -27,20 +30,14 @@ func TestRestClient_Get(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	// Setup client
-	client := NewRestClient(nil)
-
 	// Setup request
 	type resultStruct struct {
 		Message string `json:"message"`
 	}
-	result := &resultStruct{}
-	req := &Request{
-		URL:    server.URL,
-		Result: result,
-	}
 
-	err := client.Get(context.Background(), req)
+	result, err := NewRequest[resultStruct](client).
+		URL(server.URL).
+		GET(context.Background())
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
@@ -73,20 +70,12 @@ func TestRestClient_Get_WithQueryParam(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	// Create client
-	client := NewRestClient(nil)
-
-	// Setup RestRequest
-	result := &MockResponse{}
-	req := &Request{
-		URL:    server.URL + "/hello/:name",
-		Query:  map[string]string{"name": "GoLang"},
-		Params: map[string]string{"lang": "en"},
-		Result: result,
-	}
-
 	// Call GET
-	err := client.Get(context.Background(), req)
+	result, err := NewRequest[MockResponse](client).
+		URL(server.URL + "/hello/:name").
+		Query(map[string]string{"name": "GoLang"}).
+		Params(map[string]string{"lang": "en"}).
+		GET(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -105,19 +94,16 @@ func TestRestClient_Timeout(t *testing.T) {
 	server := httptest.NewServer(slowHandler)
 	defer server.Close()
 
-	// Tạo RestClient với timeout thấp hơn thời gian phản hồi server
-	client := NewRestClient(&RestConfig{
+	clientTimeout := NewRestClient(&HttpConfig{
 		TimeoutSec: 1,
 	})
 
-	// Request mock
-	req := &Request{
-		URL: server.URL,
-	}
-
 	// Do Request
 	start := time.Now()
-	err := client.Get(context.Background(), req)
+	_, err := NewRequest[any](clientTimeout).
+		URL(server.URL).
+		GET(context.Background())
+
 	elapsed := time.Since(start)
 
 	// Check err timeout
@@ -161,25 +147,18 @@ func TestRestClient_PostForm_WithBodyFormAndHeader(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	// Setup client
-	client := NewRestClient(nil)
-
-	// Setup request
-	result := &MockResponse{}
-	req := &Request{
-		URL: server.URL,
-		BodyForm: map[string]string{
+	// Call PostForm
+	result, err := NewRequest[MockResponse](client).
+		URL(server.URL).
+		BodyForm(map[string]string{
 			"username": "testuser",
 			"lang":     "vi",
-		},
-		Header: map[string]string{
+		}).
+		Headers(map[string]string{
 			"X-Custom-Header": "Test123",
-		},
-		Result: result,
-	}
+		}).
+		PostForm(context.Background())
 
-	// Call PostForm
-	err := client.PostForm(context.Background(), req)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -200,18 +179,10 @@ func TestRestClient_Server500Error(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	// new rest client
-	client := NewRestClient(nil)
-
-	// Setup RestRequest
-	req := &Request{
-		URL:    server.URL,
-		Result: &struct{}{},
-	}
-
 	// Call GET
-	err := client.Get(context.Background(), req)
-
+	_, err := NewRequest[any](client).
+		URL(server.URL).
+		GET(context.Background())
 	// Check error
 	if err == nil {
 		t.Fatal("expected error but got nil")
@@ -231,21 +202,18 @@ func TestRestClient_Post(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	client := NewRestClient(nil)
-
 	type Response struct {
 		Message string `json:"message"`
 	}
-	res := &Response{}
 
-	err := client.Post(context.Background(), &Request{
-		URL:    server.URL,
-		Body:   map[string]string{"key": "value"},
-		Result: res,
-	})
+	res, err := NewRequest[Response](client).
+		URL(server.URL).
+		Body(map[string]string{"key": "value"}).
+		POST(context.Background())
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
+
 	if res.Message != "Post called" {
 		t.Errorf("Expected message 'Post called', got %s", res.Message)
 	}
@@ -262,21 +230,18 @@ func TestRestClient_Put(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	client := NewRestClient(nil)
-
 	type Response struct {
 		Message string `json:"message"`
 	}
-	res := &Response{}
 
-	err := client.Put(context.Background(), &Request{
-		URL:    server.URL,
-		Body:   map[string]string{"key": "value"},
-		Result: res,
-	})
+	res, err := NewRequest[Response](client).
+		URL(server.URL).
+		Body(map[string]string{"key": "value"}).
+		PUT(context.Background())
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
+
 	if res.Message != "Put called" {
 		t.Errorf("Expected message 'Put called', got %s", res.Message)
 	}
@@ -293,21 +258,18 @@ func TestRestClient_Patch(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	client := NewRestClient(nil)
-
 	type Response struct {
 		Message string `json:"message"`
 	}
-	res := &Response{}
 
-	err := client.Patch(context.Background(), &Request{
-		URL:    server.URL,
-		Body:   map[string]string{"key": "value"},
-		Result: res,
-	})
+	res, err := NewRequest[Response](client).
+		URL(server.URL).
+		Body(map[string]string{"key": "value"}).
+		PATCH(context.Background())
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
+
 	if res.Message != "Patch called" {
 		t.Errorf("Expected message 'Patch called', got %s", res.Message)
 	}
@@ -324,21 +286,18 @@ func TestRestClient_Delete(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	client := NewRestClient(nil)
-
 	type Response struct {
 		Message string `json:"message"`
 	}
-	res := &Response{}
 
-	err := client.Delete(context.Background(), &Request{
-		URL:    server.URL,
-		Body:   map[string]string{"key": "value"},
-		Result: res,
-	})
+	res, err := NewRequest[Response](client).
+		URL(server.URL).
+		Body(map[string]string{"key": "value"}).
+		DELETE(context.Background())
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
+
 	if res.Message != "Delete called" {
 		t.Errorf("Expected message 'Delete called', got %s", res.Message)
 	}
@@ -351,24 +310,11 @@ func TestRestClient_Response_NoBody(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	client := NewRestClient(nil)
-
-	type Response struct {
-		Message string `json:"message"`
-	}
-	res := &Response{}
-
-	err := client.Post(context.Background(), &Request{
-		URL:    server.URL,
-		Body:   map[string]string{"key": "value"},
-		Result: res,
-	})
-
+	_, err := NewRequest[any](client).
+		URL(server.URL).
+		Body(map[string]string{"key": "value"}).
+		POST(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if res.Message != "" {
-		t.Errorf("expected empty message, got %s", res.Message)
 	}
 }

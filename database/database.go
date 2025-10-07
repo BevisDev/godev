@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/BevisDev/godev/types"
 	"github.com/BevisDev/godev/utils"
 	"github.com/BevisDev/godev/utils/validate"
 	"github.com/jmoiron/sqlx"
@@ -13,55 +12,8 @@ import (
 	"net/url"
 	"runtime/debug"
 	"strings"
-	"sync"
 	"time"
 )
-
-// ConfigDB defines the configuration for connecting to a SQL database.
-//
-// It supports common settings such as connection parameters, pool sizing, timeouts,
-// and connection string customization. The `Kind` field determines the target
-// database type (e.g., MySQL, Postgres, SQL Server, Oracle).
-type ConfigDB struct {
-	// Kind specifies the type of database (e.g., types.MySQL, types.Postgres).
-	Kind types.KindDB
-
-	// Schema is the name of the target database/schema.
-	Schema string
-
-	// TimeoutSec defines the default timeout (in seconds) for DB operations.
-	TimeoutSec int
-
-	// Host is the hostname or IP address of the database server.
-	Host string
-
-	// Port is the port number to connect to the database server.
-	Port int
-
-	// Username is the database login username.
-	Username string
-
-	// Password is the database login password.
-	Password string
-
-	// MaxOpenConns sets the maximum number of open connections to the database.
-	MaxOpenConns int
-
-	// MaxIdleConns sets the maximum number of idle connections in the pool.
-	MaxIdleConns int
-
-	// MaxIdleTimeSec is the maximum amount of time (in seconds) a connection can remain idle.
-	MaxIdleTimeSec int
-
-	// MaxLifeTimeSec is the maximum amount of time (in seconds) a connection can be reused.
-	MaxLifeTimeSec int
-
-	// ShowQuery enables SQL query logging when set to true.
-	ShowQuery bool
-
-	// Params is an optional map of additional connection string parameters.
-	Params map[string]string
-}
 
 // Database represents a database connection along with configuration
 // settings and options for query logging.
@@ -72,52 +24,16 @@ type ConfigDB struct {
 //   - showQuery: if true, executed SQL queries will be logged.
 //   - kindDB: the type of database (e.g., mysql, postgres, sqlserver).
 type Database struct {
-	// DB is the initialized sqlx.DB connection.
-	db *sqlx.DB
-
-	// TimeoutSec specifies the default timeout for queries, in seconds.
-	TimeoutSec int
-
-	// showQuery enables logging of SQL queries when set to true.
-	showQuery bool
-
-	// kindDB stores the database type.
-	// For example: sqlserver, postgres, mysql.
-	kindDB types.KindDB
-
-	config *ConfigDB
-	mu     sync.RWMutex
+	*Config
+	db *sqlx.DB // DB is the initialized sqlx.DB connection.
 }
-
-const (
-	// defaultTimeoutSec defines the default timeout (in seconds) for database operations.
-	defaultTimeoutSec = 60
-
-	// MaxParams defines the maximum number of parameters allowed
-	// To avoid hitting this hard limit, it's recommended to stay under 2000.
-	// This value is used to determine safe batch sizes for bulk operations
-	MaxParams = 2000
-)
 
 // NewDB creates a new `*Database` instance from the given ConfigDB.
 //
 // It initializes connection settings (pool, timeout), connects to the
 // appropriate database based on the `Kind` (e.g., SQL Server, Postgres),
 // and performs a ping to verify connectivity.
-//
-// If the config is nil, or connection fails, it returns an error.
-//
-// Example:
-//
-//	db, err := NewDB(&ConfigDB{
-//	    Kind:     types.Postgres,
-//	    Host:     "localhost",
-//	    Port:     5432,
-//	    Username: "admin",
-//	    Password: "secret",
-//	    Schema:   "mydb",
-//	})
-func NewDB(cf *ConfigDB) (*Database, error) {
+func NewDB(cf *Config) (*Database, error) {
 	if cf == nil {
 		return nil, errors.New("config is nil")
 	}
@@ -125,39 +41,47 @@ func NewDB(cf *ConfigDB) (*Database, error) {
 		cf.TimeoutSec = defaultTimeoutSec
 	}
 
-	db, err := newConnection(cf)
+	// set default
+	if cf.TimeoutSec <= 0 {
+		cf.TimeoutSec = defaultTimeoutSec
+	}
+	if cf.MaxOpenConns <= 0 {
+		cf.MaxOpenConns = defaultMaxOpenConn
+	}
+	if cf.MaxIdleConns <= 0 {
+		cf.MaxIdleConns = defaultMaxIdleConn
+	}
+	if cf.MaxIdleTimeSec <= 0 {
+		cf.MaxIdleTimeSec = defaultConnMaxIdleTime
+	}
+	if cf.MaxLifeTimeSec <= 0 {
+		cf.MaxLifeTimeSec = defaultConnMaxLifetime
+	}
+
+	var db = &Database{Config: cf}
+
+	// initialize connection
+	dbx, err := db.init()
 	if err != nil {
 		return nil, err
 	}
+	db.db = dbx
 
-	return &Database{
-		showQuery:  cf.ShowQuery,
-		TimeoutSec: cf.TimeoutSec,
-		kindDB:     cf.Kind,
-		db:         db,
-		config:     cf,
-	}, err
+	return db, err
 }
 
-// newConnection establishes a new `sqlx.DB` connection based on the provided ConfigDB.
-//
-// It builds the connection string depending on the database type (Kind),
-// sets connection pool parameters if configured, and verifies the connection with a ping.
-//
-// Supported databases: SQL Server, Postgres, Oracle, MySQL.
-//
-// Returns an error if the database kind is unsupported or connection fails.
-func newConnection(cf *ConfigDB) (*sqlx.DB, error) {
+func (d *Database) init() (*sqlx.DB, error) {
 	var (
 		db      *sqlx.DB
 		err     error
 		connStr string
+		cf      = d.Config
 	)
 	// build connectionString
-	switch cf.Kind {
-	case types.SqlServer:
-		connStr = fmt.Sprintf("sqlserver://%s:%s@%s:%d?database=%s",
-			cf.Username, cf.Password, cf.Host, cf.Port, cf.Schema)
+	switch cf.DBType {
+	case SqlServer:
+		connStr = fmt.Sprintf(connectionMap[SqlServer],
+			cf.Username, cf.Password, cf.Host, cf.Port, cf.DBName)
 		if len(cf.Params) > 0 {
 			params := url.Values{}
 			for k, v := range cf.Params {
@@ -165,9 +89,10 @@ func newConnection(cf *ConfigDB) (*sqlx.DB, error) {
 			}
 			connStr += "&" + params.Encode()
 		}
-	case types.Postgres:
-		connStr = fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
-			cf.Username, cf.Password, cf.Host, cf.Port, cf.Schema)
+
+	case Postgres:
+		connStr = fmt.Sprintf(connectionMap[Postgres],
+			cf.Username, cf.Password, cf.Host, cf.Port, cf.DBName)
 		if len(cf.Params) > 0 {
 			params := url.Values{}
 			for k, v := range cf.Params {
@@ -175,12 +100,14 @@ func newConnection(cf *ConfigDB) (*sqlx.DB, error) {
 			}
 			connStr += "&" + params.Encode()
 		}
-	case types.Oracle:
-		connStr = fmt.Sprintf("%s/%s@%s:%d/%s",
-			cf.Username, cf.Password, cf.Host, cf.Port, cf.Schema)
-	case types.MySQL:
-		connStr = fmt.Sprintf("%s:%s@tcp(%s:%d)/%s",
-			cf.Username, cf.Password, cf.Host, cf.Port, cf.Schema)
+
+	case Oracle:
+		connStr = fmt.Sprintf(connectionMap[Oracle],
+			cf.Username, cf.Password, cf.Host, cf.Port, cf.DBName)
+
+	case MySQL:
+		connStr = fmt.Sprintf(connectionMap[MySQL],
+			cf.Username, cf.Password, cf.Host, cf.Port, cf.DBName)
 		if len(cf.Params) > 0 {
 			params := url.Values{}
 			for k, v := range cf.Params {
@@ -189,84 +116,48 @@ func newConnection(cf *ConfigDB) (*sqlx.DB, error) {
 			connStr += "?" + params.Encode()
 		}
 	default:
-		return nil, errors.New("unsupported database kind " + cf.Kind.String())
+		return nil, errors.New("unsupported database kind " + cf.DBType.String())
 	}
 
 	// connect
-	db, err = sqlx.Connect(cf.Kind.GetDriver(), connStr)
+	db, err = sqlx.Connect(cf.DBType.GetDriver(), connStr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
 	// set pool
-	if cf.MaxOpenConns > 0 {
-		db.SetMaxOpenConns(cf.MaxOpenConns)
-	}
-	if cf.MaxIdleConns > 0 {
-		db.SetMaxIdleConns(cf.MaxIdleConns)
-	}
-	if cf.MaxIdleTimeSec > 0 {
-		db.SetConnMaxIdleTime(time.Duration(cf.MaxIdleTimeSec) * time.Second)
-	}
-	if cf.MaxLifeTimeSec > 0 {
-		db.SetConnMaxLifetime(time.Duration(cf.MaxLifeTimeSec) * time.Second)
-	}
+	db.SetMaxOpenConns(cf.MaxOpenConns)
+	db.SetMaxIdleConns(cf.MaxIdleConns)
+	db.SetConnMaxIdleTime(time.Duration(cf.MaxIdleTimeSec) * time.Second)
+	db.SetConnMaxLifetime(time.Duration(cf.MaxLifeTimeSec) * time.Second)
 
 	// ping check connection
 	if err = db.Ping(); err != nil {
 		return nil, fmt.Errorf("ping database failed: %w", err)
 	}
 
-	log.Printf("connect db %s success \n", cf.Schema)
+	log.Printf("connect db %s success \n", cf.DBName)
 	return db, nil
+}
+
+func (d *Database) Ping() error {
+	db := d.GetDB()
+	return db.Ping()
 }
 
 func (d *Database) Close() {
 	if d.db != nil {
 		_ = d.db.Close()
-	}
-}
-
-func (d *Database) GetDB() (*sqlx.DB, error) {
-	//d.mu.RLock()
-	//if d.db != nil && d.db.Ping() == nil {
-	//	defer d.mu.RUnlock()
-	//	return d.db, nil
-	//}
-	//d.mu.RUnlock()
-	//
-	//d.mu.Lock()
-	//defer d.mu.Unlock()
-	//
-	//if err := d.Reconnect(); err != nil {
-	//	return nil, fmt.Errorf("failed to get DB: %w", err)
-	//}
-	return d.db, nil
-}
-
-func (d *Database) Reconnect() error {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
-	if d.db != nil {
-		if err := d.db.Close(); err != nil {
-			log.Printf("failed to close old connection: %v", err)
-		}
 		d.db = nil
 	}
+}
 
-	newDB, err := newConnection(d.config)
-	if err != nil {
-		return fmt.Errorf("failed to reconnect: %w", err)
-	}
-
-	d.db = newDB
-	log.Printf("database %s reconnected successfully", d.config.Schema)
-	return nil
+func (d *Database) GetDB() *sqlx.DB {
+	return d.db
 }
 
 func (d *Database) ViewQuery(query string) {
-	if d.showQuery {
+	if d.ShowQuery {
 		log.Printf("Query: %s\n", query)
 	}
 }
@@ -283,99 +174,27 @@ func (d *Database) MustBePtr(dest interface{}) (err error) {
 	return
 }
 
-// GetTemplate returns a database-specific SQL template string for rendering JSON output,
-// based on the configured database kind (e.g., MySQL, MSSQL, PostgreSQL) and the desired JSON format.
-//
-// Supported templates include:
-//   - types.TemplateJSONArray: for returning JSON arrays (e.g., list of rows)
-//   - types.TemplateJSONObject: for returning a single JSON object (e.g., one row)
-//
-// Note:
-//   - MySQL templates require three fmt.Sprintf() parameters: (columns, table, where)
-//     Example: fmt.Sprintf(template, "'id', id", "users", "WHERE active = 1")
-//   - MSSQL and Postgres templates wrap a full SELECT query inside, so you typically pass only one parameter.
-//
-// Example usage:
-//
-//	tpl := db.GetTemplate(types.TemplateJSONArray)
-//	query := fmt.Sprintf(tpl, "SELECT id, name FROM users")
-//
-//	// For MySQL:
-//	tpl := db.GetTemplate(types.TemplateJSONArray)
-//	query := fmt.Sprintf(tpl, "'id', id, 'name', name", "users", "WHERE active = 1")
-func (d *Database) GetTemplate(template types.DBJSONTemplate) string {
-	switch d.kindDB {
-	case types.SqlServer:
-		if types.TemplateJSONArray == template {
-			return types.MSSQLJSONArrayTemplate
+func (d *Database) GetTemplate(template TemplateJSON) string {
+	if tempDB, ok := TemplateDBMap[d.DBType]; ok {
+		if tpl, ok := tempDB[template]; ok {
+			return tpl
 		}
-		return types.MSSQLJSONObjectTemplate
-
-		// In MySQL, the JSON templates require explicit table and WHERE clause placeholders.
-		// You must use fmt.Sprintf(template, columns, table, where) when applying this.
-		// Unlike MSSQL or Postgres, which embed the full SELECT inside the template,
-		// MySQL templates are split and require manual composition.
-	case types.MySQL:
-		if types.TemplateJSONArray == template {
-			return types.MySQLJSONArrayTemplate
-		}
-		return types.MySQLJSONObjectTemplate
-
-	case types.Postgres:
-		if types.TemplateJSONArray == template {
-			return types.PostgresJSONArrayTemplate
-		}
-		return types.PostgresJSONObjectTemplate
-
-	default:
-		return ""
 	}
+	return ""
 }
 
-// FormatRow returns a database-specific placeholder for a given parameter index,
-// used when dynamically constructing bulk insert queries or custom SQL.
-//
-// Behavior:
-//   - For MySQL: always returns "?" (since MySQL uses anonymous placeholders)
-//   - For Postgres: returns "$1", "$2", etc.
-//   - For MSSQL: returns "@p1", "@p2", etc.
-//
-// This allows dynamically building row placeholders such as:
-//
-//	"(?, ?, ?)" or "($1, $2, $3)" depending on the database in use.
-//
-// Example:
-//
-//	fmt.Sprintf("INSERT INTO users (id, name) VALUES (%s)", d.FormatRow(1))
 func (d *Database) FormatRow(idx int) string {
-	var p = d.kindDB.GetPlaceHolder()
-	if types.MySQL == d.kindDB {
+	var p = d.DBType.GetPlaceHolder()
+	if MySQL == d.DBType {
 		return p
 	}
 	return fmt.Sprintf("%s%d", p, idx)
 }
 
-// RebindQuery prepares a SQL query and its arguments for execution,
-// applying the correct placeholder format based on the database dialect.
-//
-// - For queries containing an IN clause, it uses sqlx.In() to expand slice arguments.
-// - Then, it's rebinding the query using d.db.Rebind() to match the database's placeholder style.
-//
-// Example:
-//
-//	Input query: "SELECT * FROM users WHERE id IN (?) AND status = ?"
-//	Args:        []interface{}{[]int{1, 2, 3}, "active"}
-//	Output:      "SELECT * FROM users WHERE id IN ($1,$2,$3) AND status = $4" (for Postgres)
-//
-// ViewQuery is called to optionally log or inspect the final query.
-//
-// Returns:
-//   - The final bound query string
-//   - The updated argument slice
-//   - Any error from sqlx.In (if applicable)
-func (d *Database) RebindQuery(query string, args ...interface{}) (string, []interface{}, error) {
+func (d *Database) rebind(query string, args ...interface{}) (string, []interface{}, error) {
 	var err error
 
+	// if query using IN
 	if strings.Contains(strings.ToUpper(query), "IN") {
 		query, args, err = sqlx.In(query, args...)
 		if err != nil {
@@ -383,48 +202,20 @@ func (d *Database) RebindQuery(query string, args ...interface{}) (string, []int
 		}
 	}
 
-	db, err := d.GetDB()
-	if err != nil {
-		return query, args, err
-	}
-
+	db := d.GetDB()
 	query = db.Rebind(query)
 
 	d.ViewQuery(query)
 	return query, args, err
 }
 
-// RunTx executes a function within a database transaction with a given isolation level.
-//
-// It automatically manages context timeout (`d.TimeoutSec`), begins a transaction,
-// and ensures proper commit or rollback based on the outcome of the callback function.
-//
-// If the callback returns an error or a panic occurs, the transaction is rolled back.
-// If the callback succeeds, the transaction is committed.
-//
-// Example:
-//
-//	err := db.RunTx(ctx, sql.LevelSerializable, func(txCtx context.Context, tx *sqlx.Tx) error {
-//	    _, err := tx.ExecContext(txCtx, "UPDATE accounts SET balance = balance - 100 WHERE id = ?", 1)
-//	    if err != nil {
-//	        return err
-//	    }
-//	    _, err = tx.ExecContext(txCtx, "UPDATE accounts SET balance = balance + 100 WHERE id = ?", 2)
-//	    return err
-//	})
-//
-//	if err != nil {
-//	    log.Fatalf("transaction failed: %v", err)
-//	}
-func (d *Database) RunTx(c context.Context, level sql.IsolationLevel, fn func(ctx context.Context, tx *sqlx.Tx) error) error {
+func (d *Database) RunTx(c context.Context, level sql.IsolationLevel,
+	fn func(ctx context.Context, tx *sqlx.Tx) error,
+) error {
 	ctx, cancel := utils.NewCtxTimeout(c, d.TimeoutSec)
 	defer cancel()
 
-	db, err := d.GetDB()
-	if err != nil {
-		return err
-	}
-
+	db := d.GetDB()
 	tx, err := db.BeginTxx(ctx, &sql.TxOptions{
 		Isolation: level,
 	})
@@ -457,7 +248,7 @@ func (d *Database) GetList(c context.Context, dest interface{}, query string, ar
 		return err
 	}
 
-	query, newArgs, err := d.RebindQuery(query, args...)
+	query, newArgs, err := d.rebind(query, args...)
 	if err != nil {
 		return err
 	}
@@ -465,11 +256,7 @@ func (d *Database) GetList(c context.Context, dest interface{}, query string, ar
 	ctx, cancel := utils.NewCtxTimeout(c, d.TimeoutSec)
 	defer cancel()
 
-	db, err := d.GetDB()
-	if err != nil {
-		return err
-	}
-
+	db := d.GetDB()
 	if validate.IsNilOrEmpty(newArgs) {
 		return db.SelectContext(ctx, dest, query)
 	}
@@ -486,7 +273,7 @@ func (d *Database) GetAny(c context.Context, dest interface{}, query string, arg
 		return err
 	}
 
-	query, newArgs, err := d.RebindQuery(query, args...)
+	query, newArgs, err := d.rebind(query, args...)
 	if err != nil {
 		return err
 	}
@@ -494,11 +281,7 @@ func (d *Database) GetAny(c context.Context, dest interface{}, query string, arg
 	ctx, cancel := utils.NewCtxTimeout(c, d.TimeoutSec)
 	defer cancel()
 
-	db, err := d.GetDB()
-	if err != nil {
-		return err
-	}
-
+	db := d.GetDB()
 	if validate.IsNilOrEmpty(newArgs) {
 		return db.GetContext(ctx, dest, query)
 	}
@@ -513,10 +296,7 @@ func (d *Database) Execute(ctx context.Context, query string, tx *sqlx.Tx, args 
 	var err error
 
 	if tx == nil {
-		db, err := d.GetDB()
-		if err != nil {
-			return err
-		}
+		db := d.GetDB()
 		_, err = db.ExecContext(ctx, query, args...)
 	} else {
 		_, err = tx.ExecContext(ctx, query, args...)
@@ -551,21 +331,13 @@ func (d *Database) ExecuteSafe(ctx context.Context, query string, args ...interf
 func (d *Database) ExecReturningId(ctx context.Context, query string, args ...interface{}) (id int, err error) {
 	d.ViewQuery(query)
 
-	db, err := d.GetDB()
-	if err != nil {
-		return
-	}
-
+	db := d.GetDB()
 	err = db.QueryRowxContext(ctx, query, args...).Scan(&id)
 	return
 }
 
 func (d *Database) Prepare(ctx context.Context, query string) (*sqlx.Stmt, error) {
-	db, err := d.GetDB()
-	if err != nil {
-		return nil, err
-	}
-
+	db := d.GetDB()
 	return db.PreparexContext(ctx, query)
 }
 
@@ -580,10 +352,7 @@ func (d *Database) Save(ctx context.Context, tx *sqlx.Tx, query string, args int
 	d.ViewQuery(query)
 
 	if tx == nil {
-		db, err := d.GetDB()
-		if err != nil {
-			return err
-		}
+		db := d.GetDB()
 		_, err = db.NamedExecContext(ctx, query, args)
 	} else {
 		_, err = tx.NamedExecContext(ctx, query, args)
@@ -675,11 +444,7 @@ func (d *Database) InsertReturning(c context.Context, query string, dest interfa
 	ctx, cancel := utils.NewCtxTimeout(c, d.TimeoutSec)
 	defer cancel()
 
-	db, err := d.GetDB()
-	if err != nil {
-		return err
-	}
-
+	db := d.GetDB()
 	row := db.QueryRowxContext(ctx, query, args...)
 
 	switch dest.(type) {
@@ -716,8 +481,8 @@ func (d *Database) InsertBulk(ctx context.Context, table string, row int, colNam
 	}
 
 	return d.RunTx(ctx, sql.LevelDefault, func(ctx context.Context, tx *sqlx.Tx) error {
-		if len(args) > MaxParams {
-			batchRow := MaxParams / col
+		if len(args) > maxParams {
+			batchRow := maxParams / col
 			for start := 0; start < row; start += batchRow {
 				end := start + batchRow
 				if end > row {
