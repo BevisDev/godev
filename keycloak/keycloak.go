@@ -26,18 +26,18 @@ func (k *KeyCloak) GetClient() *gocloak.GoCloak {
 	return k.client
 }
 
-func (k *KeyCloak) Login(ctx context.Context, clientId, clientSecret, realm string) (*gocloak.JWT, error) {
-	return k.client.LoginClient(ctx, clientId, clientSecret, realm)
+func (k *KeyCloak) Login(ctx context.Context, clientId, clientSecret string) (*gocloak.JWT, error) {
+	return k.client.LoginClient(ctx, clientId, clientSecret, k.Realm)
 }
 
-func (k *KeyCloak) VerifyToken(ctx context.Context, token, clientId, clientSecret, realm string) (*gocloak.IntroSpectTokenResult, error) {
-	return k.client.RetrospectToken(ctx, token, clientId, clientSecret, realm)
+func (k *KeyCloak) VerifyToken(ctx context.Context, token, clientId, clientSecret string) (*gocloak.IntroSpectTokenResult, error) {
+	return k.client.RetrospectToken(ctx, token, clientId, clientSecret, k.Realm)
 }
 
-func (k *KeyCloak) GetUserInfo(ctx context.Context, token, realm string) (*gocloak.UserInfo, error) {
-	return k.client.GetUserInfo(ctx, token, realm)
+func (k *KeyCloak) GetUserInfo(ctx context.Context, token string) (*gocloak.UserInfo, error) {
+	return k.client.GetUserInfo(ctx, token, k.Realm)
 }
 
-func (k *KeyCloak) RevokeToken(ctx context.Context, realm, clientId, clientSecret, token string) error {
-	return k.client.RevokeToken(ctx, realm, clientId, clientSecret, token)
+func (k *KeyCloak) RevokeToken(ctx context.Context, clientId, clientSecret, token string) error {
+	return k.client.RevokeToken(ctx, k.Realm, clientId, clientSecret, token)
 }

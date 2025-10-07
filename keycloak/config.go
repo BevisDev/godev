@@ -1,6 +1,7 @@
 package keycloak
 
 type Config struct {
-	Host string
-	Port int
+	Host  string
+	Port  int
+	Realm string
 }
