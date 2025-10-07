@@ -2,7 +2,7 @@ package migration
 
 import "context"
 
-type MigrationExec interface {
+type Exec interface {
 	// Init sets up the migration system.
 	// Returns an error if initialization fails.
 	Init() error

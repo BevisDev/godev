@@ -28,12 +28,12 @@ type Database struct {
 	db *sqlx.DB // DB is the initialized sqlx.DB connection.
 }
 
-// NewDB creates a new `*Database` instance from the given ConfigDB.
+// New creates a new `*Database` instance from the given ConfigDB.
 //
 // It initializes connection settings (pool, timeout), connects to the
 // appropriate database based on the `Kind` (e.g., SQL Server, Postgres),
 // and performs a ping to verify connectivity.
-func NewDB(cf *Config) (*Database, error) {
+func New(cf *Config) (*Database, error) {
 	if cf == nil {
 		return nil, errors.New("config is nil")
 	}

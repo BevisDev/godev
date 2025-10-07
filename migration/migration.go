@@ -27,7 +27,7 @@ const (
 // existence of the migration folder.
 //
 // Returns an error if initialization fails (e.g., missing directory or invalid dialect).
-func New(cf *Config) (*Migration, error) {
+func New(cf *Config) (Exec, error) {
 	// set default timeout
 	if cf.Timeout <= 0 {
 		cf.Timeout = defaultTimeout
