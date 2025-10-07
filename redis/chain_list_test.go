@@ -25,7 +25,9 @@ func TestChainList(t *testing.T) {
 	// Test Add (RPush)
 	mock.ExpectRPush("test:list", "a", "b", "c").SetVal(3)
 
-	err := list.Values("a", "b", "c").Add(ctx)
+	err := list.Values([]string{
+		"a", "b", "c",
+	}).Add(ctx)
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
 
@@ -95,7 +97,7 @@ func TestChainList_WithStruct(t *testing.T) {
 	vals := make([]interface{}, len(users))
 	for i, u := range users {
 		b, _ := json.Marshal(u)
-		vals[i] = string(b)
+		vals[i] = b
 	}
 
 	// Test Add (RPush)
@@ -105,7 +107,7 @@ func TestChainList_WithStruct(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
 
-	// Test Size
+	// --- Size ---
 	mock.ExpectLLen("user:list").SetVal(int64(len(users)))
 
 	size, err := list.Size(ctx)
@@ -113,8 +115,9 @@ func TestChainList_WithStruct(t *testing.T) {
 	assert.Equal(t, int64(2), size)
 	assert.NoError(t, mock.ExpectationsWereMet())
 
-	// Test Get index
-	mock.ExpectLRange("user:list", int64(0), int64(0)).SetVal([]string{string(vals[0].(string))})
+	// --- Get ---
+	mock.ExpectLRange("user:list", 0, 0).
+		SetVal([]string{string(vals[0].([]byte))})
 
 	val, err := list.Get(ctx, 0)
 	assert.NoError(t, err)
@@ -123,9 +126,9 @@ func TestChainList_WithStruct(t *testing.T) {
 	assert.Equal(t, users[0].Name, (*val).Name)
 	assert.NoError(t, mock.ExpectationsWereMet())
 
-	// Test GetRange
+	// --- GetRange ---
 	mock.ExpectLRange("user:list", int64(0), int64(-1)).
-		SetVal([]string{vals[0].(string), vals[1].(string)})
+		SetVal([]string{string(vals[0].([]byte)), string(vals[1].([]byte))})
 
 	valsOut, err := list.GetRange(ctx)
 	assert.NoError(t, err)
@@ -134,15 +137,18 @@ func TestChainList_WithStruct(t *testing.T) {
 	assert.Equal(t, users[1].ID, (*valsOut[1]).ID)
 	assert.NoError(t, mock.ExpectationsWereMet())
 
-	// Test PopFront
-	mock.ExpectLPop("user:list").SetVal(vals[0].(string))
+	// --- PopFront ---
+	mock.ExpectLPop("user:list").
+		SetVal(string(vals[0].([]byte)))
+
 	first, err := list.PopFront(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, users[0].ID, (*first).ID)
 	assert.NoError(t, mock.ExpectationsWereMet())
 
-	// Test Pop
-	mock.ExpectRPop("user:list").SetVal(vals[1].(string))
+	// --- Pop ---
+	mock.ExpectRPop("user:list").
+		SetVal(string(vals[1].([]byte)))
 	last, err := list.Pop(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, users[1].ID, (*last).ID)

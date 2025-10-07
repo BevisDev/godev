@@ -20,6 +20,7 @@ type Status string
 const (
 	StatusPending   Status = "pending"
 	StatusCompleted Status = "completed"
+	StatusApproved  Status = "approved"
 )
 
 func (s Status) String() string {

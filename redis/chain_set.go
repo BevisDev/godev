@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/BevisDev/godev/utils"
 	"github.com/BevisDev/godev/utils/jsonx"
+	"github.com/BevisDev/godev/utils/validate"
 )
 
 type ChainSet[T any] struct {
@@ -22,7 +23,7 @@ func (c *ChainSet[T]) Key(k string) ChainSetExec[T] {
 	return c
 }
 
-func (c *ChainSet[T]) Values(values ...interface{}) ChainSetExec[T] {
+func (c *ChainSet[T]) Values(values interface{}) ChainSetExec[T] {
 	c.Chain.Values(values)
 	return c
 }
@@ -36,7 +37,7 @@ func (c *ChainSet[T]) Add(ctx context.Context) error {
 	if c.key == "" {
 		return ErrMissingKey
 	}
-	if len(c.values) == 0 {
+	if validate.IsNilOrEmpty(c.values) {
 		return ErrMissingValues
 	}
 
@@ -54,16 +55,19 @@ func (c *ChainSet[T]) Add(ctx context.Context) error {
 	return nil
 }
 
-func (c *ChainSet[T]) Remove(ctx context.Context, members ...interface{}) error {
+func (c *ChainSet[T]) Remove(ctx context.Context) error {
 	if c.key == "" {
 		return ErrMissingKey
+	}
+	if validate.IsNilOrEmpty(c.values) {
+		return ErrMissingValues
 	}
 
 	rdb := c.GetRDB()
 	ct, cancel := utils.NewCtxTimeout(ctx, c.TimeoutSec)
 	defer cancel()
 
-	if err := rdb.SRem(ct, c.key, members...).Err(); err != nil {
+	if err := rdb.SRem(ct, c.key, c.values...).Err(); err != nil {
 		return err
 	}
 
@@ -122,4 +126,8 @@ func (c *ChainSet[T]) Size(ctx context.Context) (int64, error) {
 	defer cancel()
 
 	return rdb.SCard(ct, c.key).Result()
+}
+
+func (c *ChainSet[T]) Delete(ct context.Context) error {
+	return c.Chain.Delete(ct)
 }

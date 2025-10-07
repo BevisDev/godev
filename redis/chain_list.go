@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/BevisDev/godev/utils"
 	"github.com/BevisDev/godev/utils/jsonx"
+	"github.com/BevisDev/godev/utils/validate"
 )
 
 type ChainList[T any] struct {
@@ -25,7 +26,7 @@ func (c *ChainList[T]) Key(k string) ChainListExec[T] {
 	return c
 }
 
-func (c *ChainList[T]) Values(values ...interface{}) ChainListExec[T] {
+func (c *ChainList[T]) Values(values interface{}) ChainListExec[T] {
 	c.Chain.Values(values)
 	return c
 }
@@ -50,7 +51,7 @@ func (c *ChainList[T]) AddFirst(ctx context.Context) error {
 	if c.key == "" {
 		return ErrMissingKey
 	}
-	if len(c.values) == 0 {
+	if validate.IsNilOrEmpty(c.values) {
 		return ErrMissingValues
 	}
 
@@ -72,7 +73,7 @@ func (c *ChainList[T]) Add(ctx context.Context) error {
 	if c.key == "" {
 		return ErrMissingKey
 	}
-	if len(c.values) == 0 {
+	if validate.IsNilOrEmpty(c.values) {
 		return ErrMissingValues
 	}
 
@@ -213,4 +214,8 @@ func (c *ChainList[T]) Size(ctx context.Context) (int64, error) {
 	defer cancel()
 
 	return rdb.LLen(ct, c.key).Result()
+}
+
+func (c *ChainList[T]) Delete(ct context.Context) error {
+	return c.Chain.Delete(ct)
 }

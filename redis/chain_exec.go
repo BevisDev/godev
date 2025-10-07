@@ -15,7 +15,7 @@ type ChainExec[T any] interface {
 	Value(v interface{}) ChainExec[T]
 
 	// Values specifies multiple values to be stored with the key
-	Values(values ...interface{}) ChainExec[T]
+	Values(values interface{}) ChainExec[T]
 
 	// Expire sets the Time-To-Live (TTL) for the key.
 	// n is the time duration, and unit specifies the scale (e.g., "s" for seconds).

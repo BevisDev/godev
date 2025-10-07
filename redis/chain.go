@@ -7,6 +7,7 @@ import (
 	"github.com/BevisDev/godev/utils"
 	"github.com/BevisDev/godev/utils/jsonx"
 	"github.com/BevisDev/godev/utils/validate"
+	"reflect"
 	"time"
 )
 
@@ -17,7 +18,7 @@ type Chain[T any] struct {
 	channel    string
 	prefix     string
 	value      interface{}
-	values     []interface{}
+	values     []interface{} // for list or set
 	batches    map[string]interface{}
 	expiration time.Duration
 }
@@ -49,10 +50,19 @@ func (c *Chain[T]) Value(v interface{}) ChainExec[T] {
 	return c
 }
 
-func (c *Chain[T]) Values(values ...interface{}) ChainExec[T] {
-	for _, v := range values {
-		c.values = append(c.values, v)
+func (c *Chain[T]) Values(values interface{}) ChainExec[T] {
+	v := reflect.ValueOf(values)
+
+	if v.Kind() != reflect.Slice {
+		c.values = append(c.values, c.convertValue(values))
+		return c
 	}
+
+	for i := 0; i < v.Len(); i++ {
+		val := v.Index(i).Interface()
+		c.values = append(c.values, c.convertValue(val))
+	}
+
 	return c
 }
 

@@ -7,7 +7,7 @@ type ChainListExec[T any] interface {
 	Key(k string) ChainListExec[T]
 
 	// Values specifies multiple values to be stored with the key
-	Values(vals ...interface{}) ChainListExec[T]
+	Values(vals interface{}) ChainListExec[T]
 
 	// Expire sets the Time-To-Live (TTL) for the key.
 	// n is the time duration, and unit specifies the scale (e.g., "s" for seconds).
@@ -33,4 +33,7 @@ type ChainListExec[T any] interface {
 
 	// Size returns the number of elements in the list.
 	Size(ctx context.Context) (int64, error)
+
+	// Delete removes the specified key from Redis.
+	Delete(ctx context.Context) error
 }
