@@ -134,7 +134,7 @@ func (h *HttpClient[T]) restTemplate(c context.Context, method string) (*T, erro
 			reqBody = b
 			bodyStr = "[binary body]"
 		default:
-			reqBody = jsonx.ToJSONBytes(h.Body)
+			reqBody = jsonx.ToJSONBytes(h.body)
 			bodyStr = string(reqBody)
 		}
 	}
