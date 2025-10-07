@@ -151,7 +151,7 @@ func (h *HttpClient[T]) restTemplate(c context.Context, method string) (*T, erro
 
 	// log request
 	var (
-		isLog     = !validate.IsNilOrEmpty(h.Logger)
+		isLog     = h.Exec != nil
 		startTime = time.Now()
 	)
 	if isLog {
@@ -215,7 +215,7 @@ func (h *HttpClient[T]) requestInfoLogger(state, method, bodyStr string, startTi
 		reqLogger.Body = "no request body"
 	}
 
-	h.Logger.LogExtRequest(reqLogger)
+	h.LogExtRequest(reqLogger)
 }
 
 func (h *HttpClient[T]) requestInfoConsole(state, method, bodyStr string, startTime time.Time) {
@@ -269,7 +269,7 @@ func (h *HttpClient[T]) execute(request *http.Request, startTime time.Time, stat
 
 	// log response
 	var (
-		isLog      = h.Logger != nil
+		isLog      = h.Exec != nil
 		respLogger logger.ResponseLogger
 		sb         strings.Builder
 	)
@@ -304,7 +304,7 @@ func (h *HttpClient[T]) execute(request *http.Request, startTime time.Time, stat
 
 		if isLog {
 			respLogger.Body = bodyContent
-			h.Logger.LogExtResponse(&respLogger)
+			h.LogExtResponse(&respLogger)
 		} else {
 			sb.WriteString(fmt.Sprintf(consts.Body+": %s\n", bodyContent))
 			sb.WriteString("==================================\n")
