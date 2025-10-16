@@ -3,6 +3,7 @@ package validate
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/BevisDev/godev/consts"
 	"reflect"
 	"regexp"
@@ -82,10 +83,16 @@ func IsNilOrZero(v interface{}) bool {
 	}
 }
 
-func IsErrorOrEmpty(err error, i interface{}) bool {
-	if err != nil || IsNilOrEmpty(i) {
+func IsErrorOrEmpty(err *error, i interface{}) bool {
+	if *err != nil {
 		return true
 	}
+
+	if IsNilOrEmpty(i) {
+		*err = fmt.Errorf("value of type %v empty", reflect.TypeOf(i))
+		return true
+	}
+
 	return false
 }
 

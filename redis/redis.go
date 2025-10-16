@@ -67,7 +67,6 @@ func (r *RedisCache) connect() (*redis.Client, error) {
 func (r *RedisCache) Close() {
 	if r.client != nil {
 		_ = r.client.Close()
-		r.client = nil
 	}
 }
 

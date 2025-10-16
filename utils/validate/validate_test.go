@@ -121,7 +121,7 @@ func TestIsErrorOrEmpty(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := IsErrorOrEmpty(tt.err, tt.value)
+			result := IsErrorOrEmpty(&tt.err, tt.value)
 			if result != tt.expected {
 				t.Errorf("IsErrorOrEmpty(%v, %v) = %v; want %v", tt.err, tt.value, result, tt.expected)
 			}

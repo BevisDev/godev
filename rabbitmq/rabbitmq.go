@@ -72,7 +72,6 @@ func (r *RabbitMQ) Close() {
 
 	if r.connection != nil {
 		_ = r.connection.Close()
-		r.connection = nil
 	}
 }
 

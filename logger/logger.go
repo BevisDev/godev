@@ -293,7 +293,6 @@ func (l *AppLogger) formatAny(v interface{}) string {
 func (l *AppLogger) Sync() {
 	if l.logger != nil {
 		_ = l.logger.Sync()
-		l.logger = nil
 	}
 }
 
