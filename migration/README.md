@@ -5,6 +5,47 @@ applications.
 
 ---
 
+### Installation
+
+```bash
+go get github.com/pressly/goose/v3/cmd/goose@latest
+```
+
+**See more**: [Goose Docs](https://github.com/pressly/goose)
+
+**Example Migration File (`migrations/00001_create_users_table.sql`):**
+
+```sql
+-- +goose Up
+CREATE TABLE users
+(
+    id         SERIAL PRIMARY KEY,
+    name       VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- +goose Down
+DROP TABLE users;
+```
+
+**Running Migrations:**
+
+1. Create a `migrations/` directory in your project.
+2. Add SQL migration files with `Up` and `Down` directives as shown above.
+3. Run migrations using the `goose` CLI or using `migration package` in code
+
+```bash
+goose -dir migrations postgres "user=postgres password=secret dbname=mydb sslmode=disable" up
+```
+
+**Commands:**
+
+- `goose up`: Apply all available migrations.
+- `goose down`: Roll back the latest migration.
+- `goose status`: Check the status of migrations.
+
+> **Tip**: Ensure the database connection string matches your configuration in `config.<env>.yaml`.
+
 ## Interface
 
 ```go

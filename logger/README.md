@@ -1,8 +1,11 @@
 # Logger Package
 
-The `logger` package provides a structured logging solution for Go applications using the Zap logging library.  
+The `logger` package provides a structured logging solution for Go applications using
+the [Zap](https://github.com/uber-go/zap) logging library.
+
 It supports file-based logging with rotation, console logging, structured JSON logging, and flexible caller skip
-configuration.  
+configuration.
+
 It also includes convenient methods for logging HTTP requests and responses.
 
 ---
@@ -10,7 +13,7 @@ It also includes convenient methods for logging HTTP requests and responses.
 ## Features
 
 - Structured logging with Zap (JSON or console format).
-- File-based logging with rotation via Lumberjack:
+- File-based logging with rotation via [Lumberjack](https://github.com/natefinch/lumberjack):
     - `MaxSize` (MB per file)
     - `MaxBackups` (number of rotated files)
     - `MaxAge` (days)

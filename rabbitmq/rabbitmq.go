@@ -4,14 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/BevisDev/godev/consts"
-	"github.com/BevisDev/godev/utils"
-	"github.com/BevisDev/godev/utils/jsonx"
-	amqp "github.com/rabbitmq/amqp091-go"
 	"log"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/BevisDev/godev/consts"
+	"github.com/BevisDev/godev/utils"
+	"github.com/BevisDev/godev/utils/jsonx"
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type RabbitMQ struct {
@@ -208,7 +209,8 @@ func (r *RabbitMQ) Publish(ctx context.Context, queueName string, message interf
 }
 
 func (r *RabbitMQ) Consume(ctx context.Context, queueName string,
-	handler func(ctx context.Context, msg amqp.Delivery)) error {
+	handler func(ctx context.Context, msg amqp.Delivery),
+) error {
 	ch, err := r.GetChannel()
 	if err != nil {
 		return fmt.Errorf("failed to get channel: %w", err)
@@ -239,7 +241,7 @@ func (r *RabbitMQ) Consume(ctx context.Context, queueName string,
 				newCtx = utils.SetValueCtx(newCtx, consts.State, s)
 			}
 		}
-		handler(newCtx, msg)
+		go handler(newCtx, msg)
 	}
 
 	return nil

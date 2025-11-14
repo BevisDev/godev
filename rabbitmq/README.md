@@ -2,13 +2,20 @@
 
 `rabbitmq` is a simple Go client for RabbitMQ with automatic reconnection, queue management, and message handling.
 
+## Description
+
+GoDev supports [RabbitMQ](https://github.com/rabbitmq/amqp091-go) for message queue operations. Key methods:
+
+- `ack(multiple bool)`: Acknowledge one (`false`) or all (`true`) messages.
+- `nack(multiple, requeue bool)`: Negative acknowledgment with requeue option.
+
 ## Features
 
 - **Connect**: Establishes connection to RabbitMQ server using config.
 - **GetChannel**: Returns a new channel for publishing or consuming.
 - **DeclareQueue**: Ensures a queue exists before use.
-- **Publish**: Sends messages (string, []byte, int, bool, JSON structs) with optional context header `Xstate`.
-- **Consume**: Starts consuming messages with a handler callback; automatically extracts `Xstate` from headers.
+- **Publish**: Sends messages (string, []byte, int, bool, JSON structs) with optional context header `x-state`.
+- **Consume**: Starts consuming messages with a handler callback; automatically extracts `x-state` from headers.
 - Thread-safe and handles reconnection automatically.
 
 ## Usage

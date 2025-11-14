@@ -6,6 +6,28 @@ handling.
 
 ---
 
+## Description
+
+GoDev uses [Viper](https://github.com/spf13/viper) to load environment-specific configuration files based on
+the `GO_PROFILE` environment variable.
+Configuration files (e.g., `dev.yml`, `prod.yml`) are typically stored in a `configs/` directory.
+
+Switch between environments (e.g., `dev`, `prod`) by setting the `GO_PROFILE` environment variable:
+
+**On Windows:**
+
+```bash
+setx GO_PROFILE dev
+```
+
+**On Linux/macOS:**
+
+```bash
+export GO_PROFILE=dev
+```
+
+> **Note**: After setting the environment variable on Windows, restart your terminal to apply the changes.
+
 ## Features
 
 - Load configuration from file (`yaml`, `json`, `toml`, etc.).
@@ -19,6 +41,14 @@ handling.
 - Safe pointer checks to prevent runtime panics.
 
 ---
+
+**Example Configuration File (`configs/config.dev.yaml`):**
+
+```yaml
+server:
+  port: 8080
+  host: localhost
+```
 
 ## Structure
 

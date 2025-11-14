@@ -8,7 +8,8 @@ It includes connection pooling, timeout management, and automatic JSON serializa
 
 ## Features
 
-- Connect to Redis with host, port, password, database index, pool size, and timeout configuration.
+- Connect to [Redis](https://github.com/redis/go-redis) with host, port, password, database index, pool size, and
+  timeout configuration.
 - Basic CRUD operations:
     - `Set`, `Setx` (set without expiration)
     - `SetMany`, `SetManyx` (batch set)
@@ -24,7 +25,7 @@ It includes connection pooling, timeout management, and automatic JSON serializa
 
 ## Structure
 
-### `RedisCacheConfig`
+### `Config`
 
 Configuration struct for connecting to Redis:
 

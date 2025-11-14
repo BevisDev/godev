@@ -1,18 +1,28 @@
 # Database Package (`database`)
 
 The `database` package provides a robust and flexible abstraction layer for managing SQL database connections and
-executing various database operations in Go applications. It utilizes the `sqlx` library to simplify struct-to-query
+executing various database operations in Go applications. It utilizes the [sqlx](https://github.com/jmoiron/sqlx)
+library to simplify struct-to-query
 mapping and supports multiple database kinds (Postgres, MySQL, SQL Server, Oracle).
 
 ---
 
-## 1. Configuration (`ConfigDB`)
+## Database Support
 
-The `ConfigDB` struct defines all parameters necessary to establish a database connection.
+GoDev supports multiple SQL databases. Install the appropriate driver:
+
+- **SQL Server**: `go get github.com/denisenkom/go-mssqldb`
+- **PostgreSQL**: `go get github.com/lib/pq`
+- **Oracle**: `go get github.com/godror/godror@latest`
+- **Other**: [SQL Drivers](https://go.dev/wiki/SQLDrivers)
+
+## 1. Configuration (`Config`)
+
+The `Config` struct defines all parameters necessary to establish a database connection.
 
 | Field                      | Type                | Description                                                                 |
 |:---------------------------|:--------------------|:----------------------------------------------------------------------------|
-| **Kind**                   | `types.KindDB`      | The target database type (e.g., `types.Postgres`, `types.MySQL`).           |
+| **DBType**                 | `DBType`            | The target database type (e.g., `Postgres`, `MySQL`).                       |
 | **Schema**                 | `string`            | The name of the target database/schema.                                     |
 | **TimeoutSec**             | `int`               | Default timeout (in seconds) for DB operations. Defaults to **60 seconds**. |
 | **Host**, **Port**         | `string`, `int`     | Server address and port.                                                    |
@@ -28,17 +38,11 @@ The `ConfigDB` struct defines all parameters necessary to establish a database c
 
 ## 2. Initialization
 
-The `NewDB` function is the entry point for creating and configuring the database connection.
+The `New` function is the entry point for creating and configuring the database connection.
 
-### `NewDB(*ConfigDB) (DBInterface, error)`
+### `New(*Config) (*Database, error)`
 
 Initializes a new `*Database` instance, sets up the connection pool, and performs a `Ping` to verify connectivity.
-
-```go
-// Example Usage:
-
-// 'db' is the primary object for executing queries
-```
 
 ```go
 package main
@@ -46,10 +50,13 @@ package main
 import (
 	"github.com/BevisDev/godev/database"
 	"log"
+	
+	// import driver sql
+	_ "github.com/lib/pq"
 )
 
 func main() {
-	cfg := &Config{
+	cfg := &database.Config{
 		DBType:    database.Postgres,
 		DBName:    "app_db",
 		Host:      "localhost",
@@ -59,7 +66,7 @@ func main() {
 		ShowQuery: true,
 	}
 
-	db, err := New(cfg)
+	db, err := database.New(cfg)
 	if err != nil {
 		log.Fatal("Failed to connect to DB:", err)
 	}
