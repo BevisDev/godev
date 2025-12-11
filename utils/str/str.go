@@ -3,9 +3,6 @@ package str
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/BevisDev/godev/types"
-	"github.com/shopspring/decimal"
-	"golang.org/x/text/unicode/norm"
 	"math"
 	"reflect"
 	"regexp"
@@ -13,6 +10,10 @@ import (
 	"strings"
 	"time"
 	"unicode"
+
+	"github.com/BevisDev/godev/types"
+	"github.com/shopspring/decimal"
+	"golang.org/x/text/unicode/norm"
 )
 
 // ToString converts a value of any supported type to its string representation.
@@ -82,6 +83,10 @@ func ToString(value any) string {
 		return fmt.Sprintf("%+v", val.Interface())
 	}
 	return fmt.Sprintf("%+v", val.Interface())
+}
+
+func IsEmpty(s string) bool {
+	return len(s) == 0
 }
 
 // ToInt parses a string to any signed integer type (int, int16, ...).

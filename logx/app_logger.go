@@ -1,14 +1,10 @@
-package logger
+package logx
 
 import (
 	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"github.com/BevisDev/godev/consts"
-	"github.com/BevisDev/godev/utils/datetime"
-	"github.com/BevisDev/godev/utils/jsonx"
-	"github.com/shopspring/decimal"
 	"log"
 	"os"
 	"path/filepath"
@@ -16,6 +12,11 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"github.com/BevisDev/godev/consts"
+	"github.com/BevisDev/godev/utils/datetime"
+	"github.com/BevisDev/godev/utils/jsonx"
+	"github.com/shopspring/decimal"
 
 	"github.com/robfig/cron/v3"
 	"go.uber.org/zap"
@@ -28,7 +29,7 @@ type AppLogger struct {
 	logger *zap.Logger
 }
 
-// New initializes and returns a new application logger (`*AppLogger`) using the Zap logging library.
+// NewLogger initializes and returns a new application logger (`*AppLogger`) using the Zap logging library.
 //
 // It configures the log encoder format (e.g., JSON or console), the log output (e.g., file path),
 // and log rotation settings based on the provided `ConfigLogger`.
@@ -38,7 +39,7 @@ type AppLogger struct {
 //
 // Example:
 //
-//	logger := New(&Config{
+//	logger := NewLogger(&Config{
 //	    profile:    "prod",
 //	    MaxSize:    100,             // 100 MB per file
 //	    MaxBackups: 7,               // keep 7 rotated logs
@@ -50,7 +51,7 @@ type AppLogger struct {
 //	})
 //
 //	logger.Info("Application started")
-func New(cf *Config) Exec {
+func NewLogger(cf *Config) Logger {
 	var l = &AppLogger{Config: cf}
 	encoder := l.getEncoderLog()
 	writer := l.writeSync()
@@ -322,16 +323,26 @@ func (l *AppLogger) LogRequest(req *RequestLogger) {
 		return
 	}
 
-	l.logger.WithOptions(
-		zap.AddCallerSkip(l.CallerConfig.Request.Internal)).Info(
-		"[===== REQUEST INFO =====]",
+	fields := []zap.Field{
 		zap.String(consts.State, req.State),
 		zap.String(consts.Url, req.URL),
 		zap.Time(consts.RequestTime, req.RequestTime),
 		zap.String(consts.Method, req.Method),
-		zap.String(consts.Query, req.Query),
-		zap.Any(consts.Header, req.Header),
-		zap.String(consts.Body, req.Body),
+	}
+	if req.Query != "" {
+		fields = append(fields, zap.String(consts.Query, req.Query))
+	}
+	if req.Header != nil {
+		fields = append(fields, zap.Any(consts.Header, req.Header))
+	}
+	if req.Body != "" {
+		fields = append(fields, zap.String(consts.Body, req.Body))
+	}
+
+	l.logger.WithOptions(
+		zap.AddCallerSkip(l.CallerConfig.Request.Internal)).Info(
+		"[===== REQUEST INFO =====]",
+		fields...,
 	)
 }
 
@@ -341,14 +352,22 @@ func (l *AppLogger) LogResponse(resp *ResponseLogger) {
 		return
 	}
 
+	fields := []zap.Field{
+		zap.String(consts.State, resp.State),
+		zap.Int(consts.Status, resp.Status),
+		zap.String(consts.Duration, resp.Duration.String()),
+	}
+	if resp.Header != nil {
+		fields = append(fields, zap.Any(consts.Header, resp.Header))
+	}
+	if resp.Body != "" {
+		fields = append(fields, zap.String(consts.Body, resp.Body))
+	}
+
 	l.logger.WithOptions(
 		zap.AddCallerSkip(l.CallerConfig.Response.Internal)).Info(
 		"[===== RESPONSE INFO =====]",
-		zap.String(consts.State, resp.State),
-		zap.Int(consts.Status, resp.Status),
-		zap.Float64(consts.Duration, resp.DurationSec.Seconds()),
-		zap.Any(consts.Header, resp.Header),
-		zap.String(consts.Body, resp.Body),
+		fields...,
 	)
 }
 
@@ -358,27 +377,50 @@ func (l *AppLogger) LogExtRequest(req *RequestLogger) {
 		return
 	}
 
-	l.logger.WithOptions(
-		zap.AddCallerSkip(l.CallerConfig.Request.External)).Info(
-		"[===== REQUEST EXTERNAL INFO =====]",
+	fields := []zap.Field{
 		zap.String(consts.State, req.State),
 		zap.String(consts.Url, req.URL),
 		zap.Time(consts.RequestTime, req.RequestTime),
 		zap.String(consts.Method, req.Method),
-		zap.String(consts.Query, req.Query),
-		zap.Any(consts.Header, req.Header),
-		zap.String(consts.Body, req.Body),
+	}
+	if req.Query != "" {
+		fields = append(fields, zap.String(consts.Query, req.Query))
+	}
+	if req.Header != nil {
+		fields = append(fields, zap.Any(consts.Header, req.Header))
+	}
+	if req.Body != "" {
+		fields = append(fields, zap.String(consts.Body, req.Body))
+	}
+
+	l.logger.WithOptions(
+		zap.AddCallerSkip(l.CallerConfig.Request.External)).Info(
+		"[===== REQUEST EXTERNAL INFO =====]",
+		fields...,
 	)
 }
 
 func (l *AppLogger) LogExtResponse(resp *ResponseLogger) {
+	if l.logger == nil {
+		log.Fatalln("logger is nil")
+		return
+	}
+
+	fields := []zap.Field{
+		zap.String(consts.State, resp.State),
+		zap.Int(consts.Status, resp.Status),
+		zap.String(consts.Duration, resp.Duration.String()),
+	}
+	if resp.Header != nil {
+		fields = append(fields, zap.Any(consts.Header, resp.Header))
+	}
+	if resp.Body != "" {
+		fields = append(fields, zap.String(consts.Body, resp.Body))
+	}
+
 	l.logger.WithOptions(
 		zap.AddCallerSkip(l.CallerConfig.Response.External)).Info(
 		"[===== RESPONSE EXTERNAL INFO =====]",
-		zap.String(consts.State, resp.State),
-		zap.Int(consts.Status, resp.Status),
-		zap.Float64(consts.Duration, resp.DurationSec.Seconds()),
-		zap.Any(consts.Header, resp.Header),
-		zap.String(consts.Body, resp.Body),
+		fields...,
 	)
 }

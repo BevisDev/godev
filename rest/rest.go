@@ -7,18 +7,19 @@ import (
 // defaultTimeoutSec defines the default timeout (in seconds) for rest client operations.
 const defaultTimeoutSec = 60
 
-// RestClient wraps an HTTP client with a configurable timeout and optional logger.
+// Client wraps an HTTP client with a configurable timeout and optional logger.
 //
 // It is intended for making REST API calls with consistent timeout settings
 // and optional logging support via AppLogger.
-type RestClient struct {
+type Client struct {
 	*HttpConfig
 	client *http.Client
+	hasLog bool
 }
 
-// New creates a new RestClient instance using the provided HttpConfig.
+// NewClient creates a new Client instance using the provided HttpConfig.
 // It initializes the internal HTTP client and applies the specified timeout in seconds.
-func New(cf *HttpConfig) *RestClient {
+func NewClient(cf *HttpConfig) *Client {
 	if cf == nil {
 		cf = new(HttpConfig)
 	}
@@ -27,13 +28,14 @@ func New(cf *HttpConfig) *RestClient {
 		cf.TimeoutSec = defaultTimeoutSec
 	}
 
-	restClient := &RestClient{
+	c := &Client{
 		client:     new(http.Client),
 		HttpConfig: cf,
+		hasLog:     cf.Logger != nil,
 	}
-	return restClient
+	return c
 }
 
-func (r *RestClient) GetClient() *http.Client {
+func (r *Client) GetClient() *http.Client {
 	return r.client
 }

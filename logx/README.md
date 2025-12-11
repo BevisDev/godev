@@ -1,6 +1,6 @@
-# Logger Package
+# Logx Package
 
-The `logger` package provides a structured logging solution for Go applications using
+The `logx` package provides a structured logging solution for Go applications using
 the [Zap](https://github.com/uber-go/zap) logging library.
 
 It supports file-based logging with rotation, console logging, structured JSON logging, and flexible caller skip
@@ -84,7 +84,7 @@ import (
 )
 
 func main() {
-	log := logger.NewLogger(&logger.ConfigLogger{
+	log := logger.NewLogger(&logger.Config{
 		Profile:    "prod",
 		MaxSize:    100,
 		MaxBackups: 7,
@@ -97,4 +97,5 @@ func main() {
 
 	log.Info("init", "Application started")
 }
+
 ```

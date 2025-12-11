@@ -1,4 +1,4 @@
-package logger
+package logx
 
 // Config defines the configuration options for setting up the application logger.
 //

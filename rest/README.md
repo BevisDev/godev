@@ -68,6 +68,7 @@ package main
 import (
 	"context"
 	"fmt"
+
 	"github.com/BevisDev/godev/rest"
 )
 
@@ -77,19 +78,19 @@ type UserResponse struct {
 	Email string `json:"email"`
 }
 
-var Client *rest.RestClient
+var Client *rest.Client
 
 func main() {
 	ctx := context.Background()
 
-	Client = rest.New(&rest.HttpConfig{
+	Client = rest.NewClient(&rest.HttpConfig{
 		TimeoutSec:    10,
 		SkipLogHeader: true,
 	})
 
-	user, err := rest.NewRequest[UserResponse](Client).
+	user, err := rest.NewRequest[*UserResponse](Client).
 		URL("https://jsonplaceholder.typicode.com/users/:id").
-		Params(map[string]string{"id": "1"}).
+		PathParams(map[string]string{"id": "1"}).
 		GET(ctx)
 	if err != nil {
 		panic(err)

@@ -4,32 +4,33 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/BevisDev/godev/consts"
-	"github.com/BevisDev/godev/logger"
-	"github.com/BevisDev/godev/utils"
-	"github.com/BevisDev/godev/utils/datetime"
-	"github.com/BevisDev/godev/utils/jsonx"
-	"github.com/BevisDev/godev/utils/str"
-	"github.com/BevisDev/godev/utils/validate"
 	"io"
 	"log"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/BevisDev/godev/consts"
+	"github.com/BevisDev/godev/logx"
+	"github.com/BevisDev/godev/utils"
+	"github.com/BevisDev/godev/utils/datetime"
+	"github.com/BevisDev/godev/utils/jsonx"
+	"github.com/BevisDev/godev/utils/str"
+	"github.com/BevisDev/godev/utils/validate"
 )
 
 type HttpClient[T any] struct {
-	*RestClient
+	*Client
 
 	// url is the target API endpoint (e.g., "/users/:id").
 	url string
 
-	// query contains query parameters to be appended to the URL (?key=value).
-	query map[string]string
+	// queryParams contains query parameters to be appended to the URL (?key=value).
+	queryParams map[string]string
 
-	// params contains path parameters to replace placeholders in the URL (e.g., ":id").
-	params map[string]string
+	// pathParams contains path parameters to replace placeholders in the URL (e.g., ":id").
+	pathParams map[string]string
 
 	// bodyForm contains form data (application/x-www-form-urlencoded).
 	// Used only if Body is nil and the request requires form encoding.
@@ -41,124 +42,110 @@ type HttpClient[T any] struct {
 	// body is the raw request body (typically a struct to be JSON-encoded).
 	// This is ignored if BodyForm is set.
 	body any
+
+	// method execute request
+	method string
+
+	// state: ID request
+	state string
+
+	// startTime time begin request
+	startTime time.Time
 }
 
-func NewRequest[T any](restClient *RestClient) HttpExec[T] {
-	if restClient == nil {
-		restClient = New(new(HttpConfig))
+func NewRequest[T any](client *Client) HttpHandler[T] {
+	if client == nil {
+		client = NewClient(nil)
 	}
 
 	return &HttpClient[T]{
-		RestClient: restClient,
+		Client: client,
 	}
 }
 
-func (h *HttpClient[T]) URL(url string) HttpExec[T] {
+func (h *HttpClient[T]) URL(url string) HttpHandler[T] {
 	h.url = url
 	return h
 }
 
-func (h *HttpClient[T]) Query(query map[string]string) HttpExec[T] {
-	h.query = query
+func (h *HttpClient[T]) QueryParams(query map[string]string) HttpHandler[T] {
+	h.queryParams = query
 	return h
 }
 
-func (h *HttpClient[T]) Params(params map[string]string) HttpExec[T] {
-	h.params = params
+func (h *HttpClient[T]) PathParams(params map[string]string) HttpHandler[T] {
+	h.pathParams = params
 	return h
 }
 
-func (h *HttpClient[T]) Headers(headers map[string]string) HttpExec[T] {
+func (h *HttpClient[T]) Headers(headers map[string]string) HttpHandler[T] {
 	h.headers = headers
 	return h
 }
 
-func (h *HttpClient[T]) Body(body any) HttpExec[T] {
+func (h *HttpClient[T]) Body(body any) HttpHandler[T] {
 	h.body = body
 	return h
 }
 
-func (h *HttpClient[T]) BodyForm(bodyForm map[string]string) HttpExec[T] {
+func (h *HttpClient[T]) BodyForm(bodyForm map[string]string) HttpHandler[T] {
 	h.bodyForm = bodyForm
 	return h
 }
 
-func (h *HttpClient[T]) GET(c context.Context) (*T, error) {
-	return h.restTemplate(c, http.MethodGet)
+func (h *HttpClient[T]) GET(c context.Context) (Response[T], error) {
+	h.method = http.MethodGet
+	return h.restTemplate(c)
 }
 
-func (h *HttpClient[T]) POST(c context.Context) (*T, error) {
-	return h.restTemplate(c, http.MethodPost)
+func (h *HttpClient[T]) POST(c context.Context) (Response[T], error) {
+	h.method = http.MethodPost
+	return h.restTemplate(c)
 }
 
-func (h *HttpClient[T]) PostForm(c context.Context) (*T, error) {
-	return h.restTemplate(c, http.MethodPost)
+func (h *HttpClient[T]) PostForm(c context.Context) (Response[T], error) {
+	h.method = http.MethodPost
+	return h.restTemplate(c)
 }
 
-func (h *HttpClient[T]) PUT(c context.Context) (*T, error) {
-	return h.restTemplate(c, http.MethodPut)
+func (h *HttpClient[T]) PUT(c context.Context) (Response[T], error) {
+	h.method = http.MethodPut
+	return h.restTemplate(c)
 }
 
-func (h *HttpClient[T]) PATCH(c context.Context) (*T, error) {
-	return h.restTemplate(c, http.MethodPatch)
+func (h *HttpClient[T]) PATCH(c context.Context) (Response[T], error) {
+	h.method = http.MethodPatch
+	return h.restTemplate(c)
 }
 
-func (h *HttpClient[T]) DELETE(c context.Context) (*T, error) {
-	return h.restTemplate(c, http.MethodDelete)
+func (h *HttpClient[T]) DELETE(c context.Context) (Response[T], error) {
+	h.method = http.MethodDelete
+	return h.restTemplate(c)
 }
 
-func (h *HttpClient[T]) restTemplate(c context.Context, method string) (*T, error) {
-	var state = utils.GetState(c)
+func (h *HttpClient[T]) restTemplate(c context.Context) (Response[T], error) {
+	// set metadata
+	h.state = utils.GetState(c)
+	h.startTime = time.Now()
+	if validate.IsNilOrEmpty(h.headers) {
+		h.headers = make(map[string]string)
+	}
 
 	// build URL
 	h.buildURL()
 
-	// serialize body
-	// If form-data, encodes BodyForm as URL-encoded string.
-	// If Body is []byte, use it directly and log as "[binary body]".
-	// Otherwise, marshal Body to JSON and convert to string for logging.
-	var (
-		isFormData = !validate.IsNilOrEmpty(h.bodyForm)
-		reqBody    []byte // send request
-		bodyStr    string // send post and log
-	)
-	if isFormData {
-		formValues := url.Values{}
-		for k, v := range h.bodyForm {
-			formValues.Add(k, v)
-		}
-		bodyStr = formValues.Encode()
-	} else if !validate.IsNilOrEmpty(h.body) {
-		switch b := h.body.(type) {
-		case []byte:
-			reqBody = b
-			bodyStr = "[binary body]"
-		default:
-			reqBody = jsonx.ToJSONBytes(h.body)
-			bodyStr = string(reqBody)
-		}
-	}
+	// flag check request form-data
+	isFormData := !validate.IsNilOrEmpty(h.bodyForm)
 
-	// build headers
-	if validate.IsNilOrEmpty(h.headers) {
-		h.headers = make(map[string]string)
-	}
-	if isFormData {
-		h.setContentType(consts.ApplicationFormData)
-	} else {
-		h.setContentType(consts.ApplicationJSON)
-	}
+	// raw to send request
+	// body send form-data and log
+	raw, body := h.serializeBody(isFormData)
+
+	// set content-type
+	h.setContentType(isFormData)
 
 	// log request
-	var (
-		isLog     = h.Exec != nil
-		startTime = time.Now()
-	)
-	if isLog {
-		h.requestInfoLogger(state, method, bodyStr, startTime)
-	} else {
-		h.requestInfoConsole(state, method, bodyStr, startTime)
-	}
+	h.logRequest(body)
 
 	ctx, cancel := utils.NewCtxTimeout(c, h.TimeoutSec)
 	defer cancel()
@@ -169,195 +156,202 @@ func (h *HttpClient[T]) restTemplate(c context.Context, method string) (*T, erro
 		err     error
 	)
 	if isFormData {
-		request, err = http.NewRequestWithContext(ctx, method, h.url, bytes.NewBufferString(bodyStr))
-	} else if validate.IsNilOrEmpty(reqBody) {
-		request, err = http.NewRequestWithContext(ctx, method, h.url, nil)
+		request, err = http.NewRequestWithContext(ctx, h.method, h.url, bytes.NewBufferString(body))
+	} else if validate.IsNilOrEmpty(raw) {
+		request, err = http.NewRequestWithContext(ctx, h.method, h.url, nil)
 	} else {
-		request, err = http.NewRequestWithContext(ctx, method, h.url, bytes.NewBuffer(reqBody))
+		request, err = http.NewRequestWithContext(ctx, h.method, h.url, bytes.NewBuffer(raw))
 	}
 	if err != nil {
-		return nil, err
+		return Response[T]{}, err
 	}
 
 	// set headers
 	h.setHeaders(request)
 
 	// Execute the HTTP request
-	return h.execute(request, startTime, state)
+	return h.execute(request)
 }
 
-func (h *HttpClient[T]) requestInfoLogger(state, method, bodyStr string, startTime time.Time) {
-	reqLogger := &logger.RequestLogger{
-		State:       state,
-		URL:         h.url,
-		Method:      method,
-		RequestTime: startTime,
-	}
-	if !validate.IsNilOrEmpty(h.query) {
-		reqLogger.Query = str.ToString(h.query)
-	}
-
-	// skip log header
-	if !h.SkipLogHeader {
-		reqLogger.Header = h.headers
-	}
-
-	// log body
-	if bodyStr != "" {
-		// get content-type
-		var contentType = h.headers[consts.ContentType]
-
-		// write log body
-		if !h.skipLogBody(contentType) {
-			reqLogger.Body = bodyStr
+// serializeBody
+// If form-data, encodes BodyForm as URL-encoded string.
+// If Body is []byte, use it directly and log as "[binary body]".
+// Otherwise, marshal Body to JSON and convert to string for logging.
+func (h *HttpClient[T]) serializeBody(isFormData bool) ([]byte, string) {
+	// CASE: form-data
+	if isFormData {
+		formValues := url.Values{}
+		for k, v := range h.bodyForm {
+			formValues.Add(k, v)
 		}
-	} else {
-		reqLogger.Body = "no request body"
+		return nil, formValues.Encode()
 	}
 
-	h.LogExtRequest(reqLogger)
+	// CASE: []byte and JSON
+	if !validate.IsNilOrEmpty(h.body) {
+		switch b := h.body.(type) {
+		case []byte:
+			return b, ""
+		default:
+			raw := jsonx.ToJSONBytes(h.body)
+			return raw, string(raw)
+		}
+	}
+
+	return nil, ""
 }
 
-func (h *HttpClient[T]) requestInfoConsole(state, method, bodyStr string, startTime time.Time) {
-	var sb strings.Builder
+func (h *HttpClient[T]) logRequest(body string) {
+	if h.hasLog {
+		log := &logx.RequestLogger{
+			State:       h.state,
+			URL:         h.url,
+			Method:      h.method,
+			RequestTime: h.startTime,
+		}
+		if !validate.IsNilOrEmpty(h.queryParams) {
+			log.Query = str.ToString(h.queryParams)
+		}
 
-	sb.WriteString("========== REST REQUEST INFO ==========\n")
-	sb.WriteString(fmt.Sprintf(consts.State+": %s\n", state))
+		// skip log header
+		if !h.SkipLogHeader {
+			log.Header = h.headers
+		}
+
+		// log body
+		if body != "" && h.logBody(h.headers[consts.ContentType]) {
+			log.Body = body
+		}
+
+		h.Logger.LogExtRequest(log)
+		return
+	}
+
+	var sb strings.Builder
+	sb.WriteString("========== REQUEST INFO ==========\n")
+	sb.WriteString(fmt.Sprintf(consts.State+": %s\n", h.state))
 	sb.WriteString(fmt.Sprintf(consts.Url+": %s\n", h.url))
-	sb.WriteString(fmt.Sprintf(consts.Query+": %v\n", h.query))
-	sb.WriteString(fmt.Sprintf(consts.Method+": %s\n", method))
-	sb.WriteString(fmt.Sprintf(consts.RequestTime+": %s\n", datetime.ToString(startTime, datetime.DateTimeOffset)))
+	sb.WriteString(fmt.Sprintf(consts.Method+": %s\n", h.method))
+	sb.WriteString(fmt.Sprintf(consts.RequestTime+": %s\n", datetime.ToString(h.startTime, datetime.DateTimeOffset)))
+	if !validate.IsNilOrEmpty(h.queryParams) {
+		sb.WriteString(fmt.Sprintf(consts.Query+": %v\n", h.queryParams))
+	}
 	if !h.SkipLogHeader {
 		sb.WriteString(fmt.Sprintf(consts.Header+": %s\n", h.headers))
 	}
 
-	if bodyStr != "" {
-		// get content-type
-		var contentType = h.headers[consts.ContentType]
-
-		// write log body
-		if !h.skipLogBody(contentType) {
-			sb.WriteString(fmt.Sprintf(consts.Body+": %s\n", bodyStr))
-		}
-	} else {
-		sb.WriteString(fmt.Sprintf(consts.Body+": %s\n", "no request body"))
+	if body != "" && h.logBody(h.headers[consts.ContentType]) {
+		sb.WriteString(fmt.Sprintf(consts.Body+": %s\n", body))
 	}
 
-	sb.WriteString("=================================\n")
+	sb.WriteString("==================================\n")
 	log.Println(sb.String())
 }
 
-func (h *HttpClient[T]) execute(request *http.Request, startTime time.Time, state string) (*T, error) {
+func (h *HttpClient[T]) execute(request *http.Request) (Response[T], error) {
 	client := h.GetClient()
 	response, err := client.Do(request)
 	if err != nil {
-		return nil, err
+		return Response[T]{}, err
 	}
 	defer response.Body.Close()
 
-	// read body
-	respBodyBytes, err := io.ReadAll(response.Body)
+	// READ BODY
+	raw, err := io.ReadAll(response.Body)
 	if err != nil {
-		return nil, err
+		return Response[T]{}, err
 	}
 
-	var respBodyStr string
-	hasBody := len(respBodyBytes) > 0
-	if hasBody {
-		respBodyStr = string(respBodyBytes)
+	// BUILD RESPONSE
+	var resp = Response[T]{
+		StatusCode: response.StatusCode,
+		Body:       string(raw),
+		RawBody:    raw,
+		Header:     response.Header,
+		HasBody:    len(raw) > 0,
 	}
 
 	// log response
-	var (
-		isLog      = h.Exec != nil
-		respLogger logger.ResponseLogger
-		sb         strings.Builder
-	)
-
-	// write log
-	if isLog {
-		respLogger = logger.ResponseLogger{
-			State:       state,
-			Status:      response.StatusCode,
-			DurationSec: time.Since(startTime),
-		}
-		if !h.SkipLogHeader {
-			respLogger.Header = response.Header
-		}
-	} else {
-		sb.WriteString("========== REST RESPONSE INFO ==========\n")
-		sb.WriteString(fmt.Sprintf(consts.State+": %s\n", state))
-		sb.WriteString(fmt.Sprintf(consts.Status+": %d\n", response.StatusCode))
-		sb.WriteString(fmt.Sprintf(consts.Duration+": %s\n", time.Since(startTime)))
-		if !h.SkipLogHeader {
-			sb.WriteString(fmt.Sprintf(consts.Header+": %s\n", response.Header))
-		}
-	}
-
-	// defer log
-	// check write log body in response
-	defer func() {
-		bodyContent := "hidden or empty body"
-		if hasBody && !h.skipLogBody(response.Header.Get(consts.ContentType)) {
-			bodyContent = respBodyStr
-		}
-
-		if isLog {
-			respLogger.Body = bodyContent
-			h.LogExtResponse(&respLogger)
-		} else {
-			sb.WriteString(fmt.Sprintf(consts.Body+": %s\n", bodyContent))
-			sb.WriteString("==================================\n")
-			log.Println(sb.String())
-		}
-	}()
+	h.logResponse(response, resp.HasBody, resp.Body)
 
 	// check error
-	if response.StatusCode >= 400 {
-		return nil, &HttpError{
-			StatusCode: response.StatusCode,
-			Body:       respBodyStr,
+	if resp.StatusCode >= 400 {
+		return resp, &HttpError{
+			StatusCode: resp.StatusCode,
+			Body:       resp.Body,
 		}
 	}
 
-	if !hasBody {
-		return nil, nil
+	if !resp.HasBody {
+		return resp, nil
 	}
 
+	// GET DATA
 	var result T
 	switch any(result).(type) {
 	case []byte:
-		result = any(respBodyBytes).(T)
+		resp.Data = any(raw).(T)
+	case string:
+		resp.Data = any(resp.Body).(T)
 	default:
-		if err = jsonx.JSONBytesToStruct(respBodyBytes, &result); err != nil {
-			return nil, fmt.Errorf("unmarshal response to %T failed: %w", result, err)
+		if err = jsonx.JSONBytesToStruct(raw, &result); err != nil {
+			return resp, fmt.Errorf("unmarshal response to %T failed: %w", result, err)
 		}
+		resp.Data = result
 	}
 
-	return &result, nil
+	return resp, nil
 }
 
-func (h *HttpClient[T]) skipLogBody(contentType string) bool {
-	// check skip by api
-	if h.skipLogBodyAPIs(h.url, h.SkipLogAPIs) {
-		return true
+func (h *HttpClient[T]) logResponse(response *http.Response,
+	hasBody bool, body string) {
+	if h.hasLog {
+		logger := &logx.ResponseLogger{
+			State:    h.state,
+			Status:   response.StatusCode,
+			Duration: time.Since(h.startTime),
+		}
+		if !h.SkipLogHeader {
+			logger.Header = response.Header
+		}
+		if hasBody && h.logBody(response.Header.Get(consts.ContentType)) {
+			logger.Body = body
+		}
+		h.Logger.LogExtResponse(logger)
+	} else {
+		var sb strings.Builder
+		sb.WriteString("========== RESPONSE INFO ==========\n")
+		sb.WriteString(fmt.Sprintf(consts.State+": %s\n", h.state))
+		sb.WriteString(fmt.Sprintf(consts.Status+": %d\n", response.StatusCode))
+		sb.WriteString(fmt.Sprintf(consts.Duration+": %s\n", time.Since(h.startTime)))
+		if !h.SkipLogHeader {
+			sb.WriteString(fmt.Sprintf(consts.Header+": %s\n", response.Header))
+		}
+		sb.WriteString(fmt.Sprintf(consts.Body+": %s\n", body))
+		sb.WriteString("==================================\n")
+		log.Println(sb.String())
+	}
+}
+
+func (h *HttpClient[T]) logBody(contentType string) bool {
+	// skip by apis
+	if h.skipBodyByAPIs(h.url, h.SkipLogAPIs) {
+		return false
 	}
 
-	// check skip content-type
-	if !validate.IsNilOrEmpty(h.SkipLogHeader) && contentType != "" {
+	// skip by content-type
+	if !validate.IsNilOrEmpty(h.SkipContentType) {
 		for _, c := range h.SkipContentType {
 			if strings.HasPrefix(contentType, c) {
-				return true
+				return false
 			}
 		}
-	} else if contentType != "" {
-		return utils.SkipContentType(contentType)
 	}
 
-	return false
+	return !utils.SkipContentType(contentType)
 }
 
-func (h *HttpClient[T]) skipLogBodyAPIs(u string, apis []string) bool {
+func (h *HttpClient[T]) skipBodyByAPIs(u string, apis []string) bool {
 	if len(apis) == 0 {
 		return false
 	}
@@ -377,15 +371,20 @@ func (h *HttpClient[T]) skipLogBodyAPIs(u string, apis []string) bool {
 }
 
 func (h *HttpClient[T]) buildURL() {
-	for key, val := range h.query {
-		h.url = strings.ReplaceAll(h.url, ":"+key, val)
+	for key, val := range h.pathParams {
+		if strings.HasPrefix(key, ":") {
+			h.url = strings.ReplaceAll(h.url, key, val)
+		} else {
+			h.url = strings.ReplaceAll(h.url, ":"+key, val)
+		}
 	}
 
-	if !validate.IsNilOrEmpty(h.params) {
+	if !validate.IsNilOrEmpty(h.queryParams) {
 		q := url.Values{}
-		for k, v := range h.params {
+		for k, v := range h.queryParams {
 			q.Add(k, v)
 		}
+
 		if strings.Contains(h.url, "?") {
 			h.url += "&" + q.Encode()
 		} else {
@@ -394,9 +393,13 @@ func (h *HttpClient[T]) buildURL() {
 	}
 }
 
-func (h *HttpClient[T]) setContentType(contentTypeDefault string) {
+func (h *HttpClient[T]) setContentType(isFormData bool) {
 	if h.headers[consts.ContentType] == "" {
-		h.headers[consts.ContentType] = contentTypeDefault
+		if isFormData {
+			h.headers[consts.ContentType] = consts.ApplicationFormData
+		} else {
+			h.headers[consts.ContentType] = consts.ApplicationJSON
+		}
 	}
 }
 

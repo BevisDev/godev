@@ -1,4 +1,4 @@
-package logger
+package logx
 
 import (
 	"bytes"
@@ -6,15 +6,16 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"reflect"
+	"testing"
+	"time"
+
 	"github.com/BevisDev/godev/utils/jsonx"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest"
-	"reflect"
-	"testing"
-	"time"
 )
 
 type User struct {
@@ -178,12 +179,14 @@ func TestLogResponse(t *testing.T) {
 		},
 	}
 
+	now := time.Now()
+	time.Sleep(2 * time.Second)
 	resp := &ResponseLogger{
-		State:       "RESP_TEST",
-		DurationSec: 2 * time.Second,
-		Status:      200,
-		Header:      map[string]string{"Content-Type": "application/json"},
-		Body:        jsonx.ToJSON(map[string]string{"result": "ok"}),
+		State:    "RESP_TEST",
+		Duration: time.Since(now),
+		Status:   200,
+		Header:   map[string]string{"Content-Type": "application/json"},
+		Body:     jsonx.ToJSON(map[string]string{"result": "ok"}),
 	}
 
 	appLogger.LogResponse(resp)

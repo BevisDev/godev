@@ -3,12 +3,13 @@ package utils
 import (
 	"context"
 	"fmt"
-	"github.com/BevisDev/godev/consts"
-	"github.com/BevisDev/godev/utils/random"
-	"golang.org/x/exp/constraints"
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/BevisDev/godev/consts"
+	"github.com/BevisDev/godev/utils/random"
+	"golang.org/x/exp/constraints"
 )
 
 type MapObject map[string]interface{}
@@ -140,14 +141,15 @@ func SkipContentType(contentType string) bool {
 	case strings.HasPrefix(contentType, "image"),
 		strings.HasPrefix(contentType, "video"),
 		strings.HasPrefix(contentType, "audio"),
-		strings.HasPrefix(contentType, "application/octet-stream"),
-		strings.HasPrefix(contentType, "multipart/form-data"),
-		strings.HasPrefix(contentType, "application/pdf"),
-		strings.HasPrefix(contentType, "application/zip"),
-		strings.HasPrefix(contentType, "application/x-zip-compressed"),
 		strings.HasPrefix(contentType, "application/vnd."),
-		strings.HasPrefix(contentType, "application/msword"),
-		strings.HasPrefix(contentType, "application/x-protobuf"):
+		strings.HasPrefix(contentType, "application/x-protobuf"),
+		strings.HasPrefix(contentType, consts.ApplicationOctetStream),
+		strings.HasPrefix(contentType, consts.MultipartFormData),
+		strings.HasPrefix(contentType, consts.ApplicationPDF),
+		strings.HasPrefix(contentType, consts.ApplicationMSWord),
+		strings.HasPrefix(contentType, consts.ApplicationZip),
+		strings.HasPrefix(contentType, consts.ApplicationX7z),
+		strings.HasPrefix(contentType, consts.ApplicationXZip):
 		return true
 	default:
 		return false

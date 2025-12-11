@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -19,7 +20,7 @@ type MockResponse struct {
 }
 
 // Setup client
-var client = NewRestClient(nil)
+var client = NewClient(nil)
 
 func TestRestClient_Get(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -35,7 +36,7 @@ func TestRestClient_Get(t *testing.T) {
 		Message string `json:"message"`
 	}
 
-	result, err := NewRequest[resultStruct](client).
+	result, err := NewRequest[*resultStruct](client).
 		URL(server.URL).
 		GET(context.Background())
 	if err != nil {
@@ -43,8 +44,9 @@ func TestRestClient_Get(t *testing.T) {
 	}
 
 	// check response
-	if result.Message != "hello" {
-		t.Errorf("expected result to be 'hello', got: %s", result.Message)
+	data := result.Data
+	if data.Message != "hello" {
+		t.Errorf("expected result to be 'hello', got: %s", data.Message)
 	}
 }
 
@@ -73,16 +75,16 @@ func TestRestClient_Get_WithQueryParam(t *testing.T) {
 	// Call GET
 	result, err := NewRequest[MockResponse](client).
 		URL(server.URL + "/hello/:name").
-		Query(map[string]string{"name": "GoLang"}).
-		Params(map[string]string{"lang": "en"}).
+		PathParams(map[string]string{"name": "GoLang"}).
+		QueryParams(map[string]string{"lang": "en"}).
 		GET(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	// check response
-	if result.Message != "Hello GoLang" {
-		t.Errorf("expected message 'Hello GoLang', got %s", result.Message)
+	if result.Data.Message != "Hello GoLang" {
+		t.Errorf("expected message 'Hello GoLang', got %s", result.Data.Message)
 	}
 }
 
@@ -94,7 +96,7 @@ func TestRestClient_Timeout(t *testing.T) {
 	server := httptest.NewServer(slowHandler)
 	defer server.Close()
 
-	clientTimeout := NewRestClient(&HttpConfig{
+	clientTimeout := NewClient(&HttpConfig{
 		TimeoutSec: 1,
 	})
 
@@ -164,8 +166,8 @@ func TestRestClient_PostForm_WithBodyFormAndHeader(t *testing.T) {
 	}
 
 	// check response
-	if result.Status != "ok" {
-		t.Errorf("expected status 'ok', got %s", result.Status)
+	if result.Data.Status != "ok" {
+		t.Errorf("expected status 'ok', got %s", result.Data.Status)
 	}
 }
 
@@ -214,8 +216,8 @@ func TestRestClient_Post(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	if res.Message != "Post called" {
-		t.Errorf("Expected message 'Post called', got %s", res.Message)
+	if res.Data.Message != "Post called" {
+		t.Errorf("Expected message 'Post called', got %s", res.Data.Message)
 	}
 }
 
@@ -242,8 +244,8 @@ func TestRestClient_Put(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	if res.Message != "Put called" {
-		t.Errorf("Expected message 'Put called', got %s", res.Message)
+	if res.Data.Message != "Put called" {
+		t.Errorf("Expected message 'Put called', got %s", res.Data.Message)
 	}
 }
 
@@ -270,8 +272,8 @@ func TestRestClient_Patch(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	if res.Message != "Patch called" {
-		t.Errorf("Expected message 'Patch called', got %s", res.Message)
+	if res.Data.Message != "Patch called" {
+		t.Errorf("Expected message 'Patch called', got %s", res.Data.Message)
 	}
 }
 
@@ -298,8 +300,8 @@ func TestRestClient_Delete(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	if res.Message != "Delete called" {
-		t.Errorf("Expected message 'Delete called', got %s", res.Message)
+	if res.Data.Message != "Delete called" {
+		t.Errorf("Expected message 'Delete called', got %s", res.Data.Message)
 	}
 }
 
@@ -317,4 +319,76 @@ func TestRestClient_Response_NoBody(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+}
+
+func TestExecute_GatewayTimeout504(t *testing.T) {
+	// Mock server trả 504 Gateway Time-out HTML
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(504)
+		w.Header().Set("Content-Type", "text/html")
+		io.WriteString(w, `
+<html>
+<head><title>504 Gateway Time-out</title></head>
+<body>
+<center><h1>504 Gateway Time-out</h1></center>
+<hr><center>nginx</center>
+</body>
+</html>
+`)
+	}))
+	defer srv.Close()
+
+	_, err := NewRequest[string](nil).
+		URL(srv.URL).
+		GET(context.Background())
+	if err == nil {
+		t.Fatal("expected error but got nil")
+	}
+
+	httpErr, ok := AsHttpError(err)
+	if !ok {
+		t.Fatalf("expected HttpError, got %T", err)
+	}
+
+	if httpErr.StatusCode != 504 {
+		t.Fatalf("expected status 504, got %d", httpErr.StatusCode)
+	}
+
+	if !strings.Contains(httpErr.Body, "504 Gateway Time-out") {
+		t.Fatalf("expected HTML body, got %s", httpErr.Body)
+	}
+
+	t.Logf("Got expected error: %v", httpErr)
+}
+
+func TestExecute_ConnectionResetByPeer(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			conn.Close() // đóng ngay → simulate ECONNRESET
+		}
+	}()
+
+	_, err = NewRequest[string](nil).
+		URL("http://" + ln.Addr().String()).
+		GET(context.Background())
+	if err == nil {
+		t.Fatal("expected connection reset error but got nil")
+	}
+
+	if !strings.Contains(err.Error(), "EOF") &&
+		!strings.Contains(err.Error(), "connection reset") &&
+		!strings.Contains(err.Error(), "reset by peer") {
+		t.Fatalf("expected connection reset or EOF, got: %v", err)
+	}
+
+	t.Logf("Got expected network error: %v", err)
 }

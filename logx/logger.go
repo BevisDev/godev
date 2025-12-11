@@ -1,10 +1,10 @@
-package logger
+package logx
 
 import (
 	"go.uber.org/zap"
 )
 
-type Exec interface {
+type Logger interface {
 	// GetZap returns instance *zap.Logger
 	GetZap() *zap.Logger
 
