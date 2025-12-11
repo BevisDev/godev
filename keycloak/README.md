@@ -15,23 +15,39 @@ It allows you to easily manage authentication, token verification, and user info
 ## Example Usage
 
 ```go
-cfg := &keycloak.Config{
-    Host:         "http://localhost",
-    Port:         8080,
-    Realm:        "myrealm",
-    ClientId:     "myclient",
-    ClientSecret: "mysecret",
+import (
+    "context"
+    "fmt"
+    "log"
+    
+    "github.com/BevisDev/godev/keycloak"
+)
+
+func main() {
+    var (
+        clientId = "myclient"
+        clientSecret = "mysecret"
+    )
+    cfg := &keycloak.Config{
+        Host:  "http://localhost",
+        Port:  8080,
+        Realm: "myrealm",
+    }
+
+    kc := keycloak.NewClient(cfg)
+    ctx := context.Background()
+
+    token, err := kc.Login(ctx, clientId, clientSecret)
+    if err != nil {
+        log.Fatalf("login failed: %v", err)
+    }
+
+    userInfo, err := kc.GetUserInfo(ctx, token.AccessToken)
+    if err != nil {
+        log.Fatalf("get user info failed: %v", err)
+    }
+
+    fmt.Print(userInfo)
 }
 
-kc := keycloak.New(cfg)
-ctx := context.Background()
-
-token, err := kc.Login(ctx)
-if err != nil {
-    log.Fatalf("login failed: %v", err)
-}
-
-userInfo, err := kc.GetUserInfo(ctx, token.AccessToken)
-if err != nil {
-    log.Fatalf("get user info failed: %v", err)
-}
+```

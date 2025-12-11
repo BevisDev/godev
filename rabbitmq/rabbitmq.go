@@ -30,14 +30,14 @@ const (
 	Xstate = "x-state"
 )
 
-// New creates a new RabbitMQ client using the provided configuration.
+// NewMQ creates a new RabbitMQ client using the provided configuration.
 //
 // It connects to the broker using the AMQP protocol, establishes a connection,
 // opens a channel, and returns a `*RabbitMQ` instance.
 //
 // Returns an error if the configuration is nil, the connection fails,
 // or the channel cannot be created.
-func New(cf *Config) (Exec, error) {
+func NewMQ(cf *Config) (MQ, error) {
 	if cf == nil {
 		return nil, errors.New("config is nil")
 	}

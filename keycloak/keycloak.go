@@ -3,6 +3,7 @@ package keycloak
 import (
 	"context"
 	"fmt"
+
 	"github.com/Nerzal/gocloak/v13"
 )
 
@@ -11,11 +12,11 @@ type KeyCloak struct {
 	client *gocloak.GoCloak
 }
 
-// New creates a new KeyCloak client connected to the specified host and port.
+// NewClient creates a new KeyCloak client connected to the specified host and port.
 //
 // The returned client can be used to authenticate users, manage realms, roles,
 // and perform other Keycloak administrative tasks.
-func New(cf *Config) Exec {
+func NewClient(cf *Config) KC {
 	return &KeyCloak{
 		client: gocloak.NewClient(fmt.Sprintf("%s:%d", cf.Host, cf.Port)),
 		Config: cf,

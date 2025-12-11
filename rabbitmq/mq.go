@@ -2,10 +2,11 @@ package rabbitmq
 
 import (
 	"context"
+
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-type Exec interface {
+type MQ interface {
 	// Close closes the current channel and connection safely.
 	Close()
 

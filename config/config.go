@@ -2,12 +2,13 @@ package config
 
 import (
 	"errors"
-	"github.com/BevisDev/godev/utils/str"
-	"github.com/BevisDev/godev/utils/validate"
-	"github.com/spf13/viper"
 	"os"
 	"reflect"
 	"strings"
+
+	"github.com/BevisDev/godev/utils/str"
+	"github.com/BevisDev/godev/utils/validate"
+	"github.com/spf13/viper"
 )
 
 // Config defines the input configuration for loading application settings from file and/or environment.

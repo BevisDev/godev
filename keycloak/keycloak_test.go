@@ -3,10 +3,11 @@ package keycloak
 import (
 	"context"
 	"errors"
+	"testing"
+
 	"github.com/Nerzal/gocloak/v13"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"testing"
 )
 
 type MockKeyCloak struct {
