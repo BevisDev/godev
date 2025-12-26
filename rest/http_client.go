@@ -53,6 +53,16 @@ type HttpClient[T any] struct {
 	startTime time.Time
 }
 
+type Response[T any] struct {
+	StatusCode int
+	Header     http.Header
+	Data       T
+	Duration   time.Duration
+	RawBody    []byte
+	Body       string
+	HasBody    bool
+}
+
 func NewRequest[T any](client *Client) HttpHandler[T] {
 	if client == nil {
 		client = NewClient(nil)

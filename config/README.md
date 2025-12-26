@@ -1,16 +1,22 @@
 # Config Package
 
-The `config` package provides utilities for loading application configuration from files and environment variables.  
-It is designed to work with Viper and supports struct binding, environment variable expansion, and flexible type
-handling.
+The `config` package provides utilities for loading application configuration
+from files and environment variables.  
+It is built on top of Viper and adds support for:
+
+- strongly-typed struct binding
+- environment variable overrides
+- `$VAR` placeholder expansion
+- nested struct + slice handling.
 
 ---
 
 ## Description
 
-GoDev uses [Viper](https://github.com/spf13/viper) to load environment-specific configuration files based on
-the `GO_PROFILE` environment variable.
-Configuration files (e.g., `dev.yml`, `prod.yml`) are typically stored in a `configs/` directory.
+GoDev uses **Viper** to load configuration files based on an active *profile*
+(often controlled via the `GO_PROFILE` environment variable)
+
+Typical config files live inside a `configs/` directory:
 
 Switch between environments (e.g., `dev`, `prod`) by setting the `GO_PROFILE` environment variable:
 
@@ -30,15 +36,16 @@ export GO_PROFILE=dev
 
 ## Features
 
-- Load configuration from file (`yaml`, `json`, `toml`, etc.).
-- Automatically bind environment variables to config keys.
-- Expand environment variable placeholders in config values (e.g., `$APP_NAME`).
-- Recursive parsing and replacement for nested structs, slices, and maps.
-- Type conversion support for:
+- Load config from file (yaml, json, toml, …)
+- Environment variable overrides (APP_PORT overrides app.port)
+- Expand placeholders like $DB_DSN
+- Recursive replacement across nested maps/slices
+- Type conversion support:
     - `string`, `int`, `float`, `bool`
-    - Slices of the above types (comma-separated)
+    - slices of those types (comma-separated)
 - Struct-based configuration using `config` struct tags.
 - Safe pointer checks to prevent runtime panics.
+- MustLoad() helper that panics on startup failure
 
 ---
 
@@ -59,19 +66,19 @@ Main struct for loading configuration:
 | Field        | Description                                                                    |
 |--------------|--------------------------------------------------------------------------------|
 | `Path`       | Directory where the config file is located. Example: `"./configs"`.            |
-| `ConfigType` | Type of the config file: `"yaml"`, `"json"`, `"toml"`, etc.                    |
-| `Dest`       | Pointer to a struct to receive the parsed configuration. Must be a pointer.    |
+| `Extension`  | File type: `"yaml"`, `"json"`, `"toml"`, etc.                                  |
+| `Target`     | Generic struct type to receive parsed values.                                  |
 | `AutoEnv`    | Enable automatic environment variable binding via Viper.                       |
 | `ReplaceEnv` | Replace `$VAR` placeholders in config values with environment variable values. |
-| `Profile`    | Name of the config file without extension, e.g., `"dev"` or `"prod"`.          |
+| `Profile`    | Config file name (without extension), e.g., `"dev"` or `"prod"`.               |
 
 ---
 
 ## Functions
 
-### `NewConfig(cf *Config) error`
+### `MustLoad[T](cfg *Config) Response[T]`
 
-Loads configuration from file and optionally merges environment variables.
+Loads configuration and panics if loading fails
 
 **Example:**
 
@@ -81,30 +88,25 @@ package main
 import (
 	"log"
 	"os"
+
 	"github.com/BevisDev/godev/config"
 )
 
 type AppConfig struct {
-	Port int    `config:"app.port"`
-	Name string `config:"app.name"`
+	Port int    `mapstructure:"port"`
+	Name string `mapstructure:"name"`
 }
 
 func main() {
 	profile := os.Getenv("GO_PROFILE") // e.g., "dev" or "prod"
 
-	var cfg AppConfig
-	err := config.NewConfig(&config.Config{
-		Path:       "./configs",
-		ConfigType: "yaml",
-		Dest:       &cfg,
-		Profile:    profile,
-		AutoEnv:    true,
-		ReplaceEnv: true,
+	result := config.MustLoad[*AppConfig](&config.Config{
+		Path:      "./configs",
+		Extension: "yaml",
+		Profile:   profile,
 	})
-	if err != nil {
-		log.Fatalf("failed to load config: %v", err)
-	}
 
-	log.Printf("Loaded config: %+v", cfg)
+	log.Printf("Loaded config: %+v", result.Data)
 }
+
 ```

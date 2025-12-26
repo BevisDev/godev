@@ -2,10 +2,10 @@ package rabbitmq
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
-	"strings"
 	"sync"
 	"time"
 
@@ -160,26 +160,25 @@ func (r *RabbitMQ) Publish(ctx context.Context, queueName string, message interf
 
 	var (
 		body        []byte
-		contentType string
+		contentType = consts.TextPlain
 	)
 	switch v := message.(type) {
 	case []byte:
 		body = v
-		contentType = consts.TextPlain
-
+		if json.Valid(v) {
+			contentType = consts.ApplicationJSON
+			break
+		}
 	case string:
 		body = []byte(v)
-		trimmed := strings.TrimSpace(v)
-		if strings.HasPrefix(trimmed, "{") || strings.HasPrefix(trimmed, "[") {
+		if json.Valid(body) {
 			contentType = consts.ApplicationJSON
-		} else {
-			contentType = consts.TextPlain
 		}
-
-	case int, int64, float64, bool:
+	case bool,
+		int, int8, int16, int32, int64,
+		uint, uint8, uint16, uint32, uint64,
+		float32, float64:
 		body = []byte(fmt.Sprint(v))
-		contentType = consts.TextPlain
-
 	default:
 		body = jsonx.ToJSONBytes(v)
 		contentType = consts.ApplicationJSON

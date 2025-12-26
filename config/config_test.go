@@ -1,17 +1,17 @@
 package config
 
 import (
-	"errors"
-	"github.com/spf13/viper"
-	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 type TestConfigStruct struct {
-	AppName string `mapstructure:"app_name"`
-	Port    int    `mapstructure:"port"`
-	SomeKey struct {
+	AppName     string `mapstructure:"app_name"`
+	Port        int    `mapstructure:"port"`
+	AppOverride string `mapstructure:"app_override"`
+	SomeKey     struct {
 		ClientName string `mapstructure:"clientName"`
 		ClientPort int    `mapstructure:"ClientPort"`
 		ClientKey  string `mapstructure:"Client_Key"`
@@ -34,21 +34,17 @@ type TestConfig struct {
 	Tags      []string  `config:"tags"`
 	Numbers   []int     `config:"numbers"`
 	Threshold []float64 `config:"threshold"`
-}
-
-type NestedConfig struct {
-	ServerConfig Server `config:"server"`
+	Server    Server
+	Client    *Client
 }
 
 type Server struct {
-	Name           string   `config:"name"`
-	Profile        string   `config:"profile"`
-	TrustedProxies []string `config:"trustedProxies"`
-	Port           string   `config:"port"`
-	Version        string   `config:"version"`
-	ClientTimeout  int      `config:"clientTimeout"`
-	ServerTimeout  int      `config:"serverTimeout"`
-	RequestTimeout int      `config:"requestTimeout"`
+	Name    string `config:"server_name"`
+	Profile string `config:"server_profile"`
+}
+
+type Client struct {
+	Name string `config:"client_name"`
 }
 
 func setupEnv(vars map[string]string) func() {
@@ -62,123 +58,83 @@ func setupEnv(vars map[string]string) func() {
 	}
 }
 
-func TestNewConfig_MissingFile(t *testing.T) {
-	cfg := &TestConfigStruct{}
-	err := NewConfig(&Config{
-		Path:       "./not_exist",
-		ConfigType: "yaml",
-		Dest:       cfg,
+func TestMustLoad_MissingFile(t *testing.T) {
+	assert.Panics(t, func() {
+		_ = MustLoad[*TestConfigStruct](&Config{
+			Path:      "./testdata1",
+			Extension: "yaml",
+			Profile:   "test",
+		})
 	})
-	assert.Error(t, err)
-	assert.True(t, errors.As(err, &viper.ConfigFileNotFoundError{}))
 }
 
-func TestNewConfig_InvalidDest(t *testing.T) {
-	err := NewConfig(&Config{
-		Path:       "./testdata",
-		ConfigType: "yaml",
-		Dest:       TestConfigStruct{},
+func TestMustLoad_InvalidTarget(t *testing.T) {
+	assert.Panics(t, func() {
+		_ = MustLoad[string](&Config{
+			Path:      "./testdata",
+			Extension: "yaml",
+			Profile:   "test",
+		})
 	})
-	assert.Error(t, err)
-	assert.Equal(t, "must be a pointer", err.Error())
 }
 
-func TestNewConfig_LoadYAML_Success(t *testing.T) {
-	cfg := &TestConfigStruct{}
-	err := NewConfig(&Config{
-		Path:       "./testdata",
-		ConfigType: "yaml",
-		Dest:       cfg,
-		Profile:    "test",
+func TestMustLoad_Success(t *testing.T) {
+	resp := MustLoad[TestConfigStruct](&Config{
+		Path:      "./testdata",
+		Extension: "yaml",
+		Profile:   "test",
 	})
-	assert.NoError(t, err)
-	assert.Equal(t, "demo-app", cfg.AppName)
-	assert.Equal(t, 8080, cfg.Port)
+
+	assert.Equal(t, "demo-app", resp.Data.AppName)
 }
 
-func TestNewConfig_AutoEnvOverride(t *testing.T) {
+func TestMustLoad_AutoEnv(t *testing.T) {
 	cleanup := setupEnv(map[string]string{
-		"GO_PROFILE": "test_env",
-		"APP_NAME":   "env-app",
-		"PORT":       "9090",
-	})
-	defer cleanup()
-
-	cfg := &TestConfigStruct{}
-	err := NewConfig(&Config{
-		Path:       "./testdata",
-		ConfigType: "yaml",
-		Dest:       cfg,
-		Profile:    "test_env",
-		AutoEnv:    true,
-	})
-	assert.NoError(t, err)
-	assert.Equal(t, "env-app", cfg.AppName)
-	assert.Equal(t, 9090, cfg.Port)
-}
-
-func TestNewConfig_AutoEnv_MixedKeys(t *testing.T) {
-	cleanup := setupEnv(map[string]string{
+		"GO_PROFILE":         "test_env",
+		"APP_NAME":           "env-app",
+		"PORT":               "9090",
 		"SOMEKEY_CLIENTNAME": "envName",
 		"SOMEKEY_CLIENTPORT": "8888",
 		"SOMEKEY_CLIENT_KEY": "xyz123",
 		"DATABASEAPP_HOST":   "dbHost",
 		"REDISAPP_HOST":      "redisHost",
+		"APP_OVERRIDE":       "app_override", // it overrides
 	})
 	defer cleanup()
 
-	cfg := &TestConfigStruct{}
-	err := NewConfig(&Config{
-		Path:       "./testdata",
-		ConfigType: "yaml",
-		Dest:       cfg,
-		Profile:    "test_env",
-		AutoEnv:    true,
+	out := MustLoad[TestConfigStruct](&Config{
+		Path:      "./testdata",
+		Extension: "yaml",
+		Profile:   "test_env",
+		AutoEnv:   true,
 	})
-	assert.NoError(t, err)
+
+	cfg := out.Data
+	assert.Equal(t, "env-app", cfg.AppName)
+	assert.Equal(t, 9090, cfg.Port)
 	assert.Equal(t, "envName", cfg.SomeKey.ClientName)
 	assert.Equal(t, 8888, cfg.SomeKey.ClientPort)
 	assert.Equal(t, "xyz123", cfg.SomeKey.ClientKey)
 	assert.Equal(t, "dbHost", cfg.DatabaseAPP.Host)
 	assert.Equal(t, "redisHost", cfg.RedisAPP.Host)
+	assert.Equal(t, "app_override", cfg.AppOverride)
 }
 
-func TestNewConfig_AssignProfile_WithEnvOverride(t *testing.T) {
-	cleanup := setupEnv(map[string]string{
-		"APP_NAME": "env-app",
-		"PORT":     "9090",
-	})
-	defer cleanup()
-
-	cfg := &TestConfigStruct{}
-	err := NewConfig(&Config{
-		Path:       "./testdata",
-		ConfigType: "yaml",
-		Dest:       cfg,
-		AutoEnv:    true,
-		Profile:    "test_env",
-	})
-	assert.NoError(t, err)
-	assert.Equal(t, "env-app", cfg.AppName)
-	assert.Equal(t, 9090, cfg.Port)
-}
-
-func TestNewConfig_ReplaceEnv(t *testing.T) {
+func TestMustLoad_ReplaceEnv(t *testing.T) {
 	cleanup := setupEnv(map[string]string{
 		"APP_NAME": "expanded-app",
 		"PORT":     "9090", // optional: ensure it doesn't override if not expanded manually
 	})
 	defer cleanup()
 
-	cfg := &TestConfigStruct{}
-	err := NewConfig(&Config{
+	out := MustLoad[TestConfigStruct](&Config{
 		Path:       "./testdata",
-		ConfigType: "yaml",
-		Dest:       cfg,
+		Extension:  "yaml",
 		Profile:    "test_replace_env",
 		ReplaceEnv: true,
 	})
-	assert.NoError(t, err)
+
+	cfg := out.Data
 	assert.Equal(t, "expanded-app", cfg.AppName)
 	assert.Equal(t, 8080, cfg.Port)
 }
@@ -195,26 +151,37 @@ func equalSlice[T comparable](a, b []T) bool {
 	return true
 }
 
-func TestReadValue_AllTypes(t *testing.T) {
-	cfg := &TestConfig{}
-
+func TestMustMapStruct_Panic(t *testing.T) {
 	cfMap := map[string]string{
-		"name":      "Alice",
-		"age":       "30",
-		"rate32":    "1.23",
-		"rate64":    "4.56",
-		"active":    "true",
-		"tags":      "red, green ,blue",
-		"numbers":   "1,2,3,4",
-		"threshold": "0.1,0.5,1.5",
+		"name": "abc",
 	}
 
-	err := ReadValue(cfg, cfMap)
-	if err != nil {
-		t.Fatalf("ReadValue failed: %v", err)
-	}
+	assert.Panics(t, func() {
+		_ = MustMapStruct[*TestConfig](cfMap)
+	})
+}
 
-	// Check từng field
+func TestMapStruct_AllTypes(t *testing.T) {
+	cfMap := map[string]string{
+		"name":           "Alice",
+		"age":            "30",
+		"rate32":         "1.23",
+		"rate64":         "4.56",
+		"active":         "true",
+		"tags":           "red, green ,blue",
+		"numbers":        "1,2,3,4",
+		"threshold":      "0.1,0.5,1.5",
+		"server_name":    "ServerApp",
+		"server_profile": "test_profile",
+		"client_name":    "ClientApp",
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("expected not panic, but function panics")
+		}
+	}()
+
+	cfg := MustMapStruct[TestConfig](cfMap)
 	if cfg.Name != "Alice" {
 		t.Errorf("expected Name=Alice, got %s", cfg.Name)
 	}
@@ -239,69 +206,18 @@ func TestReadValue_AllTypes(t *testing.T) {
 	if !equalSlice(cfg.Threshold, []float64{0.1, 0.5, 1.5}) {
 		t.Errorf("expected Threshold [0.1 0.5 1.5], got %#v", cfg.Threshold)
 	}
-}
 
-func TestReadValue_InvalidCases(t *testing.T) {
-	// Case 1: target không phải pointer
-	cfg := TestConfig{}
-	cfMap := map[string]string{}
-	if err := ReadValue(cfg, cfMap); err == nil {
-		t.Errorf("expected error when target is not pointer")
+	// nested struct
+	// struct
+	if cfg.Server.Name != "ServerApp" {
+		t.Errorf("expected Name=ServerApp, got %s", cfg.Server.Name)
 	}
-
-	// Case 2: target nil
-	var cfgNil *TestConfig
-	if err := ReadValue(cfgNil, cfMap); err == nil {
-		t.Errorf("expected error when target is nil")
+	if cfg.Server.Profile != "test_profile" {
+		t.Errorf("expected profile=test_profile, got %s", cfg.Server.Profile)
 	}
 
-	// Case 3: parse lỗi (age = abc)
-	cfg2 := &TestConfig{}
-	cfMap2 := map[string]string{"age": "abc"}
-	if err := ReadValue(cfg2, cfMap2); err != nil {
-		t.Errorf("unexpected error for invalid int: %v", err)
-	}
-	// Expect Age=0 vì parse lỗi
-	if cfg2.Age != 0 {
-		t.Errorf("expected Age=0 for invalid int, got %d", cfg2.Age)
-	}
-}
-
-func TestReadValue_NestedStruct(t *testing.T) {
-	cfg := &NestedConfig{}
-	cfMap := map[string]string{
-		"name":           "AppServer",
-		"profile":        "dev",
-		"trustedProxies": "10.0.0.1,10.0.0.2",
-		"port":           "8080",
-		"version":        "1.0.0",
-		"clientTimeout":  "30",
-		"serverTimeout":  "60",
-		"requestTimeout": "90",
-	}
-
-	if err := ReadValue(cfg, cfMap); err != nil {
-		t.Fatalf("ReadValue failed: %v", err)
-	}
-
-	if cfg.ServerConfig.Name != "AppServer" {
-		t.Errorf("expected Name=AppServer, got %s", cfg.ServerConfig.Name)
-	}
-	if cfg.ServerConfig.Port != "8080" {
-		t.Errorf("expected Port=8080, got %s", cfg.ServerConfig.Port)
-	}
-	if len(cfg.ServerConfig.TrustedProxies) != 2 ||
-		cfg.ServerConfig.TrustedProxies[0] != "10.0.0.1" ||
-		cfg.ServerConfig.TrustedProxies[1] != "10.0.0.2" {
-		t.Errorf("unexpected TrustedProxies: %#v", cfg.ServerConfig.TrustedProxies)
-	}
-	if cfg.ServerConfig.ClientTimeout != 30 {
-		t.Errorf("expected ClientTimeout=30, got %d", cfg.ServerConfig.ClientTimeout)
-	}
-	if cfg.ServerConfig.ServerTimeout != 60 {
-		t.Errorf("expected ServerTimeout=60, got %d", cfg.ServerConfig.ServerTimeout)
-	}
-	if cfg.ServerConfig.RequestTimeout != 90 {
-		t.Errorf("expected RequestTimeout=90, got %d", cfg.ServerConfig.RequestTimeout)
+	// *struct
+	if cfg.Client.Name != "ClientApp" {
+		t.Errorf("expected Name=ClientApp, got %s", cfg.Client.Name)
 	}
 }

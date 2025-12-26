@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/BevisDev/godev/utils/str"
-	"github.com/BevisDev/godev/utils/validate"
 	"github.com/spf13/viper"
 )
 
@@ -15,130 +14,100 @@ import (
 //
 // It is typically used with Viper or similar tools to load a config file into a target struct.
 type Config struct {
-	// Path is the directory path where the config file is located (e.g., "./configs").
-	Path string
-
-	// ConfigType specifies the type of the config file (e.g., "yaml", "json", "toml").
-	ConfigType string
-
-	// Dest is a pointer to a struct that will be populated with the configuration data.
-	// This must be a pointer; otherwise, loading will fail.
-	Dest interface{}
-
-	// AutoEnv enables Viper's automatic environment variable binding.
-	//
-	// When enabled, Viper will automatically try to map environment variables to configuration keys.
-	// Keys are matched by transforming them (e.g., dots to underscores, camelCase to UPPER_SNAKE_CASE),
-	// and matched variables will override corresponding keys in the config.
-	//
-	// Example:
-	//	Config key: "app.port"
-	//	Environment: APP_PORT=9000
-	//	Result: viper.Get("app.port") == 9000
-	AutoEnv bool
-
-	// ReplaceEnv determines whether environment variable placeholders in the config values
-	// (e.g., "$APP_NAME") should be expanded using os.Getenv.
-	//
-	// When enabled, after reading the config file, all string values in the configuration
-	// will be recursively scanned and any "$VAR" will be replaced with the value of the corresponding environment variable.
-	//
-	// This is useful when your config file contains placeholders like:
-	//	app_name: $APP_NAME
-	ReplaceEnv bool
-
-	// Profile is the name of the config file to load (without extension), e.g., "dev", "prod".
-	// It will be combined with Path and ConfigType to locate the file.
-	Profile string
+	Path       string // Path is the directory path where the config file is located (e.g., "./configs").
+	Extension  string // Extension is the type of the config file (e.g., "yaml", "json", "toml").
+	AutoEnv    bool   // AutoEnv is used for env overrides (APP_PORT overrides app.port)
+	ReplaceEnv bool   // ReplaceEnv is used for replacing placeholders like "$DB_DSN"
+	Profile    string // Profile is config file name (without extension), e.g., "dev", "prod".
 }
 
-// NewConfig loads configuration from a file and optionally merges environment variables.
-//
-// It uses the given `Config` struct to determine the file path, config name (profile),
-// config type (e.g., json, yaml), and whether to bind environment variables.
-//
-// The `Dest` field in `Config` must be a pointer to a struct, which will be filled
-// with the parsed config data using `viper.Unmarshal`.
-//
-// Returns an error if the config file is missing, malformed, or the `Dest` is not a pointer.
-//
-// Example:
-//
-//		var appConfig AppConfig
-//
-//	 // to get profile flexible using environment
-//		profile := os.Getenv("GO_PROFILE")
-//
-//		err := NewConfig(&Config{
-//		  Path:       "./configs",
-//		  ConfigType: "yaml",
-//		  Dest:       &appConfig,
-//		  Profile:    profile,
-//		})
-//		if err != nil {
-//		  log.Fatalf("failed to load config: %v", err)
-//		}
-func NewConfig(cf *Config) error {
+type Response[T any] struct {
+	Settings map[string]any
+	Data     *T
+}
+
+// MustLoad loads configuration and panics on failure.
+// It reads the config file, applies env overrides, expands $VARS,
+// and unmarshal the result into the target struct.
+func MustLoad[T any](cf *Config) Response[T] {
 	if cf == nil {
-		return errors.New("config is nil")
-	}
-	if !validate.IsPtr(cf.Dest) {
-		return errors.New("must be a pointer")
+		panic("config is nil")
 	}
 
 	v := viper.New()
 	v.AddConfigPath(cf.Path)
 	v.SetConfigName(cf.Profile)
-	v.SetConfigType(cf.ConfigType)
+	v.SetConfigType(cf.Extension)
+
+	// BINDING ENV
 	if cf.AutoEnv {
 		v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 		v.AutomaticEnv()
 	}
 
-	// read config
+	// READ CONFIG
 	if err := v.ReadInConfig(); err != nil {
-		return err
+		panic(err)
 	}
 
-	// read environment
+	// REPLACE ENV
 	if cf.ReplaceEnv {
 		settings := v.AllSettings()
-		replaceEnvVars(settings)
+		replaceVars(settings)
 		err := v.MergeConfigMap(settings)
 		if err != nil {
-			return err
+			panic(err)
 		}
 	}
 
-	return v.Unmarshal(&cf.Dest)
+	var t T
+	err := v.Unmarshal(&t)
+	if err != nil {
+		panic(err)
+	}
+
+	// RETURN
+	var out Response[T]
+	out.Data = &t
+	out.Settings = v.AllSettings()
+	return out
 }
 
-func replaceEnvVars(data interface{}) {
+func replaceVars(data interface{}) {
 	switch v := data.(type) {
 	case map[string]interface{}:
 		for key, value := range v {
-			v[key] = processValue(value)
+			v[key] = replace(value)
 		}
 	case []interface{}:
 		for i, value := range v {
-			v[i] = processValue(value)
+			v[i] = replace(value)
 		}
 	}
 }
 
-func processValue(value interface{}) interface{} {
+func replace(value interface{}) interface{} {
 	switch v := value.(type) {
 	case string:
 		return os.ExpandEnv(v)
 	case map[string]interface{}:
-		replaceEnvVars(v)
+		replaceVars(v)
 	case []interface{}:
-		replaceEnvVars(v)
+		replaceVars(v)
 	}
 	return value
 }
 
-func ReadValue(target interface{}, cfMap map[string]string) error {
+func MustMapStruct[T any](m map[string]string) *T {
+	var dest T
+	err := mapStruct(&dest, m)
+	if err != nil {
+		panic(err)
+	}
+	return &dest
+}
+
+func mapStruct(target interface{}, cfMap map[string]string) error {
 	rv := reflect.ValueOf(target)
 	if rv.Kind() != reflect.Ptr || rv.IsNil() {
 		return errors.New("target must be a non-nil pointer to a struct")
@@ -156,11 +125,26 @@ func ReadValue(target interface{}, cfMap map[string]string) error {
 			continue
 		}
 
+		// struct
 		if field.Kind() == reflect.Struct {
-			if err := ReadValue(field.Addr().Interface(), cfMap); err != nil {
+			if err := mapStruct(field.Addr().Interface(), cfMap); err != nil {
 				return err
 			}
 			continue
+		}
+
+		// *struct
+		if field.Kind() == reflect.Ptr {
+			if field.IsNil() {
+				field.Set(reflect.New(field.Type().Elem()))
+			}
+
+			if field.Elem().Kind() == reflect.Struct {
+				if err := mapStruct(field.Interface(), cfMap); err != nil {
+					return err
+				}
+				continue
+			}
 		}
 
 		key := t.Field(i).Tag.Get("config")

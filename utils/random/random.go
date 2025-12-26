@@ -1,8 +1,9 @@
 package random
 
 import (
-	"github.com/google/uuid"
 	"math/rand"
+
+	"github.com/google/uuid"
 )
 
 const (
@@ -21,7 +22,7 @@ const (
 //	id := RandUUID()
 //	fmt.Println(id) // "550e8400-e29b-41d4-a716-446655440000"
 func RandUUID() string {
-	return uuid.NewString()
+	return uuid.Must(uuid.NewV7()).String()
 }
 
 // RandInt returns a random integer in the half-open interval [min, max).
@@ -117,7 +118,6 @@ func randStr(length int, layout string) string {
 	for i := range result {
 		result[i] = layout[RandInt(0, len(layout))]
 	}
-	
 	return string(result)
 }
 
