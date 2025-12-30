@@ -12,8 +12,6 @@ type DateSQL struct {
 	time.Time
 }
 
-const layoutDateSQL = datetime.DateTimeSQL
-
 func (d *DateSQL) UnmarshalJSON(b []byte) error {
 	if string(b) == "null" {
 		*d = DateSQL{}
@@ -25,7 +23,7 @@ func (d *DateSQL) UnmarshalJSON(b []byte) error {
 		return fmt.Errorf("invalid JSON string: %w", err)
 	}
 
-	t, err := datetime.ToTime(s, layoutDateSQL)
+	t, err := datetime.ToTime(s, datetime.DateTimeSQL)
 	if err != nil {
 		return err
 	}
@@ -35,7 +33,7 @@ func (d *DateSQL) UnmarshalJSON(b []byte) error {
 }
 
 func (d *DateSQL) MarshalJSON() ([]byte, error) {
-	return json.Marshal(d.Format(layoutDateSQL))
+	return json.Marshal(d.Format(datetime.DateTimeSQL))
 }
 
 func (d *DateSQL) ToTime() *time.Time {
@@ -50,7 +48,7 @@ func (d *DateSQL) ToString() string {
 	if d == nil || d.Time.IsZero() {
 		return ""
 	}
-	return datetime.ToString(d.Time, layoutDateSQL)
+	return datetime.ToString(d.Time, datetime.DateTimeSQL)
 }
 
 func (d *DateSQL) Scan(value interface{}) error {
@@ -58,13 +56,13 @@ func (d *DateSQL) Scan(value interface{}) error {
 	case time.Time:
 		d.Time = v
 	case string:
-		t, err := datetime.ToTime(v, layoutDateSQL)
+		t, err := datetime.ToTime(v, datetime.DateTimeSQL)
 		if err != nil {
 			return fmt.Errorf("scan string to DateSQL failed: %w", err)
 		}
 		d.Time = *t
 	case []byte:
-		t, err := datetime.ToTime(string(v), layoutDateSQL)
+		t, err := datetime.ToTime(string(v), datetime.DateTimeSQL)
 		if err != nil {
 			return fmt.Errorf("scan []byte to DateSQL failed: %w", err)
 		}

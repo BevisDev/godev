@@ -12,8 +12,6 @@ type DateTimeUTC struct {
 	time.Time
 }
 
-const layoutDateTimeUTC = datetime.DatetimeUTC
-
 func (d *DateTimeUTC) UnmarshalJSON(b []byte) error {
 	if string(b) == "null" {
 		*d = DateTimeUTC{}
@@ -25,7 +23,7 @@ func (d *DateTimeUTC) UnmarshalJSON(b []byte) error {
 		return fmt.Errorf("invalid JSON string: %w", err)
 	}
 
-	t, err := datetime.ToTime(s, layoutDateTimeUTC)
+	t, err := datetime.ToTime(s, datetime.DatetimeUTC)
 	if err != nil {
 		return err
 	}
@@ -35,7 +33,7 @@ func (d *DateTimeUTC) UnmarshalJSON(b []byte) error {
 }
 
 func (d *DateTimeUTC) MarshalJSON() ([]byte, error) {
-	return json.Marshal(d.Format(layoutDateTimeUTC))
+	return json.Marshal(d.Format(datetime.DatetimeUTC))
 }
 
 func (d *DateTimeUTC) ToTime() *time.Time {
@@ -50,7 +48,7 @@ func (d *DateTimeUTC) ToString() string {
 	if d == nil || d.Time.IsZero() {
 		return ""
 	}
-	return datetime.ToString(d.Time, layoutDateTimeUTC)
+	return datetime.ToString(d.Time, datetime.DatetimeUTC)
 }
 
 func (d *DateTimeUTC) Scan(value interface{}) error {
@@ -58,13 +56,13 @@ func (d *DateTimeUTC) Scan(value interface{}) error {
 	case time.Time:
 		d.Time = v
 	case string:
-		t, err := datetime.ToTime(v, layoutDateTimeUTC)
+		t, err := datetime.ToTime(v, datetime.DatetimeUTC)
 		if err != nil {
 			return fmt.Errorf("scan string to DateTimeUTC failed: %w", err)
 		}
 		d.Time = *t
 	case []byte:
-		t, err := datetime.ToTime(string(v), layoutDateTimeUTC)
+		t, err := datetime.ToTime(string(v), datetime.DatetimeUTC)
 		if err != nil {
 			return fmt.Errorf("scan []byte to DateTimeUTC failed: %w", err)
 		}

@@ -2,17 +2,16 @@ package types
 
 import (
 	"encoding/json"
-	"github.com/BevisDev/godev/utils/datetime"
 	"testing"
 	"time"
+
+	"github.com/BevisDev/godev/utils/datetime"
 )
 
 type Person struct {
 	Name      string `json:"name"`
 	BirthDate Date   `json:"birth_date"`
 }
-
-var layoutDateTest = datetime.DateOnly
 
 func TestDate_UnmarshalJSON(t *testing.T) {
 	var d Date
@@ -94,7 +93,7 @@ func TestDate_Scan_String(t *testing.T) {
 		t.Fatalf("Scan failed: %v", err)
 	}
 
-	expected, _ := time.Parse(layoutDateTest, "2023-12-01")
+	expected, _ := time.Parse(datetime.DateOnly, "2023-12-01")
 	if !d.Equal(expected) {
 		t.Errorf("Expected %v, got %v", expected, d.Time)
 	}
@@ -107,7 +106,7 @@ func TestDate_Scan_Bytes(t *testing.T) {
 		t.Fatalf("Scan []byte failed: %v", err)
 	}
 
-	expected, _ := time.Parse(layoutDateTest, "2023-12-01")
+	expected, _ := time.Parse(datetime.DateOnly, "2023-12-01")
 	if !d.Equal(expected) {
 		t.Errorf("Expected %v, got %v", expected, d.Time)
 	}

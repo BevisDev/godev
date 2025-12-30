@@ -12,8 +12,6 @@ type Date struct {
 	time.Time
 }
 
-const layoutDate = datetime.DateOnly
-
 func (d *Date) UnmarshalJSON(b []byte) error {
 	if string(b) == "null" {
 		*d = Date{}
@@ -25,7 +23,7 @@ func (d *Date) UnmarshalJSON(b []byte) error {
 		return fmt.Errorf("invalid JSON string: %w", err)
 	}
 
-	t, err := datetime.ToTime(s, layoutDate)
+	t, err := datetime.ToTime(s, datetime.DateOnly)
 	if err != nil {
 		return err
 	}
@@ -35,7 +33,7 @@ func (d *Date) UnmarshalJSON(b []byte) error {
 }
 
 func (d *Date) MarshalJSON() ([]byte, error) {
-	return json.Marshal(d.Format(layoutDate))
+	return json.Marshal(d.Format(datetime.DateOnly))
 }
 
 func (d *Date) ToTime() *time.Time {
@@ -50,7 +48,7 @@ func (d *Date) ToString() string {
 	if d == nil || d.Time.IsZero() {
 		return ""
 	}
-	return datetime.ToString(d.Time, layoutDate)
+	return datetime.ToString(d.Time, datetime.DateOnly)
 }
 
 func (d *Date) Scan(value interface{}) error {
@@ -58,13 +56,13 @@ func (d *Date) Scan(value interface{}) error {
 	case time.Time:
 		d.Time = v
 	case string:
-		t, err := datetime.ToTime(v, layoutDate)
+		t, err := datetime.ToTime(v, datetime.DateOnly)
 		if err != nil {
 			return fmt.Errorf("scan string to Date failed: %w", err)
 		}
 		d.Time = *t
 	case []byte:
-		t, err := datetime.ToTime(string(v), layoutDate)
+		t, err := datetime.ToTime(string(v), datetime.DateOnly)
 		if err != nil {
 			return fmt.Errorf("scan []byte to Date failed: %w", err)
 		}
