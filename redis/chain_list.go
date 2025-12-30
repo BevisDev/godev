@@ -3,6 +3,7 @@ package redis
 import (
 	"context"
 	"fmt"
+
 	"github.com/BevisDev/godev/utils"
 	"github.com/BevisDev/godev/utils/jsonx"
 	"github.com/BevisDev/godev/utils/validate"
@@ -15,7 +16,7 @@ type ChainList[T any] struct {
 	setEnd bool
 }
 
-func WithList[T any](cache *RedisCache) ChainListExec[T] {
+func WithList[T any](cache *Cache) ChainListExec[T] {
 	return &ChainList[T]{
 		Chain: withChain[T](cache),
 	}
@@ -55,7 +56,7 @@ func (c *ChainList[T]) AddFirst(ctx context.Context) error {
 		return ErrMissingValues
 	}
 
-	rdb := c.GetRDB()
+	rdb := c.GetClient()
 	ct, cancel := utils.NewCtxTimeout(ctx, c.TimeoutSec)
 	defer cancel()
 
@@ -77,7 +78,7 @@ func (c *ChainList[T]) Add(ctx context.Context) error {
 		return ErrMissingValues
 	}
 
-	rdb := c.GetRDB()
+	rdb := c.GetClient()
 	ct, cancel := utils.NewCtxTimeout(ctx, c.TimeoutSec)
 	defer cancel()
 
@@ -96,7 +97,7 @@ func (c *ChainList[T]) PopFront(ctx context.Context) (*T, error) {
 		return nil, ErrMissingKey
 	}
 
-	rdb := c.GetRDB()
+	rdb := c.GetClient()
 	ct, cancel := utils.NewCtxTimeout(ctx, c.TimeoutSec)
 	defer cancel()
 
@@ -122,7 +123,7 @@ func (c *ChainList[T]) Pop(ctx context.Context) (*T, error) {
 		return nil, ErrMissingKey
 	}
 
-	rdb := c.GetRDB()
+	rdb := c.GetClient()
 	ct, cancel := utils.NewCtxTimeout(ctx, c.TimeoutSec)
 	defer cancel()
 
@@ -148,7 +149,7 @@ func (c *ChainList[T]) GetRange(ctx context.Context) ([]*T, error) {
 		return nil, ErrMissingKey
 	}
 
-	rdb := c.GetRDB()
+	rdb := c.GetClient()
 	ct, cancel := utils.NewCtxTimeout(ctx, c.TimeoutSec)
 	defer cancel()
 
@@ -179,7 +180,7 @@ func (c *ChainList[T]) Get(ctx context.Context, index int64) (*T, error) {
 		return nil, ErrMissingKey
 	}
 
-	rdb := c.GetRDB()
+	rdb := c.GetClient()
 	ct, cancel := utils.NewCtxTimeout(ctx, c.TimeoutSec)
 	defer cancel()
 
@@ -209,7 +210,7 @@ func (c *ChainList[T]) Size(ctx context.Context) (int64, error) {
 		return 0, ErrMissingKey
 	}
 
-	rdb := c.GetRDB()
+	rdb := c.GetClient()
 	ct, cancel := utils.NewCtxTimeout(ctx, c.TimeoutSec)
 	defer cancel()
 

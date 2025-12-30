@@ -4,9 +4,23 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/redis/go-redis/v9"
 	"log"
+
+	"github.com/redis/go-redis/v9"
 )
+
+// Config holds configuration options for connecting to a Redis instance.
+//
+// It includes host address, port, authentication credentials, selected DB index,
+// connection pool size, and a default timeout (in seconds) for Redis operations.
+type Config struct {
+	Host       string // Redis server hostname or IP
+	Port       int    // Redis server port
+	Password   string // Password for authentication (if required)
+	DB         int    // Redis database index (0 by default)
+	PoolSize   int    // Maximum number of connections in the pool
+	TimeoutSec int    // timeout for Redis operations in seconds
+}
 
 const (
 	// defaultTimeoutSec defines the default timeout (in seconds) for redis operations.
@@ -14,18 +28,17 @@ const (
 	defaultPoolSize   = 10
 )
 
-type RedisCache struct {
+type Cache struct {
 	*Config
 	client *redis.Client
 }
 
-// New initializes a Redis connection using the provided configuration.
-//
+// NewCache initializes a Redis connection using the provided configuration.
 // It creates a new Redis client, verifies the connection using PING,
-// and returns a RedisCache instance. If `timeout` is zero or negative,
+// and returns a Cache instance. If `timeout` is zero or negative,
 // it falls back to the default timeout.
 // Returns an error if the connection cannot be established.
-func New(cf *Config) (*RedisCache, error) {
+func NewCache(cf *Config) (*Cache, error) {
 	if cf == nil {
 		return nil, errors.New("config is nil")
 	}
@@ -37,17 +50,17 @@ func New(cf *Config) (*RedisCache, error) {
 		cf.PoolSize = defaultPoolSize
 	}
 
-	var cache = &RedisCache{Config: cf}
-	rdb, err := cache.connect()
+	var c = &Cache{Config: cf}
+	rdb, err := c.connect()
 	if err != nil {
 		return nil, err
 	}
-	cache.client = rdb
 
-	return cache, nil
+	c.client = rdb
+	return c, nil
 }
 
-func (r *RedisCache) connect() (*redis.Client, error) {
+func (r *Cache) connect() (*redis.Client, error) {
 	rdb := redis.NewClient(&redis.Options{
 		Addr: fmt.Sprintf("%s:%d",
 			r.Host, r.Port),
@@ -64,16 +77,16 @@ func (r *RedisCache) connect() (*redis.Client, error) {
 	return rdb, nil
 }
 
-func (r *RedisCache) Close() {
+func (r *Cache) Close() {
 	if r.client != nil {
 		_ = r.client.Close()
 	}
 }
 
-func (r *RedisCache) GetRDB() *redis.Client {
+func (r *Cache) GetClient() *redis.Client {
 	return r.client
 }
 
-func (r *RedisCache) IsNil(err error) bool {
+func (r *Cache) IsNil(err error) bool {
 	return errors.Is(err, redis.Nil)
 }

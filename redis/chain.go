@@ -4,15 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
+	"time"
+
 	"github.com/BevisDev/godev/utils"
 	"github.com/BevisDev/godev/utils/jsonx"
 	"github.com/BevisDev/godev/utils/validate"
-	"reflect"
-	"time"
 )
 
 type Chain[T any] struct {
-	*RedisCache
+	*Cache
 	key        string
 	keys       []string
 	channel    string
@@ -23,15 +24,15 @@ type Chain[T any] struct {
 	expiration time.Duration
 }
 
-func With[T any](cache *RedisCache) ChainExec[T] {
+func With[T any](cache *Cache) ChainExec[T] {
 	return &Chain[T]{
-		RedisCache: cache,
+		Cache: cache,
 	}
 }
 
-func withChain[T any](cache *RedisCache) *Chain[T] {
+func withChain[T any](cache *Cache) *Chain[T] {
 	return &Chain[T]{
-		RedisCache: cache,
+		Cache: cache,
 	}
 }
 
@@ -137,7 +138,7 @@ func (c *Chain[T]) Set(ct context.Context) error {
 		return ErrMissingValue
 	}
 
-	rdb := c.GetRDB()
+	rdb := c.GetClient()
 	ctx, cancel := utils.NewCtxTimeout(ct, c.TimeoutSec)
 	defer cancel()
 
@@ -152,7 +153,7 @@ func (c *Chain[T]) SetIfNotExists(ct context.Context) (bool, error) {
 		return false, ErrMissingValue
 	}
 
-	rdb := c.GetRDB()
+	rdb := c.GetClient()
 	ctx, cancel := utils.NewCtxTimeout(ct, c.TimeoutSec)
 	defer cancel()
 
@@ -164,7 +165,7 @@ func (c *Chain[T]) SetMany(ct context.Context) error {
 		return ErrMissingPushOrBatch
 	}
 
-	rdb := c.GetRDB()
+	rdb := c.GetClient()
 	ctx, cancel := utils.NewCtxTimeout(ct, c.TimeoutSec)
 	defer cancel()
 
@@ -192,7 +193,7 @@ func (c *Chain[T]) Get(ct context.Context) (*T, error) {
 		}
 	}()
 
-	rdb := c.GetRDB()
+	rdb := c.GetClient()
 	ctx, cancel := utils.NewCtxTimeout(ct, c.TimeoutSec)
 	defer cancel()
 
@@ -221,7 +222,7 @@ func (c *Chain[T]) GetMany(ct context.Context) ([]*T, error) {
 		return nil, ErrMissingKeys
 	}
 
-	rdb := c.GetRDB()
+	rdb := c.GetClient()
 	ctx, cancel := utils.NewCtxTimeout(ct, c.TimeoutSec)
 	defer cancel()
 
@@ -267,7 +268,7 @@ func (c *Chain[T]) GetByPrefix(ct context.Context) ([]*T, error) {
 		return nil, ErrMissingPrefix
 	}
 
-	rdb := c.GetRDB()
+	rdb := c.GetClient()
 	ctx, cancel := utils.NewCtxTimeout(ct, c.TimeoutSec)
 	defer cancel()
 
@@ -305,7 +306,7 @@ func (c *Chain[T]) Delete(ct context.Context) error {
 		return ErrMissingKey
 	}
 
-	rdb := c.GetRDB()
+	rdb := c.GetClient()
 	ctx, cancel := utils.NewCtxTimeout(ct, c.TimeoutSec)
 	defer cancel()
 
@@ -317,7 +318,7 @@ func (c *Chain[T]) Exists(ct context.Context) (bool, error) {
 		return false, ErrMissingKey
 	}
 
-	rdb := c.GetRDB()
+	rdb := c.GetClient()
 	ctx, cancel := utils.NewCtxTimeout(ct, c.TimeoutSec)
 	defer cancel()
 
@@ -337,7 +338,7 @@ func (c *Chain[T]) Publish(ct context.Context) error {
 		return ErrMissingValue
 	}
 
-	rdb := c.GetRDB()
+	rdb := c.GetClient()
 	ctx, cancel := utils.NewCtxTimeout(ct, c.TimeoutSec)
 	defer cancel()
 
@@ -349,7 +350,7 @@ func (c *Chain[T]) Subscribe(ctx context.Context, handler func(msg string)) erro
 		return ErrMissingChannel
 	}
 
-	rdb := c.GetRDB()
+	rdb := c.GetClient()
 	pubsub := rdb.Subscribe(ctx, c.channel)
 	_, err := pubsub.Receive(ctx)
 	if err != nil {

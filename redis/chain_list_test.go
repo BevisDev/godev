@@ -14,7 +14,7 @@ func TestChainList(t *testing.T) {
 
 	rdb, mock := redismock.NewClientMock()
 
-	cache := &RedisCache{client: rdb,
+	cache := &Cache{client: rdb,
 		Config: &Config{
 			TimeoutSec: 5,
 		},
@@ -79,7 +79,7 @@ func TestChainList(t *testing.T) {
 func TestChainList_WithStruct(t *testing.T) {
 	ctx := context.Background()
 	rdb, mock := redismock.NewClientMock()
-	cache := &RedisCache{client: rdb,
+	cache := &Cache{client: rdb,
 		Config: &Config{
 			TimeoutSec: 5,
 		},

@@ -3,6 +3,7 @@ package rest
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -299,7 +300,7 @@ func (h *HttpClient[T]) execute(request *http.Request) (Response[T], error) {
 	// GET DATA
 	var result T
 	switch any(result).(type) {
-	case []byte:
+	case []byte, json.RawMessage:
 		resp.Data = any(raw).(T)
 	case string:
 		resp.Data = any(resp.Body).(T)
@@ -337,7 +338,9 @@ func (h *HttpClient[T]) logResponse(response *http.Response,
 		if !h.SkipLogHeader {
 			sb.WriteString(fmt.Sprintf(consts.Header+": %s\n", response.Header))
 		}
-		sb.WriteString(fmt.Sprintf(consts.Body+": %s\n", body))
+		if hasBody && h.logBody(response.Header.Get(consts.ContentType)) {
+			sb.WriteString(fmt.Sprintf(consts.Body+": %s\n", body))
+		}
 		sb.WriteString("==================================\n")
 		log.Println(sb.String())
 	}

@@ -29,7 +29,7 @@ func (s Status) String() string {
 
 func TestRedisCache_SetAndGet(t *testing.T) {
 	rdb, mock := redismock.NewClientMock()
-	cache := &RedisCache{
+	cache := &Cache{
 		client: rdb,
 		Config: &Config{
 			TimeoutSec: 5,
@@ -51,7 +51,7 @@ func TestRedisCache_SetAndGet(t *testing.T) {
 
 func TestRedisCache_Delete(t *testing.T) {
 	rdb, mock := redismock.NewClientMock()
-	cache := &RedisCache{
+	cache := &Cache{
 		client: rdb,
 		Config: &Config{
 			TimeoutSec: 5,
@@ -67,7 +67,7 @@ func TestRedisCache_Delete(t *testing.T) {
 
 func TestRedisCache_GetByPrefix(t *testing.T) {
 	rdb, mock := redismock.NewClientMock()
-	cache := &RedisCache{
+	cache := &Cache{
 		client: rdb,
 		Config: &Config{
 			TimeoutSec: 5,
@@ -97,7 +97,7 @@ func TestRedisCache_GetByPrefix(t *testing.T) {
 
 func TestRedisCache_IsNil(t *testing.T) {
 	rdb, _ := redismock.NewClientMock()
-	cache := &RedisCache{
+	cache := &Cache{
 		client: rdb,
 		Config: &Config{
 			TimeoutSec: 5,
@@ -110,7 +110,7 @@ func TestRedisCache_IsNil(t *testing.T) {
 
 func TestRedisCache_Publish(t *testing.T) {
 	rdb, mock := redismock.NewClientMock()
-	cache := &RedisCache{
+	cache := &Cache{
 		client: rdb,
 		Config: &Config{
 			TimeoutSec: 5,
@@ -134,7 +134,7 @@ func TestRedisCache_Publish(t *testing.T) {
 
 func TestRedisCache_Publish_JSON(t *testing.T) {
 	rdb, mock := redismock.NewClientMock()
-	cache := &RedisCache{
+	cache := &Cache{
 		client: rdb,
 		Config: &Config{
 			TimeoutSec: 5,
@@ -167,7 +167,7 @@ func TestSetIfNotExists(t *testing.T) {
 	ctx := context.Background()
 
 	rdb, mock := redismock.NewClientMock()
-	cache := &RedisCache{
+	cache := &Cache{
 		client: rdb,
 		Config: &Config{
 			TimeoutSec: 5,
@@ -198,7 +198,7 @@ func TestSetIfNotExists(t *testing.T) {
 func TestSetIfNotExists_EnumValue(t *testing.T) {
 	ctx := context.Background()
 	rdb, mock := redismock.NewClientMock()
-	cache := &RedisCache{
+	cache := &Cache{
 		client: rdb,
 		Config: &Config{
 			TimeoutSec: 5,

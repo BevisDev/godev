@@ -10,7 +10,7 @@ require (
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/pressly/goose/v3 v3.24.1
 	github.com/rabbitmq/amqp091-go v1.10.0
-	github.com/redis/go-redis/v9 v9.7.0
+	github.com/redis/go-redis/v9 v9.17.2
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/shopspring/decimal v1.4.0
 	github.com/spf13/viper v1.19.0

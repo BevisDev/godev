@@ -89,6 +89,13 @@ func IsEmpty(s string) bool {
 	return len(s) == 0
 }
 
+func IsNilOrEmpty(s *string) bool {
+	if s == nil {
+		return true
+	}
+	return IsEmpty(*s)
+}
+
 // ToInt parses a string to any signed integer type (int, int16, ...).
 func ToInt[T types.SignedInteger](s string) T {
 	var zero T

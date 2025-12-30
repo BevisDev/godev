@@ -3,6 +3,7 @@ package redis
 import (
 	"context"
 	"fmt"
+
 	"github.com/BevisDev/godev/utils"
 	"github.com/BevisDev/godev/utils/jsonx"
 	"github.com/BevisDev/godev/utils/validate"
@@ -12,7 +13,7 @@ type ChainSet[T any] struct {
 	*Chain[T]
 }
 
-func WithSet[T any](cache *RedisCache) ChainSetExec[T] {
+func WithSet[T any](cache *Cache) ChainSetExec[T] {
 	return &ChainSet[T]{
 		Chain: withChain[T](cache),
 	}
@@ -41,7 +42,7 @@ func (c *ChainSet[T]) Add(ctx context.Context) error {
 		return ErrMissingValues
 	}
 
-	rdb := c.GetRDB()
+	rdb := c.GetClient()
 	ct, cancel := utils.NewCtxTimeout(ctx, c.TimeoutSec)
 	defer cancel()
 
@@ -63,7 +64,7 @@ func (c *ChainSet[T]) Remove(ctx context.Context) error {
 		return ErrMissingValues
 	}
 
-	rdb := c.GetRDB()
+	rdb := c.GetClient()
 	ct, cancel := utils.NewCtxTimeout(ctx, c.TimeoutSec)
 	defer cancel()
 
@@ -79,7 +80,7 @@ func (c *ChainSet[T]) Contains(ctx context.Context, val interface{}) (bool, erro
 		return false, ErrMissingKey
 	}
 
-	rdb := c.GetRDB()
+	rdb := c.GetClient()
 	ct, cancel := utils.NewCtxTimeout(ctx, c.TimeoutSec)
 	defer cancel()
 
@@ -91,7 +92,7 @@ func (c *ChainSet[T]) GetAll(ctx context.Context) ([]*T, error) {
 		return nil, ErrMissingKey
 	}
 
-	rdb := c.GetRDB()
+	rdb := c.GetClient()
 	ct, cancel := utils.NewCtxTimeout(ctx, c.TimeoutSec)
 	defer cancel()
 
@@ -121,7 +122,7 @@ func (c *ChainSet[T]) Size(ctx context.Context) (int64, error) {
 		return 0, ErrMissingKey
 	}
 
-	rdb := c.GetRDB()
+	rdb := c.GetClient()
 	ct, cancel := utils.NewCtxTimeout(ctx, c.TimeoutSec)
 	defer cancel()
 

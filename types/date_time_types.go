@@ -3,8 +3,9 @@ package types
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/BevisDev/godev/utils/datetime"
 	"time"
+
+	"github.com/BevisDev/godev/utils/datetime"
 )
 
 type DateTime struct {

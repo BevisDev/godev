@@ -30,7 +30,7 @@ It also includes convenient methods for logging HTTP requests and responses.
 
 ## Structure
 
-### `ConfigLogger`
+### `Config`
 
 Configuration for creating a logger:
 
@@ -80,11 +80,11 @@ Structs used to log HTTP requests and responses:
 package main
 
 import (
-	"github.com/BevisDev/godev/logger"
+	"github.com/BevisDev/godev/logx"
 )
 
 func main() {
-	log := logger.NewLogger(&logger.Config{
+	log := logx.NewLogger(&logx.Config{
 		Profile:    "prod",
 		MaxSize:    100,
 		MaxBackups: 7,
