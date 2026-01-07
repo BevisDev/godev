@@ -102,6 +102,7 @@ const (
 	ExtJSON = "json"
 	ExtXML  = "xml"
 	ExtYAML = "yaml"
+	ExtYML  = "yml"
 	ExtMD   = "md"
 
 	// Images

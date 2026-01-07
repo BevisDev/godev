@@ -9,8 +9,8 @@ import (
 // Example:
 //
 //	ToString(time.Now(), "2006-01-02 15:04:05")
-func ToString(time time.Time, format string) string {
-	return time.Format(format)
+func ToString(t time.Time, format string) string {
+	return t.Format(format)
 }
 
 // ToTime parses a string into a time.Time pointer using the specified layout.
