@@ -7,7 +7,7 @@ import (
 	"github.com/Nerzal/gocloak/v13"
 )
 
-type KC struct {
+type KeyCloak struct {
 	*Config
 	client *gocloak.GoCloak
 }
@@ -16,29 +16,29 @@ type KC struct {
 //
 // The returned client can be used to authenticate users, manage realms, roles,
 // and perform other Keycloak administrative tasks.
-func NewClient(cf *Config) KeyCloak {
-	return &KC{
+func NewClient(cf *Config) KC {
+	return &KeyCloak{
 		client: gocloak.NewClient(fmt.Sprintf("%s:%d", cf.Host, cf.Port)),
 		Config: cf,
 	}
 }
 
-func (k *KC) GetClient() *gocloak.GoCloak {
+func (k *KeyCloak) GetClient() *gocloak.GoCloak {
 	return k.client
 }
 
-func (k *KC) Login(ctx context.Context, clientId, clientSecret string) (*gocloak.JWT, error) {
+func (k *KeyCloak) Login(ctx context.Context, clientId, clientSecret string) (*gocloak.JWT, error) {
 	return k.client.LoginClient(ctx, clientId, clientSecret, k.Realm)
 }
 
-func (k *KC) VerifyToken(ctx context.Context, token, clientId, clientSecret string) (*gocloak.IntroSpectTokenResult, error) {
+func (k *KeyCloak) VerifyToken(ctx context.Context, token, clientId, clientSecret string) (*gocloak.IntroSpectTokenResult, error) {
 	return k.client.RetrospectToken(ctx, token, clientId, clientSecret, k.Realm)
 }
 
-func (k *KC) GetUserInfo(ctx context.Context, token string) (*gocloak.UserInfo, error) {
+func (k *KeyCloak) GetUserInfo(ctx context.Context, token string) (*gocloak.UserInfo, error) {
 	return k.client.GetUserInfo(ctx, token, k.Realm)
 }
 
-func (k *KC) RevokeToken(ctx context.Context, clientId, clientSecret, token string) error {
+func (k *KeyCloak) RevokeToken(ctx context.Context, clientId, clientSecret, token string) error {
 	return k.client.RevokeToken(ctx, k.Realm, clientId, clientSecret, token)
 }

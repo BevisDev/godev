@@ -2,29 +2,27 @@ package rabbitmq
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"fmt"
 	"log"
 	"sync"
 	"time"
 
-	"github.com/BevisDev/godev/consts"
-	"github.com/BevisDev/godev/utils"
-	"github.com/BevisDev/godev/utils/jsonx"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
+type ConsumerHandler func(ctx context.Context, msg Message) error
+
+type ChannelHandler func(ch *amqp.Channel) error
+
 type RabbitMQ struct {
 	*Config
+	Queue      *Queue
+	Publisher  *Publisher
 	connection *amqp.Connection
 	mu         sync.RWMutex
 }
 
 const (
-	// maxMessageSize max size message
-	maxMessageSize = 50000
-
 	// Xstate is the header key used to store the RequestID (or trace ID)
 	// when publishing, and consumers to retrieve it for logging or tracing.
 	Xstate = "x-state"
@@ -37,7 +35,7 @@ const (
 //
 // Returns an error if the configuration is nil, the connection fails,
 // or the channel cannot be created.
-func NewMQ(cf *Config) (MQ, error) {
+func NewMQ(cf *Config) (*RabbitMQ, error) {
 	if cf == nil {
 		return nil, errors.New("config is nil")
 	}
@@ -45,28 +43,37 @@ func NewMQ(cf *Config) (MQ, error) {
 	r := &RabbitMQ{
 		Config: cf,
 	}
-
-	conn, err := r.init()
+	conn, err := r.connect()
 	if err != nil {
 		return nil, err
 	}
 
 	r.connection = conn
+	r.Queue = newQueue(r)
+	r.Publisher = newPublisher(r)
 	return r, nil
 }
 
-func (r *RabbitMQ) init() (*amqp.Connection, error) {
-	conn, err := amqp.Dial(
-		fmt.Sprintf("amqp://%s:%s@%s:%d/%s",
-			r.Username, r.Password, r.Host, r.Port, r.VHost),
-	)
+func (r *RabbitMQ) Bootstrap() error {
+
+	return nil
+}
+
+func (r *RabbitMQ) connect() (*amqp.Connection, error) {
+	conn, err := amqp.Dial(r.GetDSN())
 	if err != nil {
 		return nil, err
 	}
 
+	if conn == nil {
+		return nil, errors.New("connection is nil")
+	}
+
+	log.Println("RabbitMQ connected successfully")
 	return conn, nil
 }
 
+// Close closes the current channel and connection safely.
 func (r *RabbitMQ) Close() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -76,6 +83,8 @@ func (r *RabbitMQ) Close() {
 	}
 }
 
+// GetConnection returns a live connection, reconnecting if needed.
+// It retries indefinitely until a connection is established.
 func (r *RabbitMQ) GetConnection() (*amqp.Connection, error) {
 	r.mu.RLock()
 
@@ -96,14 +105,13 @@ func (r *RabbitMQ) GetConnection() (*amqp.Connection, error) {
 		err  error
 	)
 	for i := 0; i < 5; i++ {
-		conn, err = r.init()
+		conn, err = r.connect()
 		if err == nil {
-			log.Println("reconnect RabbitMQ success")
 			break
 		}
 
 		sleep := time.Second * time.Duration(1<<i)
-		log.Printf("failed to reconnect RabbitMQ: %v, retrying in %s...", err, sleep)
+		log.Printf("RabbitMQ is attempting to reconnect in %s, (err: %v)", sleep, err)
 		time.Sleep(sleep)
 	}
 	if conn == nil {
@@ -114,6 +122,8 @@ func (r *RabbitMQ) GetConnection() (*amqp.Connection, error) {
 	return conn, nil
 }
 
+// GetChannel returns a new channel from the current connection.
+// Returns an error if the connection is not available.
 func (r *RabbitMQ) GetChannel() (*amqp.Channel, error) {
 	conn, err := r.GetConnection()
 	if err != nil {
@@ -123,125 +133,62 @@ func (r *RabbitMQ) GetChannel() (*amqp.Channel, error) {
 	return conn.Channel()
 }
 
-func (r *RabbitMQ) DeclareQueue(queueName string) error {
+func (r *RabbitMQ) WithChannel(fn ChannelHandler) error {
 	ch, err := r.GetChannel()
 	if err != nil {
 		return err
 	}
 	defer ch.Close()
 
-	if err := r.DeclareQueueWithChannel(ch, queueName); err != nil {
-		return err
-	}
-	return nil
+	return fn(ch)
 }
 
-func (r *RabbitMQ) DeclareQueueWithChannel(channel *amqp.Channel, queueName string) error {
-	_, err := channel.QueueDeclare(
-		queueName,
-		true,
-		false,
-		false,
-		false,
-		nil,
-	)
-	if err != nil {
-		return fmt.Errorf("error declare queue %s, err = %w", queueName, err)
-	}
-	return nil
-}
-
-func (r *RabbitMQ) Publish(ctx context.Context, queueName string, message interface{}) error {
-	ch, err := r.GetChannel()
-	if err != nil {
-		return fmt.Errorf("failed to get channel: %w", err)
-	}
-	defer ch.Close()
-
-	var (
-		body        []byte
-		contentType = consts.TextPlain
-	)
-	switch v := message.(type) {
-	case []byte:
-		body = v
-		if json.Valid(v) {
-			contentType = consts.ApplicationJSON
-			break
-		}
-	case string:
-		body = []byte(v)
-		if json.Valid(body) {
-			contentType = consts.ApplicationJSON
-		}
-	case bool,
-		int, int8, int16, int32, int64,
-		uint, uint8, uint16, uint32, uint64,
-		float32, float64:
-		body = []byte(fmt.Sprint(v))
-	default:
-		body = jsonx.ToJSONBytes(v)
-		contentType = consts.ApplicationJSON
-	}
-	if len(body) > maxMessageSize {
-		return fmt.Errorf("message is too large: %d", len(body))
-	}
-
-	if err := r.DeclareQueueWithChannel(ch, queueName); err != nil {
-		return fmt.Errorf("failed to declare queue: %w", err)
-	}
-
-	var state = utils.GetState(ctx)
-	return ch.PublishWithContext(ctx,
-		"",
-		queueName,
-		false,
-		false,
-		amqp.Publishing{
-			ContentType: contentType,
-			Body:        body,
-			Headers: amqp.Table{
-				Xstate: state,
-			},
-		},
-	)
-}
-
-func (r *RabbitMQ) Consume(ctx context.Context, queueName string,
-	handler func(ctx context.Context, msg amqp.Delivery),
-) error {
-	ch, err := r.GetChannel()
-	if err != nil {
-		return fmt.Errorf("failed to get channel: %w", err)
-	}
-	defer ch.Close()
-
-	if err := r.DeclareQueueWithChannel(ch, queueName); err != nil {
-		return fmt.Errorf("failed to declare queue: %w", err)
-	}
-
-	msgs, err := ch.ConsumeWithContext(ctx,
-		queueName,
-		"",
-		false,
-		false,
-		false,
-		false,
-		nil,
-	)
-	if err != nil {
-		return err
-	}
-
-	for msg := range msgs {
-		newCtx := utils.NewCtx()
-		if raw, ok := msg.Headers[Xstate]; ok {
-			if s, ok := raw.(string); ok {
-				newCtx = utils.SetValueCtx(newCtx, consts.State, s)
-			}
-		}
-		go handler(newCtx, msg)
-	}
-
-	return nil
-}
+// Consume is used to start receiving messages
+// handler func(...) is a callback function that is executed every time a new message
+// Returns an error if the consumption process cannot be started
+//func (r *RabbitMQ) Consume(ctx context.Context,
+//	queueName string,
+//	handler ConsumerHandler,
+//) error {
+//	ch, err := r.GetChannel()
+//	if err != nil {
+//		return fmt.Errorf("failed to get channel: %w", err)
+//	}
+//	defer ch.Close()
+//
+//	if err := r.declareQueueWithChannel(ch, queueName); err != nil {
+//		return err
+//	}
+//
+//	msgs, err := ch.ConsumeWithContext(ctx,
+//		queueName,
+//		"",
+//		false,
+//		false,
+//		false,
+//		false,
+//		nil,
+//	)
+//	if err != nil {
+//		return err
+//	}
+//
+//	for item := range msgs {
+//		var msg = Message{
+//			item,
+//		}
+//		// create new context
+//		newCtx := utils.NewCtx()
+//
+//		// get x-state
+//		xState := msg.Header(Xstate)
+//		if xState != nil {
+//			if s, ok := xState.(string); ok {
+//				newCtx = utils.SetValueCtx(newCtx, consts.State, s)
+//			}
+//		}
+//		go handler(newCtx, msg)
+//	}
+//
+//	return nil
+//}

@@ -6,7 +6,7 @@ import (
 	"github.com/Nerzal/gocloak/v13"
 )
 
-type KeyCloak interface {
+type KC interface {
 	// GetClient returns the GoCloak client instance.
 	// This instance is configured with the base Keycloak URL and provides
 	// methods to interact with the Keycloak Admin and User APIs

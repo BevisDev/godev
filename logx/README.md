@@ -36,12 +36,13 @@ Configuration for creating a logger:
 
 | Field          | Description                                          |
 |----------------|------------------------------------------------------|
-| `Profile`      | Runtime profile, e.g., `"dev"` or `"prod"`.          |
+| `IsProduction` | Runtime profile `"prod"`.                            |
+| `IsLocal`      | Runtime profile `"dev"`, it logs output to console   |
 | `MaxSize`      | Maximum size of a log file in MB before rotation.    |
 | `MaxBackups`   | Maximum number of old log files to keep.             |
 | `MaxAge`       | Maximum number of days to retain logs.               |
 | `Compress`     | Whether to gzip old log files.                       |
-| `IsSplit`      | Whether to split log files daily or by module.       |
+| `IsRotate`     | Whether to rotate log files daily or by module.      |
 | `DirName`      | Directory path to store log files.                   |
 | `Filename`     | Base log filename, e.g., `"app.log"`.                |
 | `CallerConfig` | Caller skip configuration for request/response logs. |
@@ -90,7 +91,7 @@ func main() {
 		MaxBackups: 7,
 		MaxAge:     30,
 		Compress:   true,
-		IsSplit:    false,
+		IsRotate:   false,
 		DirName:    "./logs",
 		Filename:   "app.log",
 	})
