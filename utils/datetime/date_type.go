@@ -1,15 +1,18 @@
-package types
+package datetime
 
 import (
+	"database/sql/driver"
 	"encoding/json"
 	"fmt"
 	"time"
-
-	"github.com/BevisDev/godev/utils/datetime"
 )
 
 type Date struct {
 	time.Time
+}
+
+func (d *Date) IsZero() bool {
+	return d == nil || d.Time.IsZero()
 }
 
 func (d *Date) UnmarshalJSON(b []byte) error {
@@ -23,7 +26,7 @@ func (d *Date) UnmarshalJSON(b []byte) error {
 		return fmt.Errorf("invalid JSON string: %w", err)
 	}
 
-	t, err := datetime.ToTime(s, datetime.DateOnly)
+	t, err := ToTime(s, DateLayoutISO)
 	if err != nil {
 		return err
 	}
@@ -33,22 +36,25 @@ func (d *Date) UnmarshalJSON(b []byte) error {
 }
 
 func (d *Date) MarshalJSON() ([]byte, error) {
-	return json.Marshal(d.Format(datetime.DateOnly))
+	if d.IsZero() {
+		return []byte("null"), nil
+	}
+	return json.Marshal(d.Format(DateLayoutISO))
 }
 
 func (d *Date) ToTime() *time.Time {
-	if d == nil || d.Time.IsZero() {
+	if d.IsZero() {
 		return nil
 	}
 	t := d.Time
 	return &t
 }
 
-func (d *Date) ToString() string {
-	if d == nil || d.Time.IsZero() {
+func (d *Date) String() string {
+	if d.IsZero() {
 		return ""
 	}
-	return datetime.ToString(d.Time, datetime.DateOnly)
+	return ToString(d.Time, DateLayoutISO)
 }
 
 func (d *Date) Scan(value interface{}) error {
@@ -56,13 +62,13 @@ func (d *Date) Scan(value interface{}) error {
 	case time.Time:
 		d.Time = v
 	case string:
-		t, err := datetime.ToTime(v, datetime.DateOnly)
+		t, err := ToTime(v, DateLayoutISO)
 		if err != nil {
 			return fmt.Errorf("scan string to Date failed: %w", err)
 		}
 		d.Time = *t
 	case []byte:
-		t, err := datetime.ToTime(string(v), datetime.DateOnly)
+		t, err := ToTime(string(v), DateLayoutISO)
 		if err != nil {
 			return fmt.Errorf("scan []byte to Date failed: %w", err)
 		}
@@ -71,4 +77,11 @@ func (d *Date) Scan(value interface{}) error {
 		return fmt.Errorf("unsupported type for Date.Scan: %T", v)
 	}
 	return nil
+}
+
+func (d *Date) Value() (driver.Value, error) {
+	if d.IsZero() {
+		return nil, nil
+	}
+	return d.Format(DateLayoutISO), nil
 }

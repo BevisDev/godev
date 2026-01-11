@@ -193,7 +193,7 @@ func (l *AppLogger) writeSync() zapcore.WriteSyncer {
 
 func getFilename(dir, fileName string, isSplit bool) string {
 	if isSplit {
-		now := datetime.ToString(time.Now(), datetime.DateOnly)
+		now := datetime.ToString(time.Now(), datetime.DateLayoutISO)
 		return filepath.Join(dir, now, fileName)
 	}
 	return filepath.Join(dir, fileName)

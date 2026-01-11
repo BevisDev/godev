@@ -243,7 +243,8 @@ func (h *HttpClient[T]) logRequest(body string) {
 	sb.WriteString(fmt.Sprintf(consts.State+": %s\n", h.state))
 	sb.WriteString(fmt.Sprintf(consts.Url+": %s\n", h.url))
 	sb.WriteString(fmt.Sprintf(consts.Method+": %s\n", h.method))
-	sb.WriteString(fmt.Sprintf(consts.RequestTime+": %s\n", datetime.ToString(h.startTime, datetime.DateTimeOffset)))
+	sb.WriteString(fmt.Sprintf(consts.RequestTime+": %s\n",
+		datetime.ToString(h.startTime, datetime.DateTimeLayoutMilli)))
 	if !validate.IsNilOrEmpty(h.queryParams) {
 		sb.WriteString(fmt.Sprintf(consts.Query+": %v\n", h.queryParams))
 	}

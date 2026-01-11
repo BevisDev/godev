@@ -1,24 +1,31 @@
 package datetime
 
-// Layout datetime
+// Date & time layouts
 const (
-	// format common
-	DD_MM_YYYYY       = "02-01-2006"
-	DD_MM_YYYYY_FLASH = "02/01/2006"
-	DD_MMM_YYYY       = "02-Jan-2006"
-	YYYYMMDDHHMMSS    = "20060102150405"
-	YYYYMMDD          = "20060102"
+	// ---- Date only ----
+	DateLayoutDMYDash  = "02-01-2006"
+	DateLayoutDMYSlash = "02/01/2006"
+	DateLayoutDMYMonth = "02-Jan-2006"
+	DateLayoutCompact  = "20060102"
+	DateLayoutISO      = "2006-01-02"
+
+	// ---- DateTime (no timezone) ----
+	DateTimeLayout      = "2006-01-02 15:04:05"
+	DateTimeLayoutMilli = "2006-01-02 15:04:05.000"
+	DateTimeLayoutLocal = "2006-01-02T15:04:05"
+
+	// ---- DateTime with timezone ----
+	DateTimeLayoutRFC3339 = "2006-01-02T15:04:05Z07:00"
+	DateTimeLayoutUTC     = "2006-01-02T15:04:05Z"
+
+	// ---- Compact ----
+	DateTimeLayoutCompact = "20060102150405"
 
 	// format ISO 8601 / RFC3339
-	DateOnly       = "2006-01-02"
-	DateTime       = "2006-01-02 15:04:05"
-	DateTimeOffset = "2006-01-02T15:04:05Z07:00"
-	DatetimeUTC    = "2006-01-02T15:04:05Z"
-	DateTimeSQL    = "2006-01-02 15:04:05.000"
-	DateTimeNoTZ   = "2006-01-02T15:04:05"
+	DateTimeMillis = "2006-01-02 15:04:05.000"
 
-	// format time
-	TimeOnly    = "15:04:05"
-	TimeCompact = "150405"
-	TimeNoSec   = "1504"
+	// ---- Time only ----
+	TimeLayout          = "15:04:05"
+	TimeLayoutCompact   = "150405"
+	TimeLayoutNoSeconds = "1504"
 )

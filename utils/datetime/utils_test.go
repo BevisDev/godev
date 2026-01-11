@@ -10,9 +10,9 @@ func TestTimeToString(t *testing.T) {
 	tm := time.Date(2024, 4, 10, 12, 30, 45, 0, time.UTC)
 	expected := "2024-04-10 12:30:45"
 
-	result := ToString(tm, DateTime)
+	result := ToString(tm, DateTimeLayout)
 	if result != expected {
-		t.Errorf("ToString failed, expected %s, got %s", expected, result)
+		t.Errorf("String failed, expected %s, got %s", expected, result)
 	}
 }
 
@@ -20,7 +20,7 @@ func TestStringToTime(t *testing.T) {
 	input := "2024-04-10 12:30:45"
 	expected := time.Date(2024, 4, 10, 12, 30, 45, 0, time.UTC)
 
-	tm, err := ToTime(input, DateTime)
+	tm, err := ToTime(input, DateTimeLayout)
 	if err != nil {
 		t.Fatalf("ToTime returned unexpected error: %v", err)
 	}
@@ -32,7 +32,7 @@ func TestStringToTime(t *testing.T) {
 
 func TestStringToTime_InvalidFormat(t *testing.T) {
 	input := "invalid time"
-	_, err := ToTime(input, DateTime)
+	_, err := ToTime(input, DateTimeLayout)
 
 	if err == nil {
 		t.Error("expected error for invalid time string, got nil")
@@ -188,7 +188,7 @@ func TestCalcAgeAt(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			dob := mustParse(tc.dob)
 			now := mustParse(tc.now)
-			age := CalculateAge(dob, now)
+			age := GetAge(dob, now)
 			if age != tc.expected {
 				t.Errorf("Expected age %d, got %d", tc.expected, age)
 			}

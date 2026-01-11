@@ -1,11 +1,10 @@
-package types
+package datetime
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
-
-	"github.com/BevisDev/godev/utils/datetime"
 )
 
 type Person struct {
@@ -93,7 +92,7 @@ func TestDate_Scan_String(t *testing.T) {
 		t.Fatalf("Scan failed: %v", err)
 	}
 
-	expected, _ := time.Parse(datetime.DateOnly, "2023-12-01")
+	expected, _ := time.Parse(DateLayoutISO, "2023-12-01")
 	if !d.Equal(expected) {
 		t.Errorf("Expected %v, got %v", expected, d.Time)
 	}
@@ -106,7 +105,7 @@ func TestDate_Scan_Bytes(t *testing.T) {
 		t.Fatalf("Scan []byte failed: %v", err)
 	}
 
-	expected, _ := time.Parse(datetime.DateOnly, "2023-12-01")
+	expected, _ := time.Parse(DateLayoutISO, "2023-12-01")
 	if !d.Equal(expected) {
 		t.Errorf("Expected %v, got %v", expected, d.Time)
 	}
@@ -137,8 +136,30 @@ func TestDate_ToString(t *testing.T) {
 	d := Date{}
 	_ = d.Scan("2024-04-21")
 
-	str := d.ToString()
+	str := d.String()
 	if str != "2024-04-21" {
 		t.Errorf("Expected 2024-04-21, got %s", str)
+	}
+}
+
+func TestDate_InStruct_JSON(t *testing.T) {
+	type Payload struct {
+		BirthDate *Date `json:"birth_date"`
+	}
+
+	p := Payload{
+		BirthDate: nil,
+	}
+
+	b, err := json.Marshal(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fmt.Println(string(b))
+
+	expected := `{"birth_date":null}`
+	if string(b) != expected {
+		t.Errorf("json.Marshal() = %s; want %s", b, expected)
 	}
 }

@@ -39,7 +39,7 @@ func Run(ctx context.Context, opt Options) error {
 		_ = r.SetTrustedProxies(opt.Proxies)
 	}
 
-	srv := newServer(":"+opt.Port, r, opt)
+	srv := newServer(r, opt)
 	errCh := make(chan error, 1)
 
 	// start server
@@ -78,9 +78,9 @@ func Run(ctx context.Context, opt Options) error {
 	return nil
 }
 
-func newServer(addr string, handler http.Handler, opt Options) *http.Server {
+func newServer(handler http.Handler, opt Options) *http.Server {
 	return &http.Server{
-		Addr:         addr,
+		Addr:         ":" + opt.Port,
 		Handler:      handler,
 		ReadTimeout:  opt.ReadTimeout,
 		WriteTimeout: opt.WriteTimeout,

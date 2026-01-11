@@ -1,15 +1,16 @@
 package money
 
 import (
-	"github.com/BevisDev/godev/types"
 	"github.com/shopspring/decimal"
 )
 
-func FromFloat(f float64) types.Money {
+type Money = decimal.Decimal
+
+func FromFloat(f float64) Money {
 	return decimal.NewFromFloat(f)
 }
 
-func ToFloat(m types.Money) float64 {
+func ToFloat(m Money) float64 {
 	f, _ := m.Float64()
 	return f
 }
@@ -23,55 +24,55 @@ func IsDecimal(val interface{}) bool {
 	}
 }
 
-func GreaterThanFloat(m types.Money, f float64) bool {
+func GreaterThanFloat(m Money, f float64) bool {
 	return m.GreaterThan(FromFloat(f))
 }
 
-func GreaterThanOrEqualFloat(m types.Money, f float64) bool {
+func GreaterThanOrEqualFloat(m Money, f float64) bool {
 	return m.GreaterThanOrEqual(FromFloat(f))
 }
 
-func LessThanFloat(m types.Money, f float64) bool {
+func LessThanFloat(m Money, f float64) bool {
 	return m.LessThan(FromFloat(f))
 }
 
-func LessThanOrEqualFloat(m types.Money, f float64) bool {
+func LessThanOrEqualFloat(m Money, f float64) bool {
 	return m.LessThanOrEqual(FromFloat(f))
 }
 
-func FromInt(i int) types.Money {
+func FromInt(i int) Money {
 	return decimal.NewFromInt(int64(i))
 }
 
-func ToInt(m types.Money) int {
+func ToInt(m Money) int {
 	return int(m.IntPart())
 }
 
-func FromInt64(i int64) types.Money {
+func FromInt64(i int64) Money {
 	return decimal.NewFromInt(i)
 }
 
-func ToInt64(m types.Money) int64 {
+func ToInt64(m Money) int64 {
 	return m.IntPart()
 }
 
-func GreaterThanInt(m types.Money, i int) bool {
+func GreaterThanInt(m Money, i int) bool {
 	return m.GreaterThan(FromInt(i))
 }
 
-func GreaterThanOrEqualInt(m types.Money, i int) bool {
+func GreaterThanOrEqualInt(m Money, i int) bool {
 	return m.GreaterThanOrEqual(FromInt(i))
 }
 
-func LessThanInt(m types.Money, i int) bool {
+func LessThanInt(m Money, i int) bool {
 	return m.LessThan(FromInt(i))
 }
 
-func LessThanOrEqualInt(m types.Money, i int) bool {
+func LessThanOrEqualInt(m Money, i int) bool {
 	return m.LessThanOrEqual(FromInt(i))
 }
 
-func IsZero(m types.Money) bool {
+func IsZero(m Money) bool {
 	return m.IsZero()
 }
 
@@ -80,7 +81,7 @@ func IsZero(m types.Money) bool {
 // -0.0 false
 // 1.00 true
 // 1234.5678 true
-func IsPositive(m types.Money) bool {
+func IsPositive(m Money) bool {
 	return m.IsPositive()
 }
 
@@ -89,30 +90,30 @@ func IsPositive(m types.Money) bool {
 // -0.0 false
 // -1.00 true
 // -1234.5678 true
-func IsNegative(m types.Money) bool {
+func IsNegative(m Money) bool {
 	return m.IsNegative()
 }
 
-func Round(m types.Money, places int32) types.Money {
+func Round(m Money, places int32) Money {
 	return m.Round(places)
 }
 
-func Abs(m types.Money) types.Money {
+func Abs(m Money) Money {
 	return m.Abs()
 }
 
-func Format(m types.Money, decimalPlaces int32) string {
+func Format(m Money, decimalPlaces int32) string {
 	return m.StringFixed(decimalPlaces)
 }
 
-func Min(a, b types.Money) types.Money {
+func Min(a, b Money) Money {
 	if a.LessThan(b) {
 		return a
 	}
 	return b
 }
 
-func Max(a, b types.Money) types.Money {
+func Max(a, b Money) Money {
 	if a.GreaterThan(b) {
 		return a
 	}

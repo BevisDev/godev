@@ -1,7 +1,6 @@
 package money
 
 import (
-	"github.com/BevisDev/godev/types"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -82,7 +81,7 @@ func TestIntComparisons(t *testing.T) {
 	}
 }
 
-func newMoney(val string) types.Money {
+func newMoney(val string) Money {
 	m, err := decimal.NewFromString(val)
 	if err != nil {
 		panic(err)
