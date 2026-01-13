@@ -54,43 +54,8 @@ GoDev integrates with the following libraries to provide a comprehensive develop
 | **UUID**    | Unique ID generation     | Built-in with GoDev                       | [UUID Docs](https://github.com/google/uuid)           |
 | **Decimal** | Decimal arithmetic       | Built-in with GoDev                       | [Decimal Docs](https://github.com/shopspring/decimal) |
 
-## 📚 Core Features
-
-### Cron Jobs
-
-The `cron` package enables scheduling tasks using a flexible 6-field cron expression format (including seconds).
-
-**Example:**
-
-```go
-package main
-
-import (
-	"fmt"
-	"github.com/robfig/cron/v3"
-)
-
-func main() {
-	c := cron.New(cron.WithSeconds())
-	// second minute hour day month weekday
-	c.AddFunc("0 * * * * *", func() {
-		fmt.Println("Running every minute at the 0th second!")
-	})
-	c.Start()
-	select {} // Keep the program running
-}
-```
-
-**Cron Expression Format:**
-
-| Field        | Mandatory | Allowed Values  | Special Characters |
-|--------------|-----------|-----------------|--------------------|
-| Seconds      | Yes       | 0-59            | `* / , -`          |
-| Minutes      | Yes       | 0-59            | `* / , -`          |
-| Hours        | Yes       | 0-23            | `* / , -`          |
-| Day of Month | Yes       | 1-31            | `* / , - ?`        |
-| Month        | Yes       | 1-12 or JAN-DEC | `* / , -`          |
-| Day of Week  | Yes       | 0-6 or SUN-SAT  | `* / , - ?`        |
+## ✨ Features
+- Scheduler
 
 ### Install Make
 

@@ -1,21 +1,9 @@
 package rest
 
 import (
+	"log"
 	"net/http"
-
-	"github.com/BevisDev/godev/logx"
 )
-
-type HttpConfig struct {
-	TimeoutSec      int         // TimeoutSec in seconds
-	Logger          logx.Logger // Logger instance for logging
-	SkipLogHeader   bool        // Skip logging HTTP headers if true
-	SkipLogAPIs     []string    // List of API paths to skip logging
-	SkipContentType []string    // List of Content Type to skip logging
-}
-
-// defaultTimeoutSec defines the default timeout (in seconds) for rest client operations.
-const defaultTimeoutSec = 60
 
 // Client wraps an HTTP client with a configurable timeout and optional logger.
 //
@@ -33,16 +21,15 @@ func NewClient(cf *HttpConfig) *Client {
 	if cf == nil {
 		cf = new(HttpConfig)
 	}
-
-	if cf.TimeoutSec <= 0 {
-		cf.TimeoutSec = defaultTimeoutSec
-	}
-
+	cf.withDefaults()
+	
 	c := &Client{
 		client:     new(http.Client),
 		HttpConfig: cf,
 		hasLog:     cf.Logger != nil,
 	}
+
+	log.Printf("[rest] client started successfully")
 	return c
 }
 
