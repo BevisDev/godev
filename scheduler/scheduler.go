@@ -20,11 +20,11 @@ type Scheduler struct {
 }
 
 func NewScheduler(
-	opts ...Option,
+	fs ...OptionFunc,
 ) *Scheduler {
 	options := defaultOptions()
-	for _, opt := range opts {
-		opt(options)
+	for _, f := range fs {
+		f(options)
 	}
 
 	cronOpts := []cron.Option{

@@ -3,29 +3,9 @@ package redis
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log"
 
 	"github.com/redis/go-redis/v9"
-)
-
-// Config holds configuration options for connecting to a Redis instance.
-//
-// It includes host address, port, authentication credentials, selected DB index,
-// connection pool size, and a default timeout (in seconds) for Redis operations.
-type Config struct {
-	Host       string // Redis server hostname or IP
-	Port       int    // Redis server port
-	Password   string // Password for authentication (if required)
-	DB         int    // Redis database index (0 by default)
-	PoolSize   int    // Maximum number of connections in the pool
-	TimeoutSec int    // timeout for Redis operations in seconds
-}
-
-const (
-	// defaultTimeoutSec defines the default timeout (in seconds) for redis operations.
-	defaultTimeoutSec = 60
-	defaultPoolSize   = 10
 )
 
 type Cache struct {
@@ -42,13 +22,7 @@ func NewCache(cf *Config) (*Cache, error) {
 	if cf == nil {
 		return nil, errors.New("config is nil")
 	}
-
-	if cf.TimeoutSec <= 0 {
-		cf.TimeoutSec = defaultTimeoutSec
-	}
-	if cf.PoolSize <= 0 {
-		cf.PoolSize = defaultPoolSize
-	}
+	cf.withDefaults()
 
 	var c = &Cache{Config: cf}
 	rdb, err := c.connect()
@@ -62,8 +36,7 @@ func NewCache(cf *Config) (*Cache, error) {
 
 func (r *Cache) connect() (*redis.Client, error) {
 	rdb := redis.NewClient(&redis.Options{
-		Addr: fmt.Sprintf("%s:%d",
-			r.Host, r.Port),
+		Addr:     r.Addr(),
 		Password: r.Password,
 		DB:       r.DB,
 		PoolSize: r.PoolSize,
@@ -73,7 +46,7 @@ func (r *Cache) connect() (*redis.Client, error) {
 		return nil, err
 	}
 
-	log.Printf("connect redis %d success", r.DB)
+	log.Printf("[redis] connected %d successfully", r.DB)
 	return rdb, nil
 }
 

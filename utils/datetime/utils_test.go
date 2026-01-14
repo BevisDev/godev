@@ -1,9 +1,10 @@
 package datetime
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestTimeToString(t *testing.T) {
@@ -59,36 +60,6 @@ func TestEndDay(t *testing.T) {
 	}
 }
 
-func TestAddTime(t *testing.T) {
-	base := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-
-	tests := []struct {
-		name     string
-		unit     Unit
-		value    int
-		expected time.Time
-	}{
-		{"Nanosecond", Nanosecond, 10, base.Add(10 * time.Nanosecond)},
-		{"Millisecond", Millisecond, 10, base.Add(10 * time.Millisecond)},
-		{"Second", Second, 10, base.Add(10 * time.Second)},
-		{"Minute", Minute, 5, base.Add(5 * time.Minute)},
-		{"Hour", Hour, 2, base.Add(2 * time.Hour)},
-		{"Day", Day, 3, base.AddDate(0, 0, 3)},
-		{"Month", Month, 2, base.AddDate(0, 2, 0)},
-		{"Year", Year, 1, base.AddDate(1, 0, 0)},
-		{"invalid", 0, 999, base},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := AddTime(base, tt.value, tt.unit)
-			if !result.Equal(tt.expected) {
-				t.Errorf("AddTime kind=%q = %v; want %v", tt.unit, result, tt.expected)
-			}
-		})
-	}
-}
-
 func TestIsSameDate(t *testing.T) {
 	t1 := time.Date(2025, 5, 12, 10, 0, 0, 0, time.UTC)
 	t2 := time.Date(2025, 5, 12, 22, 59, 59, 0, time.UTC)
@@ -102,16 +73,40 @@ func TestIsSameDate(t *testing.T) {
 	}
 }
 
-func TestIsWithin(t *testing.T) {
-	now := time.Now()
-	threeDaysAgo := now.AddDate(0, 0, -3)
-	tenDaysAgo := now.AddDate(0, 0, -10)
+func TestIsWithinDays(t *testing.T) {
+	loc := time.UTC
+	now := time.Date(2025, 9, 9, 5, 30, 0, 0, loc)
 
-	if !IsWithinDays(threeDaysAgo, 5) {
-		t.Errorf("Expected threeDaysAgo to be within 5 days")
+	threeDaysAgo := time.Date(2025, 9, 6, 16, 30, 0, 0, loc)
+	tenDaysAgo := time.Date(2025, 8, 30, 10, 0, 0, 0, loc)
+
+	if !WithinDaysAt(threeDaysAgo, now, 5) {
+		t.Errorf("expected threeDaysAgo to be within 5 days")
 	}
-	if IsWithinDays(tenDaysAgo, 5) {
-		t.Errorf("Expected tenDaysAgo to be outside 5 days")
+
+	if WithinDaysAt(tenDaysAgo, now, 5) {
+		t.Errorf("expected tenDaysAgo to be outside 5 days")
+	}
+}
+
+func TestIsWithinHours(t *testing.T) {
+	loc := time.UTC
+	now := time.Date(2025, 9, 9, 5, 30, 0, 0, loc)
+
+	within48h := now.Add(-47 * time.Hour)
+	exact48h := now.Add(-48 * time.Hour)
+	outside48h := now.Add(-49 * time.Hour)
+
+	if !WithinHoursAt(within48h, now, 48) {
+		t.Errorf("expected within48h to be within 48 hours")
+	}
+
+	if !WithinHoursAt(exact48h, now, 48) {
+		t.Errorf("expected exact48h to be within 48 hours")
+	}
+
+	if WithinHoursAt(outside48h, now, 48) {
+		t.Errorf("expected outside48h to be outside 48 hours")
 	}
 }
 
@@ -166,7 +161,7 @@ func TestIsWeekend(t *testing.T) {
 }
 
 func TestGetTimestamp(t *testing.T) {
-	ts := GetTimestamp()
+	ts := Timestamp()
 	assert.Greater(t, ts, int64(0))
 }
 
@@ -188,7 +183,7 @@ func TestCalcAgeAt(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			dob := mustParse(tc.dob)
 			now := mustParse(tc.now)
-			age := GetAge(dob, now)
+			age := AgeAt(dob, now)
 			if age != tc.expected {
 				t.Errorf("Expected age %d, got %d", tc.expected, age)
 			}

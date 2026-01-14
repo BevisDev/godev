@@ -3,9 +3,10 @@ package database
 import (
 	"context"
 	"fmt"
-	"github.com/BevisDev/godev/utils"
 	"reflect"
 	"strings"
+
+	"github.com/BevisDev/godev/utils"
 )
 
 type Chain[T any] struct {

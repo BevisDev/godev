@@ -9,12 +9,12 @@ const (
 	DateLayoutCompact  = "20060102"
 	DateLayoutISO      = "2006-01-02"
 
-	// ---- DateTime (no timezone) ----
+	// ---- baseTime (no timezone) ----
 	DateTimeLayout      = "2006-01-02 15:04:05"
 	DateTimeLayoutMilli = "2006-01-02 15:04:05.000"
 	DateTimeLayoutLocal = "2006-01-02T15:04:05"
 
-	// ---- DateTime with timezone ----
+	// ---- baseTime with timezone ----
 	DateTimeLayoutRFC3339 = "2006-01-02T15:04:05Z07:00"
 	DateTimeLayoutUTC     = "2006-01-02T15:04:05Z"
 

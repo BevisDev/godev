@@ -5,14 +5,13 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
+	"runtime/debug"
+	"strings"
+
 	"github.com/BevisDev/godev/utils"
 	"github.com/BevisDev/godev/utils/validate"
 	"github.com/jmoiron/sqlx"
-	"log"
-	"net/url"
-	"runtime/debug"
-	"strings"
-	"time"
 )
 
 // Database represents a database connection along with configuration
@@ -37,31 +36,11 @@ func New(cf *Config) (*Database, error) {
 	if cf == nil {
 		return nil, errors.New("config is nil")
 	}
-	if cf.TimeoutSec <= 0 {
-		cf.TimeoutSec = defaultTimeoutSec
-	}
-
-	// set default
-	if cf.TimeoutSec <= 0 {
-		cf.TimeoutSec = defaultTimeoutSec
-	}
-	if cf.MaxOpenConns <= 0 {
-		cf.MaxOpenConns = defaultMaxOpenConn
-	}
-	if cf.MaxIdleConns <= 0 {
-		cf.MaxIdleConns = defaultMaxIdleConn
-	}
-	if cf.MaxIdleTimeSec <= 0 {
-		cf.MaxIdleTimeSec = defaultConnMaxIdleTime
-	}
-	if cf.MaxLifeTimeSec <= 0 {
-		cf.MaxLifeTimeSec = defaultConnMaxLifetime
-	}
 
 	var db = &Database{Config: cf}
 
 	// initialize connection
-	dbx, err := db.init()
+	dbx, err := db.connect()
 	if err != nil {
 		return nil, err
 	}
@@ -70,53 +49,16 @@ func New(cf *Config) (*Database, error) {
 	return db, err
 }
 
-func (d *Database) init() (*sqlx.DB, error) {
+func (d *Database) connect() (*sqlx.DB, error) {
 	var (
-		db      *sqlx.DB
-		err     error
-		connStr string
-		cf      = d.Config
+		db  *sqlx.DB
+		err error
+		cf  = d.Config
 	)
-	// build connectionString
-	switch cf.DBType {
-	case SqlServer:
-		connStr = fmt.Sprintf(connectionMap[SqlServer],
-			cf.Username, cf.Password, cf.Host, cf.Port, cf.DBName)
-		if len(cf.Params) > 0 {
-			params := url.Values{}
-			for k, v := range cf.Params {
-				params.Add(k, v)
-			}
-			connStr += "&" + params.Encode()
-		}
-
-	case Postgres:
-		connStr = fmt.Sprintf(connectionMap[Postgres],
-			cf.Username, cf.Password, cf.Host, cf.Port, cf.DBName)
-		if len(cf.Params) > 0 {
-			params := url.Values{}
-			for k, v := range cf.Params {
-				params.Add(k, v)
-			}
-			connStr += "&" + params.Encode()
-		}
-
-	case Oracle:
-		connStr = fmt.Sprintf(connectionMap[Oracle],
-			cf.Username, cf.Password, cf.Host, cf.Port, cf.DBName)
-
-	case MySQL:
-		connStr = fmt.Sprintf(connectionMap[MySQL],
-			cf.Username, cf.Password, cf.Host, cf.Port, cf.DBName)
-		if len(cf.Params) > 0 {
-			params := url.Values{}
-			for k, v := range cf.Params {
-				params.Add(k, v)
-			}
-			connStr += "?" + params.Encode()
-		}
-	default:
-		return nil, errors.New("unsupported database kind " + cf.DBType.String())
+	// get connection string
+	connStr := cf.getDSN()
+	if connStr == "" {
+		return nil, errors.New("[database] unsupported type " + cf.DBType.String())
 	}
 
 	// connect
@@ -128,8 +70,8 @@ func (d *Database) init() (*sqlx.DB, error) {
 	// set pool
 	db.SetMaxOpenConns(cf.MaxOpenConns)
 	db.SetMaxIdleConns(cf.MaxIdleConns)
-	db.SetConnMaxIdleTime(time.Duration(cf.MaxIdleTimeSec) * time.Second)
-	db.SetConnMaxLifetime(time.Duration(cf.MaxLifeTimeSec) * time.Second)
+	db.SetConnMaxIdleTime(cf.MaxIdleTimeSec)
+	db.SetConnMaxLifetime(cf.MaxLifeTimeSec)
 
 	// ping check connection
 	if err = db.Ping(); err != nil {
@@ -168,7 +110,7 @@ func (d *Database) IsNoResult(err error) bool {
 }
 
 func (d *Database) MustBePtr(dest interface{}) (err error) {
-	if !validate.IsPtr(dest) {
+	if !validate.IsNonNilPointer(dest) {
 		return errors.New("must be a pointer")
 	}
 	return
@@ -212,7 +154,7 @@ func (d *Database) rebind(query string, args ...interface{}) (string, []interfac
 func (d *Database) RunTx(c context.Context, level sql.IsolationLevel,
 	fn func(ctx context.Context, tx *sqlx.Tx) error,
 ) error {
-	ctx, cancel := utils.NewCtxTimeout(c, d.TimeoutSec)
+	ctx, cancel := utils.NewCtxTimeout(c, d.Timeout)
 	defer cancel()
 
 	db := d.GetDB()
@@ -253,7 +195,7 @@ func (d *Database) GetList(c context.Context, dest interface{}, query string, ar
 		return err
 	}
 
-	ctx, cancel := utils.NewCtxTimeout(c, d.TimeoutSec)
+	ctx, cancel := utils.NewCtxTimeout(c, d.Timeout)
 	defer cancel()
 
 	db := d.GetDB()
@@ -278,7 +220,7 @@ func (d *Database) GetAny(c context.Context, dest interface{}, query string, arg
 		return err
 	}
 
-	ctx, cancel := utils.NewCtxTimeout(c, d.TimeoutSec)
+	ctx, cancel := utils.NewCtxTimeout(c, d.Timeout)
 	defer cancel()
 
 	db := d.GetDB()
@@ -441,7 +383,7 @@ func (d *Database) InsertReturning(c context.Context, query string, dest interfa
 	}
 	d.ViewQuery(query)
 
-	ctx, cancel := utils.NewCtxTimeout(c, d.TimeoutSec)
+	ctx, cancel := utils.NewCtxTimeout(c, d.Timeout)
 	defer cancel()
 
 	db := d.GetDB()

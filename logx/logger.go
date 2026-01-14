@@ -5,10 +5,11 @@ import (
 )
 
 type Logger interface {
-	// GetZap returns instance *zap.Logger
+	// GetZap returns instance *zap.logger
 	GetZap() *zap.Logger
 
-	// Sync Forces any buffered log entries to be written out to the destination. Crucial for ensuring all logs are saved before application exit.
+	// Sync Forces any buffered log entries to be written out to the destination.
+	// Crucial for ensuring all logs are saved before application exit.
 	Sync()
 
 	// Info Logs an informational message

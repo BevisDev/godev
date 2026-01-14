@@ -3,6 +3,7 @@ package rest
 import (
 	"log"
 	"net/http"
+	"time"
 )
 
 // Client wraps an HTTP client with a configurable timeout and optional logger.
@@ -10,23 +11,21 @@ import (
 // It is intended for making REST API calls with consistent timeout settings
 // and optional logging support via AppLogger.
 type Client struct {
-	*HttpConfig
+	*options
 	client *http.Client
-	hasLog bool
 }
 
-// NewClient creates a new Client instance using the provided HttpConfig.
+// NewClient creates a new Client instance using the provided Options.
 // It initializes the internal HTTP client and applies the specified timeout in seconds.
-func NewClient(cf *HttpConfig) *Client {
-	if cf == nil {
-		cf = new(HttpConfig)
+func NewClient(fs ...OptionFunc) *Client {
+	opt := withDefaults()
+	for _, fn := range fs {
+		fn(opt)
 	}
-	cf.withDefaults()
-	
+
 	c := &Client{
-		client:     new(http.Client),
-		HttpConfig: cf,
-		hasLog:     cf.Logger != nil,
+		client:  new(http.Client),
+		options: opt,
 	}
 
 	log.Printf("[rest] client started successfully")
@@ -35,4 +34,8 @@ func NewClient(cf *HttpConfig) *Client {
 
 func (r *Client) GetClient() *http.Client {
 	return r.client
+}
+
+func (r *Client) SetTimeout(timeout time.Duration) {
+	r.timeout = timeout
 }

@@ -1,4 +1,4 @@
-package bootstrap
+package framework
 
 import (
 	"github.com/BevisDev/godev/logx"

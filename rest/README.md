@@ -1,66 +1,69 @@
-# RestClient Package
+# Rest Client
 
 The `rest` package provides a powerful and flexible REST client for Go, with optional logging support.  
 It supports common HTTP methods such as `GET`, `POST`, `PUT`, `PATCH`, and `DELETE`, with JSON or form-data payloads,
-query and path parameters, and automatic response unmarshaling into structs.
+query and path parameters, and automatic response unmarshaling into structs, and configurable request/response logging.
 
 ---
 
 ## Features
 
-- Supports HTTP methods: `GET`, `POST`, `POST Form`, `PUT`, `PATCH`, `DELETE`.
-- Send data as `JSON` or `application/x-www-form-urlencoded`.
-- Handles query parameters (`?key=value`) and path parameters (`/users/:id`).
-- Detailed request/response logging, with options to skip logging headers or body.
-- Configurable request timeout.
-- Automatic unmarshaling of response JSON into Go structs.
-- Supports raw byte responses if needed.
-- Can skip logging for specific APIs or content types.
+- Supports HTTP methods:
+    - `GET`, `POST`, `POST Form`
+    - `PUT`, `PATCH`, `DELETE`
+- Path parameters (`/users/:id`) and query parameters
+- Generic response handling (`Request[T]`)
+- Configurable request timeout
+- Detailed request/response logging
+- Skip logging by:
+    - Header
+    - API path
+    - Content-Type
+- Suitable for:
+    - Internal SDKs
+    - Service-to-service communication
+    - Microservices
 
 ---
 
 ## Structure
 
-### `Request`
+### `Request[T]`
 
-Struct for configuring each HTTP request:
+`Request[T]` is a **request builder** (the internal struct is not exposed).  
+It is used to configure and execute a single HTTP request with a **type-safe response**.
 
-| Field      | Description                                             |
-|------------|---------------------------------------------------------|
-| `URL`      | API endpoint (e.g., `/users/:id`).                      |
-| `Query`    | Map of query parameters (`?key=value`).                 |
-| `Params`   | Map of path parameters (`:id`).                         |
-| `BodyForm` | Map of form data (`application/x-www-form-urlencoded`). |
-| `Header`   | Map of custom headers.                                  |
-| `Body`     | Request body (struct will be JSON-encoded).             |
-| `Result`   | Pointer to a struct for unmarshaling the response.      |
+| Method                          | Description                                     |
+|---------------------------------|-------------------------------------------------|
+| `URL(string)`                   | API endpoint (e.g. `/users/:id`)                |
+| `Query(map[string]string)`      | Query parameters (`?key=value`)                 |
+| `PathParams(map[string]string)` | Path parameters (`:id`)                         |
+| `Header(map[string]string)`     | Custom HTTP headers                             |
+| `Body(any)`                     | Request body (automatically JSON-encoded)       |
+| `BodyForm(map[string]string)`   | Form body (`application/x-www-form-urlencoded`) |
 
-### `HttpConfig`
+The response body is **automatically unmarshaled** into type `T`.
 
-Configuration struct for `RestClient`:
+### Client Options
 
-| Field             | Description                                         |
-|-------------------|-----------------------------------------------------|
-| `TimeoutSec`      | Request timeout in seconds.                         |
-| `Logger`          | Logger instance (`AppLogger`) for detailed logging. |
-| `SkipLogHeader`   | Skip logging headers if `true`.                     |
-| `SkipLogAPIs`     | List of API paths to skip logging body.             |
-| `SkipContentType` | List of content types to skip logging body.         |
+`RestClient` is configured using the **Option Pattern**.  
+The internal configuration struct is not exposed.
+
+| Option                                  | Description                                               |
+|-----------------------------------------|-----------------------------------------------------------|
+| `WithTimeout(time.Duration)`            | Set request timeout                                       |
+| `WithLogger(logx.Logger)`               | Enable request/response logging                           |
+| `WithSkipHeader()`                      | Skip logging HTTP headers                                 |
+| `WithSkipBodyByPaths(...string)`        | Skip logging body for specific API paths                  |
+| `WithSkipBodyByContentTypes(...string)` | Skip logging body for specific content types              |
+| `WithSkipDefaultContentTypeCheck()`     | Disable the default content-type based body logging check |
+
+---
 
 ### `RestClient`
 
-Main struct to perform HTTP requests.
-
-Key methods:
-
-- `Get(ctx, req *Request) error`
-- `Post(ctx, req *Request) error`
-- `PostForm(ctx, req *Request) error`
-- `Put(ctx, req *Request) error`
-- `Patch(ctx, req *Request) error`
-- `Delete(ctx, req *Request) error`
-
----
+`RestClient` is the main HTTP client.  
+It should be created once and reused across the application.
 
 ```go
 package main
@@ -68,6 +71,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/BevisDev/godev/rest"
 )
@@ -83,14 +87,15 @@ var Client *rest.Client
 func main() {
 	ctx := context.Background()
 
-	Client = rest.NewClient(&rest.HttpConfig{
-		TimeoutSec:    10,
-		SkipLogHeader: true,
-	})
+	Client = rest.NewClient(
+		rest.WithTimeout(10 * time.Second),
+	)
 
 	user, err := rest.NewRequest[*UserResponse](Client).
 		URL("https://jsonplaceholder.typicode.com/users/:id").
-		PathParams(map[string]string{"id": "1"}).
+		PathParams(map[string]string{
+			"id": "1",
+		}).
 		GET(ctx)
 	if err != nil {
 		panic(err)

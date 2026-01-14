@@ -1,26 +1,27 @@
 package random
 
 import (
-	"github.com/stretchr/testify/assert"
 	"regexp"
 	"testing"
 	"unicode"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGenUUID(t *testing.T) {
-	uuid := RandUUID()
+	uuid := NewUUID()
 	if uuid == "" {
-		t.Errorf("RandUUID() = empty string")
+		t.Errorf("NewUUID() = empty string")
 	}
-	r := regexp.MustCompile(`^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$`)
+	r := regexp.MustCompile(`^[a-f0-9]{8}-[a-f0-9]{4}-7[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$`)
 	if !r.MatchString(uuid) {
-		t.Errorf("RandUUID() = %q, not a valid UUID v4", uuid)
+		t.Errorf("NewUUID() = %q, not a valid UUID", uuid)
 	}
 }
 
 func TestRandInt(t *testing.T) {
 	for i := 0; i < 100; i++ {
-		val := RandInt(5, 10)
+		val := NewInt(5, 10)
 		assert.GreaterOrEqual(t, val, 5)
 		assert.Less(t, val, 10)
 	}
@@ -28,7 +29,7 @@ func TestRandInt(t *testing.T) {
 
 func TestRandomFloatInRange(t *testing.T) {
 	for i := 0; i < 100; i++ {
-		val := RandFloat(1.5, 3.0)
+		val := NewFloat(1.5, 3.0)
 		assert.GreaterOrEqual(t, val, 1.5)
 		assert.Less(t, val, 3.0)
 	}
@@ -40,12 +41,12 @@ func TestRandStringLength(t *testing.T) {
 		fn     func(int) string
 		length int
 	}{
-		{"RandString", RandString, 16},
-		{"RandStringNumeric", RandStringNumeric, 10},
-		{"RandStringUpper", RandStringUpper, 12},
-		{"RandStringLower", RandStringLower, 8},
-		{"RandStringUpperNumeric", RandStringUpperNumeric, 20},
-		{"RandStringLowerNumeric", RandStringLowerNumeric, 20},
+		{"NewString", NewString, 16},
+		{"NewNumericString", NewNumericString, 10},
+		{"NewUpperString", NewUpperString, 12},
+		{"NewLowerString", NewLowerString, 8},
+		{"NewUpperStringNumeric", NewUpperStringNumeric, 20},
+		{"NewLowerStringNumeric", NewLowerStringNumeric, 20},
 	}
 
 	for _, tt := range tests {
@@ -57,27 +58,27 @@ func TestRandStringLength(t *testing.T) {
 }
 
 func TestRandStringContent(t *testing.T) {
-	s := RandStringNumeric(50)
+	s := NewNumericString(50)
 	for _, ch := range s {
 		assert.True(t, unicode.IsDigit(ch), "expected numeric char, got %c", ch)
 	}
 
-	s = RandStringUpper(50)
+	s = NewUpperString(50)
 	for _, ch := range s {
 		assert.True(t, unicode.IsUpper(ch), "expected upper case char, got %c", ch)
 	}
 
-	s = RandStringLower(50)
+	s = NewLowerString(50)
 	for _, ch := range s {
 		assert.True(t, unicode.IsLower(ch), "expected lower case char, got %c", ch)
 	}
 
-	s = RandStringUpperNumeric(50)
+	s = NewUpperStringNumeric(50)
 	for _, ch := range s {
 		assert.True(t, unicode.IsUpper(ch) || unicode.IsDigit(ch), "expected upper or digit, got %c", ch)
 	}
 
-	s = RandStringLowerNumeric(50)
+	s = NewLowerStringNumeric(50)
 	for _, ch := range s {
 		assert.True(t, unicode.IsLower(ch) || unicode.IsDigit(ch), "expected lower or digit, got %c", ch)
 	}
@@ -88,7 +89,7 @@ func TestRandPickFromStrings(t *testing.T) {
 	found := make(map[string]bool)
 
 	for i := 0; i < 100; i++ {
-		picked := RandPick(input)
+		picked := Item(input)
 		found[picked] = true
 	}
 
@@ -99,13 +100,13 @@ func TestRandPickFromStrings(t *testing.T) {
 
 func TestRandPickFromInts(t *testing.T) {
 	input := []int{1, 2, 3, 4, 5}
-	result := RandPick(input)
+	result := Item(input)
 	assert.Contains(t, input, result)
 }
 
 func TestRandPickFromEmpty(t *testing.T) {
 	var input []int
-	result := RandPick(input)
+	result := Item(input)
 	assert.Equal(t, 0, result)
 }
 
@@ -119,6 +120,6 @@ func TestRandPickFromStruct(t *testing.T) {
 		{ID: 2, Name: "Bob"},
 		{ID: 3, Name: "Charlie"},
 	}
-	picked := RandPick(users)
+	picked := Item(users)
 	assert.Contains(t, []int{1, 2, 3}, picked.ID)
 }

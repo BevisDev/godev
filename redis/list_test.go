@@ -3,8 +3,10 @@ package redis
 import (
 	"context"
 	"encoding/json"
-	"github.com/stretchr/testify/assert"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/go-redis/redismock/v9"
 )
@@ -16,7 +18,7 @@ func TestChainList(t *testing.T) {
 
 	cache := &Cache{client: rdb,
 		Config: &Config{
-			TimeoutSec: 5,
+			Timeout: 5 * time.Second,
 		},
 	}
 
@@ -81,7 +83,7 @@ func TestChainList_WithStruct(t *testing.T) {
 	rdb, mock := redismock.NewClientMock()
 	cache := &Cache{client: rdb,
 		Config: &Config{
-			TimeoutSec: 5,
+			Timeout: 5 * time.Second,
 		},
 	}
 

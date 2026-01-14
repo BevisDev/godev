@@ -1,10 +1,11 @@
-package ginfw
+package server
 
 import (
 	"context"
-	"github.com/gin-gonic/gin"
 	"testing"
 	"time"
+
+	"github.com/gin-gonic/gin"
 )
 
 func TestRun_SetupCalled(t *testing.T) {

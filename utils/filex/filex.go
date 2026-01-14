@@ -13,6 +13,21 @@ const (
 	Full       = os.ModePerm // 0777
 )
 
+// Join joins any number of path elements into a single path,
+// using the operating system's path separator.
+//
+// It cleans the result by removing redundant separators
+// and resolving "." and ".." elements.
+//
+// Example:
+//
+//	p := Join("/tmp", "data", "file.txt")
+//	// On Unix:    "/tmp/data/file.txt"
+//	// On Windows: "C:\\tmp\\data\\file.txt"
+func Join(paths ...string) string {
+	return filepath.Join(paths...)
+}
+
 // ReadAsBytes reads the entire content of the file specified by `path`
 // and returns it as a byte slice.
 //

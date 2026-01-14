@@ -60,7 +60,7 @@ func (r *RabbitMQ) Bootstrap() error {
 }
 
 func (r *RabbitMQ) connect() (*amqp.Connection, error) {
-	conn, err := amqp.Dial(r.GetDSN())
+	conn, err := amqp.Dial(r.URL())
 	if err != nil {
 		return nil, err
 	}

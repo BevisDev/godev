@@ -139,7 +139,7 @@ func (c *Chain[T]) Set(ct context.Context) error {
 	}
 
 	rdb := c.GetClient()
-	ctx, cancel := utils.NewCtxTimeout(ct, c.TimeoutSec)
+	ctx, cancel := utils.NewCtxTimeout(ct, c.Timeout)
 	defer cancel()
 
 	return rdb.Set(ctx, c.key, c.value, c.expiration).Err()
@@ -154,7 +154,7 @@ func (c *Chain[T]) SetIfNotExists(ct context.Context) (bool, error) {
 	}
 
 	rdb := c.GetClient()
-	ctx, cancel := utils.NewCtxTimeout(ct, c.TimeoutSec)
+	ctx, cancel := utils.NewCtxTimeout(ct, c.Timeout)
 	defer cancel()
 
 	return rdb.SetNX(ctx, c.key, c.value, c.expiration).Result()
@@ -166,7 +166,7 @@ func (c *Chain[T]) SetMany(ct context.Context) error {
 	}
 
 	rdb := c.GetClient()
-	ctx, cancel := utils.NewCtxTimeout(ct, c.TimeoutSec)
+	ctx, cancel := utils.NewCtxTimeout(ct, c.Timeout)
 	defer cancel()
 
 	pipe := rdb.Pipeline()
@@ -194,7 +194,7 @@ func (c *Chain[T]) Get(ct context.Context) (*T, error) {
 	}()
 
 	rdb := c.GetClient()
-	ctx, cancel := utils.NewCtxTimeout(ct, c.TimeoutSec)
+	ctx, cancel := utils.NewCtxTimeout(ct, c.Timeout)
 	defer cancel()
 
 	val, err := rdb.Get(ctx, c.key).Result()
@@ -223,7 +223,7 @@ func (c *Chain[T]) GetMany(ct context.Context) ([]*T, error) {
 	}
 
 	rdb := c.GetClient()
-	ctx, cancel := utils.NewCtxTimeout(ct, c.TimeoutSec)
+	ctx, cancel := utils.NewCtxTimeout(ct, c.Timeout)
 	defer cancel()
 
 	vals, err := rdb.MGet(ctx, c.keys...).Result()
@@ -269,7 +269,7 @@ func (c *Chain[T]) GetByPrefix(ct context.Context) ([]*T, error) {
 	}
 
 	rdb := c.GetClient()
-	ctx, cancel := utils.NewCtxTimeout(ct, c.TimeoutSec)
+	ctx, cancel := utils.NewCtxTimeout(ct, c.Timeout)
 	defer cancel()
 
 	var (
@@ -307,7 +307,7 @@ func (c *Chain[T]) Delete(ct context.Context) error {
 	}
 
 	rdb := c.GetClient()
-	ctx, cancel := utils.NewCtxTimeout(ct, c.TimeoutSec)
+	ctx, cancel := utils.NewCtxTimeout(ct, c.Timeout)
 	defer cancel()
 
 	return rdb.Del(ctx, c.key).Err()
@@ -319,7 +319,7 @@ func (c *Chain[T]) Exists(ct context.Context) (bool, error) {
 	}
 
 	rdb := c.GetClient()
-	ctx, cancel := utils.NewCtxTimeout(ct, c.TimeoutSec)
+	ctx, cancel := utils.NewCtxTimeout(ct, c.Timeout)
 	defer cancel()
 
 	count, err := rdb.Exists(ctx, c.key).Result()
@@ -339,7 +339,7 @@ func (c *Chain[T]) Publish(ct context.Context) error {
 	}
 
 	rdb := c.GetClient()
-	ctx, cancel := utils.NewCtxTimeout(ct, c.TimeoutSec)
+	ctx, cancel := utils.NewCtxTimeout(ct, c.Timeout)
 	defer cancel()
 
 	return rdb.Publish(ctx, c.channel, c.value).Err()

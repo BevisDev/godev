@@ -11,7 +11,7 @@ type Config struct {
 	PersistentMsg bool   // PersistentMsg config to set delivery mode when publish message
 }
 
-func (c *Config) GetDSN() string {
+func (c *Config) URL() string {
 	return fmt.Sprintf("amqp://%s:%s@%s:%d/%s",
 		c.Username, c.Password, c.Host, c.Port, c.VHost)
 }

@@ -28,7 +28,11 @@ func TestDate_UnmarshalJSON(t *testing.T) {
 }
 
 func TestDate_MarshalJSON(t *testing.T) {
-	d := Date{Time: time.Date(2024, 4, 21, 15, 30, 0, 0, time.UTC)}
+	d := Date{
+		baseTime: baseTime{
+			Time: time.Date(2024, 4, 21, 15, 30, 0, 0, time.UTC),
+		},
+	}
 
 	data, err := json.Marshal(&d)
 	if err != nil {

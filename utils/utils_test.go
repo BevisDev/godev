@@ -3,11 +3,12 @@ package utils
 import (
 	"context"
 	"errors"
+	"testing"
+	"time"
+
 	"github.com/BevisDev/godev/consts"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/exp/constraints"
-	"testing"
-	"time"
 )
 
 type User struct {
@@ -331,38 +332,6 @@ func TestParseValueMap_TypeMismatch(t *testing.T) {
 	assert.Equal(t, 0, val)
 }
 
-func TestMin_Int(t *testing.T) {
-	assert.Equal(t, 3, Min(3, 5))
-	assert.Equal(t, -1, Min(-1, 0))
-	assert.Equal(t, 7, Min(7, 7))
-}
-
-func TestMax_Int(t *testing.T) {
-	assert.Equal(t, 5, Max(3, 5))
-	assert.Equal(t, 0, Max(-1, 0))
-	assert.Equal(t, 7, Max(7, 7))
-}
-
-func TestMin_Float(t *testing.T) {
-	assert.Equal(t, 3.2, Min(3.2, 5.9))
-	assert.Equal(t, -2.1, Min(-2.1, 0.0))
-}
-
-func TestMax_Float(t *testing.T) {
-	assert.Equal(t, 5.9, Max(3.2, 5.9))
-	assert.Equal(t, 0.0, Max(-2.1, 0.0))
-}
-
-func TestMin_String(t *testing.T) {
-	assert.Equal(t, "apple", Min("apple", "banana"))
-	assert.Equal(t, "abc", Min("abc", "abc"))
-}
-
-func TestMax_String(t *testing.T) {
-	assert.Equal(t, "banana", Max("apple", "banana"))
-	assert.Equal(t, "abc", Max("abc", "abc"))
-}
-
 func TestIsContains(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -430,7 +399,7 @@ func TestPercent(t *testing.T) {
 	}
 }
 
-func TestMilli(t *testing.T) {
+func TestMillion(t *testing.T) {
 	type testCase struct {
 		name     string
 		input    int64
@@ -448,7 +417,7 @@ func TestMilli(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			result := Milli(tc.input)
+			result := Million(tc.input)
 			assert.Equal(t, tc.expected, result)
 		})
 	}
@@ -523,14 +492,14 @@ func TestRoundUpToMul(t *testing.T) {
 func TestPtrTo(t *testing.T) {
 	t.Run("string", func(t *testing.T) {
 		s := "hello"
-		p := PtrTo(s)
+		p := GetPointer(s)
 		assert.NotNil(t, p)
 		assert.Equal(t, "hello", *p)
 	})
 
 	t.Run("int", func(t *testing.T) {
 		n := 42
-		p := PtrTo(n)
+		p := GetPointer(n)
 		assert.NotNil(t, p)
 		assert.Equal(t, 42, *p)
 	})
@@ -540,7 +509,7 @@ func TestPtrTo(t *testing.T) {
 			ID int
 		}
 		u := User{ID: 1}
-		p := PtrTo(u)
+		p := GetPointer(u)
 		assert.NotNil(t, p)
 		assert.Equal(t, 1, p.ID)
 	})

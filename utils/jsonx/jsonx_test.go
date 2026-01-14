@@ -2,8 +2,9 @@ package jsonx
 
 import (
 	"encoding/json"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 type Person struct {
@@ -13,86 +14,99 @@ type Person struct {
 
 func TestToJSONBytes(t *testing.T) {
 	p := Person{Name: "Alice", Age: 30}
-	jsonBytes := ToJSONBytes(p)
 
-	if jsonBytes == nil {
-		t.Fatal("ToJSONBytes returned nil")
-	}
+	jsonBytes, err := ToJSONBytes(p)
+	assert.NoError(t, err)
+	assert.NotNil(t, jsonBytes)
+
+	var out Person
+	err = json.Unmarshal(jsonBytes, &out)
+	assert.NoError(t, err)
+	assert.Equal(t, p, out)
 }
 
-func TestJSONBytesToStruct(t *testing.T) {
+func TestFromJSONBytes(t *testing.T) {
 	jsonData := []byte(`{"name":"Bob","age":25}`)
 
-	var p Person
-	err := JSONBytesToStruct(jsonData, &p)
-
-	if err != nil {
-		t.Fatalf("JSONBytesToStruct failed: %v", err)
-	}
-	if p.Name != "Bob" || p.Age != 25 {
-		t.Errorf("Got %+v; want {Name:Bob Age:25}", p)
-	}
+	p, err := FromJSONBytes[Person](jsonData)
+	assert.NoError(t, err)
+	assert.Equal(t, "Bob", p.Name)
+	assert.Equal(t, 25, p.Age)
 }
 
-func TestJSONBytesToStruct_NotPointer(t *testing.T) {
-	jsonData := []byte(`{"name":"Bob","age":25}`)
+func TestFromJSON(t *testing.T) {
+	jsonStr := `{"name":"Carol","age":40}`
 
-	var p Person
-	err := JSONBytesToStruct(jsonData, p) // not pointer
-
-	if err == nil || err.Error() != "must be a pointer" {
-		t.Errorf("Expected 'must be a pointer' error, got %v", err)
-	}
+	p, err := FromJSON[Person](jsonStr)
+	assert.NoError(t, err)
+	assert.Equal(t, "Carol", p.Name)
+	assert.Equal(t, 40, p.Age)
 }
 
 func TestToJSON(t *testing.T) {
 	p := Person{Name: "Alice", Age: 30}
+
 	jsonStr := ToJSON(p)
+	assert.NotEmpty(t, jsonStr)
 
-	if jsonStr == "" {
-		t.Fatal("ToJSON returned empty string")
-	}
-	if jsonStr != `{"name":"Alice","age":30}` && jsonStr != `{"age":30,"name":"Alice"}` {
-		t.Errorf("ToJSON returned unexpected string: %s", jsonStr)
-	}
-}
-
-func TestJSONToStruct(t *testing.T) {
-	jsonStr := `{"name":"Carol","age":40}`
-
-	var p Person
-	err := ToStruct(jsonStr, &p)
-
-	if err != nil {
-		t.Fatalf("ToStruct failed: %v", err)
-	}
-	if p.Name != "Carol" || p.Age != 40 {
-		t.Errorf("Got %+v; want {Name:Carol Age:40}", p)
-	}
-}
-
-func TestJSONToStruct_NotPointer(t *testing.T) {
-	jsonStr := `{"name":"Carol","age":40}`
-
-	var p Person
-	err := ToStruct(jsonStr, p)
-
-	if err == nil || err.Error() != "must be a pointer" {
-		t.Errorf("Expected 'must be a pointer' error, got %v", err)
-	}
+	var out Person
+	err := json.Unmarshal([]byte(jsonStr), &out)
+	assert.NoError(t, err)
+	assert.Equal(t, p, out)
 }
 
 func TestStructToMap(t *testing.T) {
 	p := Person{Name: "Dan", Age: 22}
-	result := StructToMap(p)
 
-	if result == nil {
-		t.Fatal("StructToMap returned nil")
-	}
+	m := StructToMap(p)
+	assert.NotNil(t, m)
 
-	if result["name"] != "Dan" || int(result["age"].(float64)) != 22 {
-		t.Errorf("Got %+v; want {name: Dan, age: 22}", result)
-	}
+	assert.Equal(t, "Dan", m["name"])
+	assert.Equal(t, float64(22), m["age"])
+}
+
+func TestJSONToMap(t *testing.T) {
+	jsonStr := `{
+		"age": 20,
+		"name": "Alice",
+		"email": "alice@example.com"
+	}`
+
+	m, err := FromJSON[map[string]interface{}](jsonStr)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "Alice", m["name"])
+	assert.Equal(t, float64(20), m["age"])
+}
+
+func TestFromJSON_ObjectToStruct(t *testing.T) {
+	jsonStr := `{
+		"age": 20,
+		"name": "Alice",
+		"email": "alice@example.com"
+	}`
+
+	user, err := FromJSON[Person](jsonStr)
+	assert.NoError(t, err)
+
+	assert.Equal(t, 20, user.Age)
+	assert.Equal(t, "Alice", user.Name)
+}
+
+func TestFromJSON_ArrayToSlice(t *testing.T) {
+	jsonStr := `[
+		{ "age": 10, "name": "Alice" },
+		{ "age": 22, "name": "Bob" }
+	]`
+
+	users, err := FromJSON[[]Person](jsonStr)
+	assert.NoError(t, err)
+	assert.Len(t, users, 2)
+
+	assert.Equal(t, 10, users[0].Age)
+	assert.Equal(t, "Alice", users[0].Name)
+	assert.Equal(t, 22, users[1].Age)
+	assert.Equal(t, "Bob", users[1].Name)
 }
 
 func TestPretty_Struct(t *testing.T) {

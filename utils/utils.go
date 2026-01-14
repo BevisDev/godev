@@ -16,7 +16,7 @@ type MapObject map[string]interface{}
 
 func NewCtx() context.Context {
 	ctx := context.Background()
-	return context.WithValue(ctx, consts.State, random.RandUUID())
+	return context.WithValue(ctx, consts.State, random.NewUUID())
 }
 
 func SetValueCtx(ctx context.Context, key string, value interface{}) context.Context {
@@ -28,22 +28,22 @@ func SetValueCtx(ctx context.Context, key string, value interface{}) context.Con
 
 func GetState(ctx context.Context) string {
 	if ctx == nil {
-		return random.RandUUID()
+		return random.NewUUID()
 	}
 
 	state, ok := ctx.Value(consts.State).(string)
 	if !ok {
-		state = random.RandUUID()
+		state = random.NewUUID()
 	}
 
 	return state
 }
 
-func NewCtxTimeout(ctx context.Context, timeoutSec int) (context.Context, context.CancelFunc) {
+func NewCtxTimeout(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	return context.WithTimeout(ctx, time.Duration(timeoutSec)*time.Second)
+	return context.WithTimeout(ctx, timeout)
 }
 
 func NewCtxCancel(ctx context.Context) (context.Context, context.CancelFunc) {
@@ -188,36 +188,6 @@ func IndexOf[T comparable](slice []T, value T) int {
 	return slices.Index(slice, value)
 }
 
-// Min returns the smaller of two ordered values a and b.
-//
-// Works with any comparable type (int, float64, string, etc.).
-//
-// Example:
-//
-//	min := Min(3, 7)        // min = 3
-//	min := Min("a", "b")    // min = "a"
-func Min[T constraints.Ordered](a, b T) T {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-// Max returns the larger of two ordered values a and b.
-//
-// Works with any comparable type (int, float64, string, etc.).
-//
-// Example:
-//
-//	max := Max(3, 7)        // max = 7
-//	max := Max("a", "b")    // max = "b"
-func Max[T constraints.Ordered](a, b T) T {
-	if a > b {
-		return a
-	}
-	return b
-}
-
 // Percent converts an integer value to its percentage form as a float64.
 //
 // For example, Percent(65) returns 0.65.
@@ -230,17 +200,17 @@ func Percent[T constraints.Integer](n T) float64 {
 	return float64(n) / 100
 }
 
-// Milli multiplies an integer by one million.
+// A Million multiplies an integer by one million.
 //
 // It is useful when you want to convert a base unit into millions.
-// For example, Milli(5) returns 5,000,000.
+// For example, Million(5) returns 5,000,000.
 //
 // Example:
 //
 //	n := 5
-//	result := Milli(n)
+//	result := Million(n)
 //	// result == 5_000_000
-func Milli(n int64) int64 {
+func Million(n int64) int64 {
 	return n * 1_000_000
 }
 
@@ -283,7 +253,7 @@ func RoundUpToMul[T constraints.Integer](n T, mul T) T {
 	return ((n / mul) + 1) * mul
 }
 
-// PtrTo returns a pointer to the given value.
+// GetPointer returns a pointer to the given value.
 //
 // Useful in tests and code where you want to pass a pointer literal.
 //
@@ -291,6 +261,6 @@ func RoundUpToMul[T constraints.Integer](n T, mul T) T {
 //
 //	s := ptrTo("hello")  // *string → "hello"
 //	n := ptrTo(123)      // *int → 123
-func PtrTo[T any](v T) *T {
+func GetPointer[T any](v T) *T {
 	return &v
 }

@@ -4,12 +4,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/BevisDev/godev/consts"
 	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/BevisDev/godev/consts"
+)
+
+var (
+	ErrNotPointer = errors.New("value is not a pointer")
 )
 
 // IsNilOrEmpty checks whether the given input is nil or empty.
@@ -35,7 +40,7 @@ func IsNilOrEmpty(inp interface{}) bool {
 	}
 	v := reflect.ValueOf(inp)
 
-	// get val ptr
+	// check if pointer and nil
 	if v.Kind() == reflect.Ptr {
 		if v.IsNil() {
 			return true
@@ -55,9 +60,9 @@ func IsNilOrEmpty(inp interface{}) bool {
 	}
 }
 
-// IsNilOrZero checks whether a value is nil or equals to numeric zero.
+// IsNilOrNumericZero checks whether a value is nil or equals to numeric zero.
 // It supports int, int64, float64, uint, pointers to those types.
-func IsNilOrZero(v interface{}) bool {
+func IsNilOrNumericZero(v interface{}) bool {
 	if v == nil {
 		return true
 	}
@@ -83,20 +88,32 @@ func IsNilOrZero(v interface{}) bool {
 	}
 }
 
-func IsErrorOrEmpty(err *error, i interface{}) bool {
-	if *err != nil {
-		return true
+// MustSucceed returns an error if:
+//   - err is not nil, OR
+//   - data is nil / empty
+func MustSucceed(err error, i interface{}) error {
+	if err != nil {
+		return err
 	}
-
 	if IsNilOrEmpty(i) {
-		*err = fmt.Errorf("value of type %v empty", reflect.TypeOf(i))
-		return true
+		return fmt.Errorf("value of type %v empty", reflect.TypeOf(i))
 	}
-
-	return false
+	return nil
 }
 
-func IsPtr(i interface{}) bool {
+// IsPointer reports whether i is a pointer type (nil pointer is allowed).
+func IsPointer(i interface{}) error {
+	if i == nil {
+		return ErrNotPointer
+	}
+	if reflect.ValueOf(i).Kind() != reflect.Ptr {
+		return ErrNotPointer
+	}
+	return nil
+}
+
+// IsNonNilPointer reports whether i is a non-nil pointer.
+func IsNonNilPointer(i interface{}) bool {
 	if i == nil {
 		return false
 	}

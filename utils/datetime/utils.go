@@ -18,8 +18,8 @@ func ToString(t time.Time, format string) string {
 // Example:
 //
 //	t, err := ToTime("2024-01-02", "2006-01-02")
-func ToTime(timeStr string, format string) (*time.Time, error) {
-	parsedTime, err := time.Parse(format, timeStr)
+func ToTime(str string, format string) (*time.Time, error) {
+	parsedTime, err := time.Parse(format, str)
 	if err != nil {
 		return nil, err
 	}
@@ -27,42 +27,77 @@ func ToTime(timeStr string, format string) (*time.Time, error) {
 }
 
 // BeginDay returns a time.Time representing the start of the day (00:00:00) in the same location.
-func BeginDay(date time.Time) time.Time {
-	return time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, date.Location())
+func BeginDay(t time.Time) time.Time {
+	return time.Date(
+		t.Year(), t.Month(), t.Day(),
+		0, 0, 0, 0,
+		t.Location(),
+	)
 }
 
 // EndDay returns a time.Time representing the end of the day (23:59:59.999999000) in the same location.
-func EndDay(date time.Time) time.Time {
-	return time.Date(date.Year(), date.Month(), date.Day(), 23, 59, 59, 999999000, date.Location())
+func EndDay(t time.Time) time.Time {
+	return time.Date(
+		t.Year(), t.Month(), t.Day(),
+		23, 59, 59, 999999000,
+		t.Location(),
+	)
 }
 
-// AddTime adds a specified amount of time to the given date based on the unit kind.
-// Supported kinds: Nanosecond, Millisecond, Second, Minute, Hour, Day, Month, Year.
-//
-// Example:
-//
-//	AddTime(time.Now(), 3, Day)
-func AddTime(date time.Time, v int, unit Unit) time.Time {
-	switch unit {
-	case Nanosecond:
-		return date.Add(time.Duration(v) * time.Nanosecond)
-	case Millisecond:
-		return date.Add(time.Duration(v) * time.Millisecond)
-	case Second:
-		return date.Add(time.Duration(v) * time.Second)
-	case Minute:
-		return date.Add(time.Duration(v) * time.Minute)
-	case Hour:
-		return date.Add(time.Duration(v) * time.Hour)
-	case Day:
-		return date.AddDate(0, 0, v)
-	case Month:
-		return date.AddDate(0, v, 0)
-	case Year:
-		return date.AddDate(v, 0, 0)
-	default:
-		return date
-	}
+func AddYears(t time.Time, n int) time.Time {
+	return t.AddDate(n, 0, 0)
+}
+
+func SubYears(t time.Time, n int) time.Time {
+	return t.AddDate(-n, 0, 0)
+}
+
+func AddMonths(t time.Time, n int) time.Time {
+	return t.AddDate(0, n, 0)
+}
+
+func SubMonths(t time.Time, n int) time.Time {
+	return t.AddDate(0, -n, 0)
+}
+
+func AddDays(t time.Time, n int) time.Time {
+	return t.AddDate(0, 0, n)
+}
+
+func SubDays(t time.Time, n int) time.Time {
+	return t.AddDate(0, 0, -n)
+}
+
+func AddHours(t time.Time, n int) time.Time {
+	return t.Add(time.Duration(n) * time.Hour)
+}
+
+func SubHours(t time.Time, n int) time.Time {
+	return t.Add(-time.Duration(n) * time.Hour)
+}
+
+func AddMinutes(t time.Time, n int) time.Time {
+	return t.Add(time.Duration(n) * time.Minute)
+}
+
+func SubMinutes(t time.Time, n int) time.Time {
+	return t.Add(-time.Duration(n) * time.Minute)
+}
+
+func AddSeconds(t time.Time, n int) time.Time {
+	return t.Add(time.Duration(n) * time.Second)
+}
+
+func SubSeconds(t time.Time, n int) time.Time {
+	return t.Add(-time.Duration(n) * time.Second)
+}
+
+func AddMilliseconds(t time.Time, n int) time.Time {
+	return t.Add(time.Duration(n) * time.Millisecond)
+}
+
+func SubMilliseconds(t time.Time, n int) time.Time {
+	return t.Add(-time.Duration(n) * time.Millisecond)
 }
 
 // IsSameDate returns true if t1 and t2 have the same year, month, and day.
@@ -72,9 +107,19 @@ func IsSameDate(t1, t2 time.Time) bool {
 		t1.Day() == t2.Day()
 }
 
-// IsWithinDays returns true if the given time is within the past N days from now.
-func IsWithinDays(t time.Time, day int) bool {
-	return time.Since(t) <= time.Duration(day)*24*time.Hour
+// WithinDaysAt returns true if the given time is within the past N days from t2.
+func WithinDaysAt(t1, t2 time.Time, days int) bool {
+	start := SubDays(
+		BeginDay(t2),
+		days,
+	)
+	return !t1.Before(start)
+}
+
+// WithinHoursAt returns true if t1 is within the past N hours from t2.
+// The comparison is duration-based (exact hours).
+func WithinHoursAt(t1, t2 time.Time, hours int) bool {
+	return t2.Sub(t1) <= time.Duration(hours)*time.Hour
 }
 
 // DaysBetween returns the absolute number of full days between two dates.
@@ -88,7 +133,11 @@ func DaysBetween(t1, t2 time.Time) int {
 
 // StartOfMonth returns a time.Time representing the start of the month (the first day at midnight).
 func StartOfMonth(t time.Time) time.Time {
-	return time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, t.Location())
+	return time.Date(
+		t.Year(), t.Month(), 1,
+		0, 0, 0, 0,
+		t.Location(),
+	)
 }
 
 // EndOfMonth returns a time.Time representing the last day of the month at midnight.
@@ -113,7 +162,7 @@ func StartOfWeek(t time.Time) time.Time {
 	}
 
 	// Subtract days to go back to Monday
-	start := AddTime(t, -(weekday - 1), Day)
+	start := SubDays(t, weekday-1)
 
 	// Return the date set to 00:00:00
 	return BeginDay(start)
@@ -132,7 +181,7 @@ func EndOfWeek(t time.Time) time.Time {
 	startOfWeek := StartOfWeek(t)
 
 	// Add 6 days to reach Sunday
-	end := AddTime(startOfWeek, 6, Day)
+	end := AddDays(startOfWeek, 6)
 
 	// Set time to end of day (23:59:59.999999)
 	return EndDay(end)
@@ -168,16 +217,16 @@ func IsToday(t time.Time) bool {
 //	}
 func IsYesterday(t time.Time) bool {
 	now := time.Now()
-	yesterday := AddTime(now, -1, Day)
+	yesterday := SubDays(now, 1)
 	return IsSameDate(t, yesterday)
 }
 
-// GetTimestamp returns the current Unix timestamp in milliseconds.
-func GetTimestamp() int64 {
+// Timestamp returns the current Unix timestamp in milliseconds.
+func Timestamp() int64 {
 	return time.Now().UnixMilli()
 }
 
-// GetAge computes the age in years based on a date of birth and a reference date.
+// AgeAt computes the age in years based on a date of birth and a reference date.
 //
 // If the reference date (calcTime) is before the birthday in the current year,
 // the age is decreased by 1.
@@ -186,7 +235,7 @@ func GetTimestamp() int64 {
 //
 //	dob := time.Date(1990, 7, 10, 0, 0, 0, 0, time.UTC)
 //	ref := time.Date(2024, 7, 9, 0, 0, 0, 0, time.UTC)
-//	age := GetAge(dob, ref) // returns 33
+//	age := AgeAt(dob, ref) // returns 33
 //
 // Parameters:
 //   - dob: date of birth
@@ -194,7 +243,7 @@ func GetTimestamp() int64 {
 //
 // Returns:
 //   - The integer age in years
-func GetAge(dob, calcTime time.Time) int {
+func AgeAt(dob, calcTime time.Time) int {
 	age := calcTime.Year() - dob.Year()
 
 	if calcTime.Month() < dob.Month() ||

@@ -56,7 +56,7 @@ func TestIsNilOrEmpty(t *testing.T) {
 	}
 }
 
-func TestIsNilOrZero(t *testing.T) {
+func TestIsNilOrNumericZero(t *testing.T) {
 	var (
 		nilIntPointer   *int
 		nilFloatPointer *float64
@@ -97,21 +97,21 @@ func TestIsNilOrZero(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := IsNilOrZero(tt.v)
+			got := IsNilOrNumericZero(tt.v)
 			if got != tt.want {
-				t.Errorf("IsNilOrZero(%v) = %v, want %v", tt.v, got, tt.want)
+				t.Errorf("IsNilOrNumericZero(%v) = %v, want %v", tt.v, got, tt.want)
 			}
 		})
 	}
 }
 
-func TestIsErrorOrEmpty(t *testing.T) {
+func TestMustSucceed(t *testing.T) {
 	errSample := errors.New("some error")
 	tests := []struct {
 		name     string
 		err      error
 		value    interface{}
-		expected bool
+		hasError bool
 	}{
 		{"no error, not empty", nil, "abc", false},
 		{"with error", errSample, "abc", true},
@@ -121,22 +121,25 @@ func TestIsErrorOrEmpty(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := IsErrorOrEmpty(&tt.err, tt.value)
-			if result != tt.expected {
-				t.Errorf("IsErrorOrEmpty(%v, %v) = %v; want %v", tt.err, tt.value, result, tt.expected)
+			err := MustSucceed(tt.err, tt.value)
+			if (err != nil) != tt.hasError {
+				t.Errorf(
+					"MustSucceed(%v, %v) error = %v; want error = %v",
+					tt.err, tt.value, err, tt.hasError,
+				)
 			}
 		})
 	}
 }
 
-func TestIsPtr(t *testing.T) {
+func TestIsPointer(t *testing.T) {
 	a := 5
 	var pNil *int
 
 	tests := []struct {
-		name     string
-		input    interface{}
-		expected bool
+		name    string
+		input   interface{}
+		wantErr bool
 	}{
 		{"pointer int", &a, true},
 		{"non-pointer", a, false},
@@ -146,9 +149,12 @@ func TestIsPtr(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := IsPtr(tt.input)
-			if result != tt.expected {
-				t.Errorf("IsPtr(%v) = %v; want %v", tt.input, result, tt.expected)
+			err := IsPointer(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Errorf(
+					"IsPointer(%v) error = %v; wantErr = %v",
+					tt.input, err, tt.wantErr,
+				)
 			}
 		})
 	}
@@ -156,6 +162,7 @@ func TestIsPtr(t *testing.T) {
 
 func TestIsStruct(t *testing.T) {
 	type MyStruct struct{ Name string }
+
 	var s *MyStruct
 	var i interface{}
 	var ip *int
