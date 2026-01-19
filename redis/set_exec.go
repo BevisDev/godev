@@ -1,6 +1,9 @@
 package redis
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 type ChainSetExec[T any] interface {
 	// Key specifies a single key to operate on for the next execution command
@@ -10,8 +13,7 @@ type ChainSetExec[T any] interface {
 	Values(vals interface{}) ChainSetExec[T]
 
 	// Expire sets the Time-To-Live (TTL) for the key.
-	// n is the time duration, and unit specifies the scale (e.g., "s" for seconds).
-	Expire(n int, unit string) ChainSetExec[T]
+	Expire(d time.Duration) ChainSetExec[T]
 
 	// Add adds one or more members to the set
 	Add(ctx context.Context) error

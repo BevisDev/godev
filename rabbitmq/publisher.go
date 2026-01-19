@@ -107,7 +107,11 @@ func (p *Publisher) buildMessage(message interface{}) (string, []byte, error) {
 		float32, float64:
 		body = []byte(fmt.Sprint(v))
 	default:
-		body = jsonx.ToJSONBytes(v)
+		var err error
+		body, err = jsonx.ToJSONBytes(v)
+		if err != nil {
+			return "", nil, err
+		}
 		contentType = consts.ApplicationJSON
 	}
 	// message can not exceed max size

@@ -2,6 +2,7 @@ package redis
 
 import (
 	"context"
+	"time"
 )
 
 type ChainExec[T any] interface {
@@ -18,8 +19,7 @@ type ChainExec[T any] interface {
 	Values(values interface{}) ChainExec[T]
 
 	// Expire sets the Time-To-Live (TTL) for the key.
-	// n is the time duration, and unit specifies the scale (e.g., "s" for seconds).
-	Expire(n int, unit string) ChainExec[T]
+	Expire(d time.Duration) ChainExec[T]
 
 	// Put executes a direct Set operation for a single Key-Value pair,
 	Put(k string, v interface{}) ChainExec[T]

@@ -47,8 +47,8 @@ type request[T any] struct {
 	// method execute request
 	method string
 
-	// state: ID request
-	state string
+	// rid: ID request
+	rid string
 
 	// startTime time begin request
 	startTime time.Time
@@ -136,21 +136,19 @@ func (r *request[T]) DELETE(c context.Context) (Response[T], error) {
 
 func (r *request[T]) restTemplate(c context.Context) (Response[T], error) {
 	// set metadata
-	r.state = utils.GetRID(c)
+	r.rid = utils.GetRID(c)
 	r.startTime = time.Now()
 
-	// flag check request form-data
+	// determine request shape and prepare URL/body/headers
 	isFormData := !validate.IsNilOrEmpty(r.bodyForm)
-
-	// set content-type
 	r.setContentType(isFormData)
-
-	// build URL
 	r.buildURL()
 
-	// raw to send request
-	// body send form-data and log
-	raw, body := r.serializeBody(isFormData)
+	// serialise body for transport and logging
+	raw, body, err := r.serializeBody(isFormData)
+	if err != nil {
+		return Response[T]{}, err
+	}
 
 	// log request
 	r.logRequest(body)
@@ -159,17 +157,7 @@ func (r *request[T]) restTemplate(c context.Context) (Response[T], error) {
 	defer cancel()
 
 	// create request
-	var (
-		request *http.Request
-		err     error
-	)
-	if isFormData {
-		request, err = http.NewRequestWithContext(ctx, r.method, r.url, bytes.NewBufferString(body))
-	} else if validate.IsNilOrEmpty(raw) {
-		request, err = http.NewRequestWithContext(ctx, r.method, r.url, nil)
-	} else {
-		request, err = http.NewRequestWithContext(ctx, r.method, r.url, bytes.NewBuffer(raw))
-	}
+	request, err := r.httpRequest(ctx, isFormData, raw, body)
 	if err != nil {
 		return Response[T]{}, err
 	}
@@ -185,34 +173,55 @@ func (r *request[T]) restTemplate(c context.Context) (Response[T], error) {
 // If form-data, encodes BodyForm as URL-encoded string.
 // If Body is []byte, use it directly and log as "[binary body]".
 // Otherwise, marshal Body to JSON and convert to string for logging.
-func (r *request[T]) serializeBody(isFormData bool) ([]byte, string) {
+func (r *request[T]) serializeBody(isFormData bool) ([]byte, string, error) {
 	// CASE: form-data
 	if isFormData {
 		formValues := url.Values{}
 		for k, v := range r.bodyForm {
 			formValues.Add(k, v)
 		}
-		return nil, formValues.Encode()
+		return nil, formValues.Encode(), nil
 	}
 
 	// CASE: []byte and JSON
 	if !validate.IsNilOrEmpty(r.body) {
 		switch b := r.body.(type) {
 		case []byte:
-			return b, ""
+			return b, "", nil
 		default:
-			raw := jsonx.ToJSONBytes(r.body)
-			return raw, string(raw)
+			raw, err := jsonx.ToJSONBytes(r.body)
+			if err != nil {
+				return nil, "", err
+			}
+			return raw, string(raw), nil
 		}
 	}
 
-	return nil, ""
+	return nil, "", nil
+}
+
+// httpRequest constructs the underlying *http.Request based on
+// the previously prepared URL, headers and body serialisation.
+func (r *request[T]) httpRequest(
+	ctx context.Context,
+	isFormData bool,
+	raw []byte,
+	body string,
+) (*http.Request, error) {
+	switch {
+	case isFormData:
+		return http.NewRequestWithContext(ctx, r.method, r.url, bytes.NewBufferString(body))
+	case validate.IsNilOrEmpty(raw):
+		return http.NewRequestWithContext(ctx, r.method, r.url, nil)
+	default:
+		return http.NewRequestWithContext(ctx, r.method, r.url, bytes.NewBuffer(raw))
+	}
 }
 
 func (r *request[T]) logRequest(body string) {
 	if r.useLog {
 		log := &logx.RequestLogger{
-			RID:    r.state,
+			RID:    r.rid,
 			URL:    r.url,
 			Method: r.method,
 			Time:   r.startTime,
@@ -232,19 +241,19 @@ func (r *request[T]) logRequest(body string) {
 
 	var sb strings.Builder
 	sb.WriteString("\n========== REQUEST INFO ==========\n")
-	sb.WriteString(fmt.Sprintf(consts.RID+": %s\n", r.state))
-	sb.WriteString(fmt.Sprintf(consts.Url+": %s\n", r.url))
-	sb.WriteString(fmt.Sprintf(consts.Method+": %s\n", r.method))
-	sb.WriteString(fmt.Sprintf(consts.Time+": %s\n",
-		datetime.ToString(r.startTime, datetime.DateTimeLayoutMilli)))
+	fmt.Fprintf(&sb, consts.RID+": %s\n", r.rid)
+	fmt.Fprintf(&sb, consts.Url+": %s\n", r.url)
+	fmt.Fprintf(&sb, consts.Method+": %s\n", r.method)
+	fmt.Fprintf(&sb, consts.Time+": %s\n",
+		datetime.ToString(r.startTime, datetime.DateTimeLayoutMilli))
 	if !validate.IsNilOrEmpty(r.queryParams) {
-		sb.WriteString(fmt.Sprintf(consts.Query+": %v\n", r.queryParams))
+		fmt.Fprintf(&sb, consts.Query+": %v\n", r.queryParams)
 	}
 	if !r.skipHeader {
-		sb.WriteString(fmt.Sprintf(consts.Header+": %s\n", r.headers))
+		fmt.Fprintf(&sb, consts.Header+": %s\n", r.headers)
 	}
 	if body != "" && r.logBody(r.headers[consts.ContentType]) {
-		sb.WriteString(fmt.Sprintf(consts.Body+": %s\n", body))
+		fmt.Fprintf(&sb, consts.Body+": %s\n", body)
 	}
 	sb.WriteString("==================================\n")
 	log.Println(sb.String())
@@ -271,6 +280,7 @@ func (r *request[T]) execute(request *http.Request) (Response[T], error) {
 		RawBody:    raw,
 		Header:     response.Header,
 		HasBody:    len(raw) > 0,
+		Duration:   time.Since(r.startTime),
 	}
 
 	// log response
@@ -288,28 +298,39 @@ func (r *request[T]) execute(request *http.Request) (Response[T], error) {
 		return resp, nil
 	}
 
-	// GET DATA
-	var result T
-	switch any(result).(type) {
-	case []byte, json.RawMessage:
-		resp.Data = any(raw).(T)
-	case string:
-		resp.Data = any(resp.Body).(T)
-	default:
-		if err = jsonx.JSONBytesToStruct(raw, &result); err != nil {
-			return resp, fmt.Errorf("unmarshal response to %T failed: %w", result, err)
-		}
-		resp.Data = result
+	result, err := r.getData(raw)
+	if err != nil {
+		return resp, err
 	}
+	resp.Data = result
 
 	return resp, nil
+}
+
+// getData converts the raw HTTP response bytes into the generic
+// type T. It supports []byte, json.RawMessage, string and arbitrary structs.
+func (r *request[T]) getData(raw []byte) (T, error) {
+	var result T
+
+	switch any(result).(type) {
+	case []byte, json.RawMessage:
+		return any(raw).(T), nil
+	case string:
+		return any(string(raw)).(T), nil
+	default:
+		result, err := jsonx.FromJSONBytes[T](raw)
+		if err != nil {
+			return result, fmt.Errorf("unmarshal response to %T failed: %w", result, err)
+		}
+		return result, nil
+	}
 }
 
 func (r *request[T]) logResponse(response *http.Response,
 	hasBody bool, body string) {
 	if r.useLog {
 		logger := &logx.ResponseLogger{
-			RID:      r.state,
+			RID:      r.rid,
 			Status:   response.StatusCode,
 			Duration: time.Since(r.startTime),
 		}
@@ -323,14 +344,14 @@ func (r *request[T]) logResponse(response *http.Response,
 	} else {
 		var sb strings.Builder
 		sb.WriteString("\n========== RESPONSE INFO ==========\n")
-		sb.WriteString(fmt.Sprintf(consts.RID+": %s\n", r.state))
-		sb.WriteString(fmt.Sprintf(consts.Status+": %d\n", response.StatusCode))
-		sb.WriteString(fmt.Sprintf(consts.Duration+": %s\n", time.Since(r.startTime)))
+		fmt.Fprintf(&sb, consts.RID+": %s\n", r.rid)
+		fmt.Fprintf(&sb, consts.Status+": %d\n", response.StatusCode)
+		fmt.Fprintf(&sb, consts.Duration+": %s\n", time.Since(r.startTime))
 		if !r.skipHeader {
-			sb.WriteString(fmt.Sprintf(consts.Header+": %s\n", response.Header))
+			fmt.Fprintf(&sb, consts.Header+": %s\n", response.Header)
 		}
 		if hasBody && r.logBody(response.Header.Get(consts.ContentType)) {
-			sb.WriteString(fmt.Sprintf(consts.Body+": %s\n", body))
+			fmt.Fprintf(&sb, consts.Body+": %s\n", body)
 		}
 		sb.WriteString("==================================\n")
 		log.Println(sb.String())

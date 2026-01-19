@@ -2,7 +2,7 @@ package redis
 
 import (
 	"context"
-	"fmt"
+	"time"
 
 	"github.com/BevisDev/godev/utils"
 	"github.com/BevisDev/godev/utils/jsonx"
@@ -29,8 +29,8 @@ func (c *ChainSet[T]) Values(values interface{}) ChainSetExec[T] {
 	return c
 }
 
-func (c *ChainSet[T]) Expire(n int, unit string) ChainSetExec[T] {
-	c.Chain.Expire(n, unit)
+func (c *ChainSet[T]) Expire(d time.Duration) ChainSetExec[T] {
+	c.Chain.Expire(d)
 	return c
 }
 
@@ -43,7 +43,7 @@ func (c *ChainSet[T]) Add(ctx context.Context) error {
 	}
 
 	rdb := c.GetClient()
-	ct, cancel := utils.NewCtxTimeout(ctx, c.TimeoutSec)
+	ct, cancel := utils.NewCtxTimeout(ctx, c.Timeout)
 	defer cancel()
 
 	if err := rdb.SAdd(ct, c.key, c.values...).Err(); err != nil {
@@ -65,7 +65,7 @@ func (c *ChainSet[T]) Remove(ctx context.Context) error {
 	}
 
 	rdb := c.GetClient()
-	ct, cancel := utils.NewCtxTimeout(ctx, c.TimeoutSec)
+	ct, cancel := utils.NewCtxTimeout(ctx, c.Timeout)
 	defer cancel()
 
 	if err := rdb.SRem(ct, c.key, c.values...).Err(); err != nil {
@@ -81,7 +81,7 @@ func (c *ChainSet[T]) Contains(ctx context.Context, val interface{}) (bool, erro
 	}
 
 	rdb := c.GetClient()
-	ct, cancel := utils.NewCtxTimeout(ctx, c.TimeoutSec)
+	ct, cancel := utils.NewCtxTimeout(ctx, c.Timeout)
 	defer cancel()
 
 	return rdb.SIsMember(ct, c.key, val).Result()
@@ -93,7 +93,7 @@ func (c *ChainSet[T]) GetAll(ctx context.Context) ([]*T, error) {
 	}
 
 	rdb := c.GetClient()
-	ct, cancel := utils.NewCtxTimeout(ctx, c.TimeoutSec)
+	ct, cancel := utils.NewCtxTimeout(ctx, c.Timeout)
 	defer cancel()
 
 	res, err := rdb.SMembers(ct, c.key).Result()
@@ -103,13 +103,9 @@ func (c *ChainSet[T]) GetAll(ctx context.Context) ([]*T, error) {
 
 	result := make([]*T, 0, len(res))
 	for _, v := range res {
-		var t T
-		if _, ok := any(t).(string); ok {
-			t = any(v).(T)
-		} else {
-			if err := jsonx.ToStruct(v, &t); err != nil {
-				return nil, fmt.Errorf("parse to %T failed: %w", t, err)
-			}
+		t, err := jsonx.FromJSON[T](v)
+		if err != nil {
+			return nil, err
 		}
 		result = append(result, &t)
 	}
@@ -123,7 +119,7 @@ func (c *ChainSet[T]) Size(ctx context.Context) (int64, error) {
 	}
 
 	rdb := c.GetClient()
-	ct, cancel := utils.NewCtxTimeout(ctx, c.TimeoutSec)
+	ct, cancel := utils.NewCtxTimeout(ctx, c.Timeout)
 	defer cancel()
 
 	return rdb.SCard(ct, c.key).Result()

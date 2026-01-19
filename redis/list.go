@@ -2,7 +2,7 @@ package redis
 
 import (
 	"context"
-	"fmt"
+	"time"
 
 	"github.com/BevisDev/godev/utils"
 	"github.com/BevisDev/godev/utils/jsonx"
@@ -32,8 +32,8 @@ func (c *ChainList[T]) Values(values interface{}) ChainListExec[T] {
 	return c
 }
 
-func (c *ChainList[T]) Expire(n int, unit string) ChainListExec[T] {
-	c.Chain.Expire(n, unit)
+func (c *ChainList[T]) Expire(d time.Duration) ChainListExec[T] {
+	c.Chain.Expire(d)
 	return c
 }
 
@@ -57,7 +57,7 @@ func (c *ChainList[T]) AddFirst(ctx context.Context) error {
 	}
 
 	rdb := c.GetClient()
-	ct, cancel := utils.NewCtxTimeout(ctx, c.TimeoutSec)
+	ct, cancel := utils.NewCtxTimeout(ctx, c.Timeout)
 	defer cancel()
 
 	if err := rdb.LPush(ct, c.key, c.values...).Err(); err != nil {
@@ -79,7 +79,7 @@ func (c *ChainList[T]) Add(ctx context.Context) error {
 	}
 
 	rdb := c.GetClient()
-	ct, cancel := utils.NewCtxTimeout(ctx, c.TimeoutSec)
+	ct, cancel := utils.NewCtxTimeout(ctx, c.Timeout)
 	defer cancel()
 
 	if err := rdb.RPush(ct, c.key, c.values...).Err(); err != nil {
@@ -98,7 +98,7 @@ func (c *ChainList[T]) PopFront(ctx context.Context) (*T, error) {
 	}
 
 	rdb := c.GetClient()
-	ct, cancel := utils.NewCtxTimeout(ctx, c.TimeoutSec)
+	ct, cancel := utils.NewCtxTimeout(ctx, c.Timeout)
 	defer cancel()
 
 	val, err := rdb.LPop(ct, c.key).Result()
@@ -109,11 +109,9 @@ func (c *ChainList[T]) PopFront(ctx context.Context) (*T, error) {
 		return nil, err
 	}
 
-	var t T
-	if _, ok := any(t).(string); ok {
-		t = any(val).(T)
-	} else if err := jsonx.ToStruct(val, &t); err != nil {
-		return nil, fmt.Errorf("parse to %T failed: %w", t, err)
+	t, err := jsonx.FromJSON[T](val)
+	if err != nil {
+		return nil, err
 	}
 	return &t, nil
 }
@@ -124,7 +122,7 @@ func (c *ChainList[T]) Pop(ctx context.Context) (*T, error) {
 	}
 
 	rdb := c.GetClient()
-	ct, cancel := utils.NewCtxTimeout(ctx, c.TimeoutSec)
+	ct, cancel := utils.NewCtxTimeout(ctx, c.Timeout)
 	defer cancel()
 
 	val, err := rdb.RPop(ct, c.key).Result()
@@ -135,11 +133,9 @@ func (c *ChainList[T]) Pop(ctx context.Context) (*T, error) {
 		return nil, err
 	}
 
-	var t T
-	if _, ok := any(t).(string); ok {
-		t = any(val).(T)
-	} else if err := jsonx.ToStruct(val, &t); err != nil {
-		return nil, fmt.Errorf("parse to %T failed: %w", t, err)
+	t, err := jsonx.FromJSON[T](val)
+	if err != nil {
+		return nil, err
 	}
 	return &t, nil
 }
@@ -150,7 +146,7 @@ func (c *ChainList[T]) GetRange(ctx context.Context) ([]*T, error) {
 	}
 
 	rdb := c.GetClient()
-	ct, cancel := utils.NewCtxTimeout(ctx, c.TimeoutSec)
+	ct, cancel := utils.NewCtxTimeout(ctx, c.Timeout)
 	defer cancel()
 
 	end := c.end
@@ -164,11 +160,9 @@ func (c *ChainList[T]) GetRange(ctx context.Context) ([]*T, error) {
 
 	result := make([]*T, 0, len(vals))
 	for _, v := range vals {
-		var t T
-		if _, ok := any(t).(string); ok {
-			t = any(v).(T)
-		} else if err := jsonx.ToStruct(v, &t); err != nil {
-			return nil, fmt.Errorf("parse to %T failed: %w", t, err)
+		t, err := jsonx.FromJSON[T](v)
+		if err != nil {
+			return nil, err
 		}
 		result = append(result, &t)
 	}
@@ -181,7 +175,7 @@ func (c *ChainList[T]) Get(ctx context.Context, index int64) (*T, error) {
 	}
 
 	rdb := c.GetClient()
-	ct, cancel := utils.NewCtxTimeout(ctx, c.TimeoutSec)
+	ct, cancel := utils.NewCtxTimeout(ctx, c.Timeout)
 	defer cancel()
 
 	vals, err := rdb.LRange(ct, c.key, index, index).Result()
@@ -193,15 +187,10 @@ func (c *ChainList[T]) Get(ctx context.Context, index int64) (*T, error) {
 		return nil, nil
 	}
 
-	var t T
-	if _, ok := any(t).(string); ok {
-		t = any(vals[0]).(T)
-	} else {
-		if err := jsonx.ToStruct(vals[0], &t); err != nil {
-			return nil, fmt.Errorf("parse to %T failed: %w", t, err)
-		}
+	t, err := jsonx.FromJSON[T](vals[0])
+	if err != nil {
+		return nil, err
 	}
-
 	return &t, nil
 }
 
@@ -211,7 +200,7 @@ func (c *ChainList[T]) Size(ctx context.Context) (int64, error) {
 	}
 
 	rdb := c.GetClient()
-	ct, cancel := utils.NewCtxTimeout(ctx, c.TimeoutSec)
+	ct, cancel := utils.NewCtxTimeout(ctx, c.Timeout)
 	defer cancel()
 
 	return rdb.LLen(ct, c.key).Result()

@@ -86,18 +86,8 @@ func (c *Chain[T]) Batch(b map[string]interface{}) ChainExec[T] {
 	return c
 }
 
-func (c *Chain[T]) Expire(n int, unit string) ChainExec[T] {
-	switch unit {
-	case "s", "sec", "second", "seconds":
-		c.expiration = time.Duration(n) * time.Second
-	case "m", "min", "minute", "minutes":
-		c.expiration = time.Duration(n) * time.Minute
-	case "h", "hr", "hour", "hours":
-		c.expiration = time.Duration(n) * time.Hour
-	default:
-		c.expiration = time.Duration(n) * time.Second
-	}
-
+func (c *Chain[T]) Expire(d time.Duration) ChainExec[T] {
+	c.expiration = d
 	return c
 }
 
@@ -182,16 +172,9 @@ func (c *Chain[T]) SetMany(ct context.Context) error {
 }
 
 func (c *Chain[T]) Get(ct context.Context) (*T, error) {
-	var err error
 	if c.key == "" {
 		return nil, ErrMissingKey
 	}
-
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("panic: %v", r)
-		}
-	}()
 
 	rdb := c.GetClient()
 	ctx, cancel := utils.NewCtxTimeout(ct, c.Timeout)
@@ -205,15 +188,10 @@ func (c *Chain[T]) Get(ct context.Context) (*T, error) {
 		return nil, err
 	}
 
-	var t T
-	if _, ok := any(t).(string); ok {
-		t = any(val).(T)
-	} else {
-		if err := jsonx.ToStruct(val, &t); err != nil {
-			return nil, fmt.Errorf("parse to %T failed: %w", t, err)
-		}
+	t, err := jsonx.FromJSON[T](val)
+	if err != nil {
+		return nil, err
 	}
-
 	return &t, nil
 }
 
@@ -248,13 +226,9 @@ func (c *Chain[T]) GetMany(ct context.Context) ([]*T, error) {
 			continue
 		}
 
-		var t T
-		if _, ok := any(t).(string); ok {
-			t = any(strVal).(T)
-		} else {
-			if err := jsonx.ToStruct(strVal, &t); err != nil {
-				return nil, fmt.Errorf("parse to %T failed: %w", t, err)
-			}
+		t, err := jsonx.FromJSON[T](strVal)
+		if err != nil {
+			return nil, err
 		}
 
 		result = append(result, &t)

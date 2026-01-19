@@ -123,7 +123,7 @@ func TestInfoLog(t *testing.T) {
 	)
 	zapLogger := zap.New(core)
 
-	logger := &AppLogger{logger: zapLogger}
+	logger := &AppLogger{zap: zapLogger}
 	logger.Info("TEST_STATE", "Hello {}", "World")
 
 	logOutput := buf.String()
@@ -140,7 +140,7 @@ func TestErrorLog(t *testing.T) {
 	)
 	zapLogger := zap.New(core)
 
-	logger := &AppLogger{logger: zapLogger}
+	logger := &AppLogger{zap: zapLogger}
 	logger.Error("ERR_STATE", "Something went wrong: {}", "disk full")
 
 	logOutput := buf.String()
@@ -151,7 +151,7 @@ func TestErrorLog(t *testing.T) {
 func TestLogRequest(t *testing.T) {
 	tLogger := zaptest.NewLogger(t)
 	appLogger := &AppLogger{
-		logger: tLogger,
+		zap: tLogger,
 		Config: &Config{
 			CallerConfig: CallerConfig{},
 		},
@@ -173,7 +173,7 @@ func TestLogRequest(t *testing.T) {
 func TestLogResponse(t *testing.T) {
 	tLogger := zaptest.NewLogger(t)
 	appLogger := &AppLogger{
-		logger: tLogger,
+		zap: tLogger,
 		Config: &Config{
 			CallerConfig: CallerConfig{},
 		},

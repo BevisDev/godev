@@ -3,15 +3,16 @@ package redis
 import (
 	"context"
 	"encoding/json"
+	"testing"
+
 	"github.com/go-redis/redismock/v9"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestChainSet_StringValue(t *testing.T) {
 	ctx := context.Background()
 	rdb, mock := redismock.NewClientMock()
-	cache := &Cache{client: rdb, Config: &Config{TimeoutSec: 5}}
+	cache := &Cache{client: rdb, Config: &Config{Timeout: 5}}
 
 	set := WithSet[string](cache).Key("test:set")
 
@@ -61,7 +62,7 @@ func TestChainSet_StringValue(t *testing.T) {
 func TestChainSet_StructValue(t *testing.T) {
 	ctx := context.Background()
 	rdb, mock := redismock.NewClientMock()
-	cache := &Cache{client: rdb, Config: &Config{TimeoutSec: 5}}
+	cache := &Cache{client: rdb, Config: &Config{Timeout: 5}}
 
 	set := WithSet[User](cache).Key("user:set")
 
@@ -113,7 +114,7 @@ func TestChainSet_StructValue(t *testing.T) {
 func TestChainSet_WithEnum(t *testing.T) {
 	ctx := context.Background()
 	rdb, mock := redismock.NewClientMock()
-	cache := &Cache{client: rdb, Config: &Config{TimeoutSec: 5}}
+	cache := &Cache{client: rdb, Config: &Config{Timeout: 5}}
 
 	set := WithSet[Status](cache).Key("status:set")
 
@@ -145,7 +146,7 @@ func TestChainSet_WithEnum(t *testing.T) {
 func TestChainSet_ErrorCases(t *testing.T) {
 	ctx := context.Background()
 	rdb, _ := redismock.NewClientMock()
-	cache := &Cache{client: rdb, Config: &Config{TimeoutSec: 5}}
+	cache := &Cache{client: rdb, Config: &Config{Timeout: 5}}
 
 	set := WithSet[string](cache)
 

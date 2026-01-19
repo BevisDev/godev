@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"testing"
+
 	"github.com/go-redis/redismock/v9"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 type User struct {
@@ -32,7 +33,7 @@ func TestRedisCache_SetAndGet(t *testing.T) {
 	cache := &Cache{
 		client: rdb,
 		Config: &Config{
-			TimeoutSec: 5,
+			Timeout: 5,
 		},
 	}
 	ctx := context.Background()
@@ -54,7 +55,7 @@ func TestRedisCache_Delete(t *testing.T) {
 	cache := &Cache{
 		client: rdb,
 		Config: &Config{
-			TimeoutSec: 5,
+			Timeout: 5,
 		},
 	}
 	ctx := context.Background()
@@ -70,7 +71,7 @@ func TestRedisCache_GetByPrefix(t *testing.T) {
 	cache := &Cache{
 		client: rdb,
 		Config: &Config{
-			TimeoutSec: 5,
+			Timeout: 5,
 		},
 	}
 	ctx := context.Background()
@@ -100,7 +101,7 @@ func TestRedisCache_IsNil(t *testing.T) {
 	cache := &Cache{
 		client: rdb,
 		Config: &Config{
-			TimeoutSec: 5,
+			Timeout: 5,
 		},
 	}
 
@@ -113,7 +114,7 @@ func TestRedisCache_Publish(t *testing.T) {
 	cache := &Cache{
 		client: rdb,
 		Config: &Config{
-			TimeoutSec: 5,
+			Timeout: 5,
 		},
 	}
 	ctx := context.Background()
@@ -137,7 +138,7 @@ func TestRedisCache_Publish_JSON(t *testing.T) {
 	cache := &Cache{
 		client: rdb,
 		Config: &Config{
-			TimeoutSec: 5,
+			Timeout: 5,
 		},
 	}
 	ctx := context.Background()
@@ -170,7 +171,7 @@ func TestSetIfNotExists(t *testing.T) {
 	cache := &Cache{
 		client: rdb,
 		Config: &Config{
-			TimeoutSec: 5,
+			Timeout: 5,
 		},
 	}
 
@@ -201,7 +202,7 @@ func TestSetIfNotExists_EnumValue(t *testing.T) {
 	cache := &Cache{
 		client: rdb,
 		Config: &Config{
-			TimeoutSec: 5,
+			Timeout: 5,
 		},
 	}
 	chain := With[Status](cache)
