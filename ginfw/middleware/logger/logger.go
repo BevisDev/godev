@@ -37,7 +37,7 @@ func Logger(fs ...OptionFunc) gin.HandlerFunc {
 
 		// generate state per request and attach state to context
 		var state = random.NewUUID()
-		ctx := utils.SetValueCtx(c.Request.Context(), consts.State, state)
+		ctx := utils.SetValueCtx(c.Request.Context(), consts.RID, state)
 		c.Request = c.Request.WithContext(ctx)
 
 		// ===== REQUEST LOG =====
@@ -51,12 +51,12 @@ func Logger(fs ...OptionFunc) gin.HandlerFunc {
 
 		if o.useLog {
 			reqLog := &logx.RequestLogger{
-				State:       state,
-				URL:         c.Request.URL.String(),
-				RequestTime: startTime,
-				Query:       c.Request.URL.RawQuery,
-				Method:      c.Request.Method,
-				Body:        reqBody,
+				RID:    state,
+				URL:    c.Request.URL.String(),
+				Time:   startTime,
+				Query:  c.Request.URL.RawQuery,
+				Method: c.Request.Method,
+				Body:   reqBody,
 			}
 			if !o.skipHeader {
 				reqLog.Header = c.Request.Header
@@ -65,10 +65,10 @@ func Logger(fs ...OptionFunc) gin.HandlerFunc {
 		} else {
 			var sb strings.Builder
 			sb.WriteString("\n========== REQUEST INFO ==========\n")
-			sb.WriteString(fmt.Sprintf(consts.State+": %s\n", state))
+			sb.WriteString(fmt.Sprintf(consts.RID+": %s\n", state))
 			sb.WriteString(fmt.Sprintf(consts.Url+": %s\n", c.Request.URL.String()))
 			sb.WriteString(fmt.Sprintf(consts.Method+": %s\n", c.Request.Method))
-			sb.WriteString(fmt.Sprintf(consts.RequestTime+": %s\n",
+			sb.WriteString(fmt.Sprintf(consts.Time+": %s\n",
 				datetime.ToString(startTime, datetime.DateTimeLayoutMilli)))
 			sb.WriteString(fmt.Sprintf(consts.Query+": %v\n", c.Request.URL.RawQuery))
 			if !o.skipHeader {
@@ -102,7 +102,7 @@ func Logger(fs ...OptionFunc) gin.HandlerFunc {
 
 		if o.useLog {
 			resLog := &logx.ResponseLogger{
-				State:    state,
+				RID:      state,
 				Status:   c.Writer.Status(),
 				Duration: duration,
 				Body:     resBody,

@@ -24,58 +24,18 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
-// Config defines the configuration options for setting up the application logger.
-//
-// It supports file-based logging with rotation (via lumberjack) and optional
-// profile-based behavior (e.g., dev/prod).
-type Config struct {
-	// IsProduction indicates whether the application is running in PROD environment.
-	IsProduction bool
-	// IsLocal indicates whether the application is running in DEV environment.
-	IsLocal bool
-	// MaxSize is the maximum size (in megabytes) of the log file before it gets rotated.
-	MaxSize int
-	// MaxBackups is the maximum number of old log files to retain.
-	MaxBackups int
-	// MaxAge is the maximum number of days to retain old log files.
-	MaxAge int
-	// Compress determines whether rotated log files are compressed using gzip.
-	Compress bool
-	// IsRotate indicates whether to rotate log files by day or by module (depending on implementation).
-	IsRotate bool
-	// DirName is the directory path where logs will be stored.
-	DirName string
-	// Filename is the base name of the log file (e.g., "app.log").
-	Filename string
-	// CallerConfig defines the number of caller stack frames to skip
-	// when logging for different request/response contexts.
-	// Useful for configuring zap.AddCallerSkip(...) dynamically.
-	CallerConfig CallerConfig
-}
-
-type CallerConfig struct {
-	Request  SkipGroup // Request defines caller skip config for internal/external request logs.
-	Response SkipGroup // Response defines caller skip config for internal/external response logs.
-}
-
-// SkipGroup holds the caller skip values for internal and external contexts.
-type SkipGroup struct {
-	Internal int // Internal number of caller frames to skip for internal log calls.
-	External int // External number of caller frames to skip for external log calls.
-}
-
 type RequestLogger struct {
-	State       string
-	URL         string
-	RequestTime time.Time
-	Query       string
-	Method      string
-	Header      any
-	Body        string
+	RID    string
+	URL    string
+	Time   time.Time
+	Query  string
+	Method string
+	Header any
+	Body   string
 }
 
 type ResponseLogger struct {
-	State    string
+	RID      string
 	Duration time.Duration
 	Status   int
 	Header   any
@@ -98,14 +58,14 @@ type AppLogger struct {
 // Example:
 //
 //	logger := NewLogger(&Config{
-//	    profile:    "prod",
-//	    MaxSize:    100,             // 100 MB per file
-//	    MaxBackups: 7,               // keep 7 rotated logs
-//	    MaxAge:     30,              // keep logs for 30 days
-//	    Compress:   true,            // compress old logs
-//	    IsRotate:   false,           // no daily split
-//	    DirName:    "./logs",
-//	    Filename:   "app.log",
+//	    isProduction: true,
+//	    MaxSize		: 100,             // 100 MB per file
+//	    MaxBackups	: 7,               // keep 7 rotated logs
+//	    MaxAge		: 30,              // keep logs for 30 days
+//	    Compress	: true,            // compress old logs
+//	    IsRotate	: false,           // no daily split
+//	    DirName		: "./logs",
+//	    Filename	: "app.log",
 //	})
 //
 //	logger.Info("Application started")
@@ -116,12 +76,16 @@ func NewLogger(cf *Config) Logger {
 
 	var z = new(zap.Logger)
 	z = zap.New(
-		zapcore.NewCore(encoder, writer, zapcore.InfoLevel),
+		zapcore.NewCore(
+			encoder,
+			writer,
+			zapcore.InfoLevel,
+		),
 		zap.AddCaller(),
 	)
 	l.zap = z
 
-	l.zap.Info("logger started successfully")
+	l.zap.Info("[logger] started successfully")
 	return l
 }
 
@@ -205,17 +169,22 @@ func (l *AppLogger) mustHaveZap() {
 	}
 }
 
-func (l *AppLogger) log(level zapcore.Level, state string, msg string, args ...interface{}) {
+func (l *AppLogger) log(level zapcore.Level,
+	rid, msg string,
+	args ...interface{},
+) {
 	l.mustHaveZap()
 
 	// format message
 	var message = l.formatMessage(msg, args...)
 
 	// skip caller before
-	logging := l.zap.WithOptions(zap.AddCallerSkip(2))
+	logging := l.zap.WithOptions(
+		zap.AddCallerSkip(2),
+	)
 
 	// declare field
-	fields := []zap.Field{zap.String(consts.State, state)}
+	fields := []zap.Field{zap.String(consts.RID, rid)}
 
 	switch level {
 	case zapcore.InfoLevel:
@@ -358,33 +327,33 @@ func (l *AppLogger) Sync() {
 	}
 }
 
-func (l *AppLogger) Info(state, msg string, args ...interface{}) {
-	l.log(zapcore.InfoLevel, state, msg, args...)
+func (l *AppLogger) Info(rid, msg string, args ...interface{}) {
+	l.log(zapcore.InfoLevel, rid, msg, args...)
 }
 
-func (l *AppLogger) Error(state, msg string, args ...interface{}) {
-	l.log(zapcore.ErrorLevel, state, msg, args...)
+func (l *AppLogger) Error(rid, msg string, args ...interface{}) {
+	l.log(zapcore.ErrorLevel, rid, msg, args...)
 }
 
-func (l *AppLogger) Warn(state, msg string, args ...interface{}) {
-	l.log(zapcore.WarnLevel, state, msg, args...)
+func (l *AppLogger) Warn(rid, msg string, args ...interface{}) {
+	l.log(zapcore.WarnLevel, rid, msg, args...)
 }
 
-func (l *AppLogger) Panic(state, msg string, args ...interface{}) {
-	l.log(zapcore.PanicLevel, state, msg, args...)
+func (l *AppLogger) Panic(rid, msg string, args ...interface{}) {
+	l.log(zapcore.PanicLevel, rid, msg, args...)
 }
 
-func (l *AppLogger) Fatal(state, msg string, args ...interface{}) {
-	l.log(zapcore.FatalLevel, state, msg, args...)
+func (l *AppLogger) Fatal(rid, msg string, args ...interface{}) {
+	l.log(zapcore.FatalLevel, rid, msg, args...)
 }
 
 func (l *AppLogger) LogRequest(req *RequestLogger) {
 	l.mustHaveZap()
 
 	fields := []zap.Field{
-		zap.String(consts.State, req.State),
+		zap.String(consts.RID, req.RID),
 		zap.String(consts.Url, req.URL),
-		zap.Time(consts.RequestTime, req.RequestTime),
+		zap.Time(consts.Time, req.Time),
 		zap.String(consts.Method, req.Method),
 	}
 	if req.Query != "" {
@@ -409,7 +378,7 @@ func (l *AppLogger) LogResponse(resp *ResponseLogger) {
 	l.mustHaveZap()
 
 	fields := []zap.Field{
-		zap.String(consts.State, resp.State),
+		zap.String(consts.RID, resp.RID),
 		zap.Int(consts.Status, resp.Status),
 		zap.String(consts.Duration, resp.Duration.String()),
 	}
@@ -432,9 +401,9 @@ func (l *AppLogger) LogExtRequest(req *RequestLogger) {
 	l.mustHaveZap()
 
 	fields := []zap.Field{
-		zap.String(consts.State, req.State),
+		zap.String(consts.RID, req.RID),
 		zap.String(consts.Url, req.URL),
-		zap.Time(consts.RequestTime, req.RequestTime),
+		zap.Time(consts.Time, req.Time),
 		zap.String(consts.Method, req.Method),
 	}
 	if req.Query != "" {
@@ -459,7 +428,7 @@ func (l *AppLogger) LogExtResponse(resp *ResponseLogger) {
 	l.mustHaveZap()
 
 	fields := []zap.Field{
-		zap.String(consts.State, resp.State),
+		zap.String(consts.RID, resp.RID),
 		zap.Int(consts.Status, resp.Status),
 		zap.String(consts.Duration, resp.Duration.String()),
 	}

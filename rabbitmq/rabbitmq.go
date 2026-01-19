@@ -184,7 +184,7 @@ func (r *RabbitMQ) WithChannel(fn ChannelHandler) error {
 //		xState := msg.Header(Xstate)
 //		if xState != nil {
 //			if s, ok := xState.(string); ok {
-//				newCtx = utils.SetValueCtx(newCtx, consts.State, s)
+//				newCtx = utils.SetValueCtx(newCtx, consts.RID, s)
 //			}
 //		}
 //		go handler(newCtx, msg)

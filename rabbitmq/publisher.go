@@ -67,7 +67,7 @@ func (p *Publisher) publish(ctx context.Context,
 			ContentType: contentType,
 			Body:        body,
 			Headers: amqp.Table{
-				Xstate: utils.GetState(ctx),
+				Xstate: utils.GetRID(ctx),
 			},
 		}
 		if p.mq.PersistentMsg {

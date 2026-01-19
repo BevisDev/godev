@@ -158,13 +158,13 @@ func TestLogRequest(t *testing.T) {
 	}
 
 	req := &RequestLogger{
-		State:       "REQ_TEST",
-		URL:         "/api/test",
-		RequestTime: time.Now(),
-		Method:      "GET",
-		Query:       "id=1",
-		Header:      map[string]string{"Authorization": "Bearer token"},
-		Body:        jsonx.ToJSON(map[string]string{"data": "value"}),
+		RID:    "REQ_TEST",
+		URL:    "/api/test",
+		Time:   time.Now(),
+		Method: "GET",
+		Query:  "id=1",
+		Header: map[string]string{"Authorization": "Bearer token"},
+		Body:   jsonx.ToJSON(map[string]string{"data": "value"}),
 	}
 
 	appLogger.LogRequest(req)
@@ -182,7 +182,7 @@ func TestLogResponse(t *testing.T) {
 	now := time.Now()
 	time.Sleep(2 * time.Second)
 	resp := &ResponseLogger{
-		State:    "RESP_TEST",
+		RID:      "RESP_TEST",
 		Duration: time.Since(now),
 		Status:   200,
 		Header:   map[string]string{"Content-Type": "application/json"},

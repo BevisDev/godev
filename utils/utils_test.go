@@ -18,7 +18,7 @@ type User struct {
 
 func TestNewCtx_ShouldReturnContextWithState(t *testing.T) {
 	ctx := NewCtx()
-	state := ctx.Value(consts.State)
+	state := ctx.Value(consts.RID)
 
 	if state == nil || state == "" {
 		t.Error("Expected state in context")
@@ -26,7 +26,7 @@ func TestNewCtx_ShouldReturnContextWithState(t *testing.T) {
 }
 
 func TestGetState_WhenCtxNil(t *testing.T) {
-	state := GetState(nil)
+	state := GetRID(nil)
 	if state == "" {
 		t.Error("Expected non-empty state")
 	}
@@ -34,7 +34,7 @@ func TestGetState_WhenCtxNil(t *testing.T) {
 
 func TestGetState_WhenCtxHasNoState(t *testing.T) {
 	ctx := context.Background()
-	state := GetState(ctx)
+	state := GetRID(ctx)
 	if state == "" {
 		t.Error("Expected generated state")
 	}
@@ -42,10 +42,10 @@ func TestGetState_WhenCtxHasNoState(t *testing.T) {
 
 func TestGetState_WhenCtxHasState(t *testing.T) {
 	expected := "fixed-state"
-	ctx := context.WithValue(context.Background(), consts.State, expected)
-	state := GetState(ctx)
+	ctx := context.WithValue(context.Background(), consts.RID, expected)
+	state := GetRID(ctx)
 	if state != expected {
-		t.Errorf("GetState() = %q; want %q", state, expected)
+		t.Errorf("GetRID() = %q; want %q", state, expected)
 	}
 }
 

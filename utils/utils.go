@@ -16,7 +16,7 @@ type MapObject map[string]interface{}
 
 func NewCtx() context.Context {
 	ctx := context.Background()
-	return context.WithValue(ctx, consts.State, random.NewUUID())
+	return context.WithValue(ctx, consts.RID, random.NewUUID())
 }
 
 func SetValueCtx(ctx context.Context, key string, value interface{}) context.Context {
@@ -26,12 +26,12 @@ func SetValueCtx(ctx context.Context, key string, value interface{}) context.Con
 	return context.WithValue(ctx, key, value)
 }
 
-func GetState(ctx context.Context) string {
+func GetRID(ctx context.Context) string {
 	if ctx == nil {
 		return random.NewUUID()
 	}
 
-	state, ok := ctx.Value(consts.State).(string)
+	state, ok := ctx.Value(consts.RID).(string)
 	if !ok {
 		state = random.NewUUID()
 	}

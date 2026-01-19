@@ -136,7 +136,7 @@ func (r *request[T]) DELETE(c context.Context) (Response[T], error) {
 
 func (r *request[T]) restTemplate(c context.Context) (Response[T], error) {
 	// set metadata
-	r.state = utils.GetState(c)
+	r.state = utils.GetRID(c)
 	r.startTime = time.Now()
 
 	// flag check request form-data
@@ -212,10 +212,10 @@ func (r *request[T]) serializeBody(isFormData bool) ([]byte, string) {
 func (r *request[T]) logRequest(body string) {
 	if r.useLog {
 		log := &logx.RequestLogger{
-			State:       r.state,
-			URL:         r.url,
-			Method:      r.method,
-			RequestTime: r.startTime,
+			RID:    r.state,
+			URL:    r.url,
+			Method: r.method,
+			Time:   r.startTime,
 		}
 		if !validate.IsNilOrEmpty(r.queryParams) {
 			log.Query = str.ToString(r.queryParams)
@@ -232,10 +232,10 @@ func (r *request[T]) logRequest(body string) {
 
 	var sb strings.Builder
 	sb.WriteString("\n========== REQUEST INFO ==========\n")
-	sb.WriteString(fmt.Sprintf(consts.State+": %s\n", r.state))
+	sb.WriteString(fmt.Sprintf(consts.RID+": %s\n", r.state))
 	sb.WriteString(fmt.Sprintf(consts.Url+": %s\n", r.url))
 	sb.WriteString(fmt.Sprintf(consts.Method+": %s\n", r.method))
-	sb.WriteString(fmt.Sprintf(consts.RequestTime+": %s\n",
+	sb.WriteString(fmt.Sprintf(consts.Time+": %s\n",
 		datetime.ToString(r.startTime, datetime.DateTimeLayoutMilli)))
 	if !validate.IsNilOrEmpty(r.queryParams) {
 		sb.WriteString(fmt.Sprintf(consts.Query+": %v\n", r.queryParams))
@@ -309,7 +309,7 @@ func (r *request[T]) logResponse(response *http.Response,
 	hasBody bool, body string) {
 	if r.useLog {
 		logger := &logx.ResponseLogger{
-			State:    r.state,
+			RID:      r.state,
 			Status:   response.StatusCode,
 			Duration: time.Since(r.startTime),
 		}
@@ -323,7 +323,7 @@ func (r *request[T]) logResponse(response *http.Response,
 	} else {
 		var sb strings.Builder
 		sb.WriteString("\n========== RESPONSE INFO ==========\n")
-		sb.WriteString(fmt.Sprintf(consts.State+": %s\n", r.state))
+		sb.WriteString(fmt.Sprintf(consts.RID+": %s\n", r.state))
 		sb.WriteString(fmt.Sprintf(consts.Status+": %d\n", response.StatusCode))
 		sb.WriteString(fmt.Sprintf(consts.Duration+": %s\n", time.Since(r.startTime)))
 		if !r.skipHeader {

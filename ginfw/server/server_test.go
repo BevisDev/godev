@@ -14,7 +14,7 @@ func TestRun_SetupCalled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	err := Run(ctx, Options{
+	err := Run(ctx, &Config{
 		Port: "8080",
 		Setup: func(r *gin.Engine) {
 			setupCalled = true
@@ -35,7 +35,7 @@ func TestRun_ShutdownCalled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	err := Run(ctx, Options{
+	err := Run(ctx, &Config{
 		Port: "8080",
 		Shutdown: func(ctx context.Context) error {
 			shutdownCalled = true
@@ -59,7 +59,7 @@ func TestRun_ContextCancel(t *testing.T) {
 		cancel()
 	}()
 
-	err := Run(ctx, Options{
+	err := Run(ctx, &Config{
 		Port: "8080",
 	})
 
@@ -74,7 +74,7 @@ func TestRun_ShutdownTimeout(t *testing.T) {
 
 	start := time.Now()
 
-	err := Run(ctx, Options{
+	err := Run(ctx, &Config{
 		Port:            "8080",
 		ShutdownTimeout: 100 * time.Millisecond,
 		Shutdown: func(ctx context.Context) error {
