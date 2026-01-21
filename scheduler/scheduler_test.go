@@ -24,7 +24,7 @@ func (m *mockJob) Handle(ctx context.Context) {
 }
 
 func TestScheduler_RegisterJob_Success(t *testing.T) {
-	s := NewScheduler()
+	s := New()
 
 	job := &mockJob{name: "job1"}
 
@@ -33,10 +33,7 @@ func TestScheduler_RegisterJob_Success(t *testing.T) {
 		IsOn: true,
 	})
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	s.Start(ctx)
+	s.Start(t.Context())
 
 	entries := s.cron.Entries()
 	if len(entries) != 1 {
@@ -45,17 +42,14 @@ func TestScheduler_RegisterJob_Success(t *testing.T) {
 }
 
 func TestScheduler_RegisterJob_Disabled(t *testing.T) {
-	s := NewScheduler()
+	s := New()
 
 	s.Register(&mockJob{name: "job1"}, JobConfig{
 		Cron: "*/1 * * * *",
 		IsOn: false,
 	})
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	s.Start(ctx)
+	s.Start(t.Context())
 
 	if len(s.cron.Entries()) != 0 {
 		t.Fatal("expected no cron entries for disabled job")
@@ -63,17 +57,14 @@ func TestScheduler_RegisterJob_Disabled(t *testing.T) {
 }
 
 func TestScheduler_RegisterJob_EmptyCron(t *testing.T) {
-	s := NewScheduler()
+	s := New()
 
 	s.Register(&mockJob{name: "job1"}, JobConfig{
 		Cron: "",
 		IsOn: true,
 	})
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	s.Start(ctx)
+	s.Start(t.Context())
 
 	if len(s.cron.Entries()) != 0 {
 		t.Fatal("expected no cron entries when cron is empty")
@@ -81,7 +72,7 @@ func TestScheduler_RegisterJob_EmptyCron(t *testing.T) {
 }
 
 func TestScheduler_JobPanicRecovered(t *testing.T) {
-	s := NewScheduler(WithSeconds())
+	s := New(WithSeconds())
 
 	job := &mockJob{
 		name:  "panic-job",
@@ -93,11 +84,8 @@ func TestScheduler_JobPanicRecovered(t *testing.T) {
 		IsOn: true,
 	})
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	// should not panic
-	s.Start(ctx)
+	s.Start(t.Context())
 
 	time.Sleep(1100 * time.Millisecond)
 

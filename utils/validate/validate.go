@@ -13,10 +13,6 @@ import (
 	"github.com/BevisDev/godev/consts"
 )
 
-var (
-	ErrNotPointer = errors.New("value is not a pointer")
-)
-
 // IsNilOrEmpty checks whether the given input is nil or empty.
 //
 // It supports multiple types including:
@@ -97,17 +93,6 @@ func MustSucceed(err error, i interface{}) error {
 	}
 	if IsNilOrEmpty(i) {
 		return fmt.Errorf("value of type %v empty", reflect.TypeOf(i))
-	}
-	return nil
-}
-
-// IsPointer reports whether i is a pointer type (nil pointer is allowed).
-func IsPointer(i interface{}) error {
-	if i == nil {
-		return ErrNotPointer
-	}
-	if reflect.ValueOf(i).Kind() != reflect.Ptr {
-		return ErrNotPointer
 	}
 	return nil
 }

@@ -63,7 +63,7 @@ func main() {
     signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 
     // Initialize scheduler
-    s := scheduler.NewScheduler(
+    s := scheduler.New(
         scheduler.WithSeconds(),
         scheduler.WithTimezone("Asia/Ho_Chi_Minh"),
     )

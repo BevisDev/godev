@@ -55,10 +55,10 @@ func TestToJSON(t *testing.T) {
 	assert.Equal(t, p, out)
 }
 
-func TestStructToMap(t *testing.T) {
+func TestObjectToMap(t *testing.T) {
 	p := Person{Name: "Dan", Age: 22}
 
-	m := StructToMap(p)
+	m := ObjectToMap(&p)
 	assert.NotNil(t, m)
 
 	assert.Equal(t, "Dan", m["name"])

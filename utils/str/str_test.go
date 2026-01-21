@@ -1,11 +1,12 @@
 package str
 
 import (
+	"testing"
+	"time"
+
 	"github.com/BevisDev/godev/types"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
-	"testing"
-	"time"
 )
 
 func decimalPtr(f float64) *decimal.Decimal {
@@ -501,13 +502,13 @@ func TestEndWith(t *testing.T) {
 	}
 
 	// has white space or tab
-	if !StartWith("Hello, world    ", "Hello") {
-		t.Error(`StartWith("Hello, world", "Hello") = false; want true`)
+	if !EndWith("Hello, world    ", "world") {
+		t.Error(`EndWith("Hello, world    ", "world") = false; want true`)
 	}
 
 	// has break line
-	if !StartWith("Hello, world\n\t", "Hello") {
-		t.Error(`StartWith("Hello, world", "Hello") = false; want true`)
+	if !EndWith("Hello, world\n\t", "world") {
+		t.Error(`EndWith("Hello, world\n\t", "world") = false; want true`)
 	}
 
 	// negative

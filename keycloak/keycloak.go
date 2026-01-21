@@ -2,43 +2,31 @@ package keycloak
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/Nerzal/gocloak/v13"
 )
 
-type KeyCloak struct {
-	*Config
-	client *gocloak.GoCloak
-}
+type KeyCloak interface {
+	// GetClient returns the GoCloak client instance.
+	// This instance is configured with the base Keycloak URL and provides
+	// methods to interact with the Keycloak Admin and User APIs
+	GetClient() *gocloak.GoCloak
 
-// NewClient creates a new KeyCloak client connected to the specified host and port.
-//
-// The returned client can be used to authenticate users, manage realms, roles,
-// and perform other Keycloak administrative tasks.
-func NewClient(cf *Config) KC {
-	return &KeyCloak{
-		client: gocloak.NewClient(fmt.Sprintf("%s:%d", cf.Host, cf.Port)),
-		Config: cf,
-	}
-}
+	// Login is responsible for authenticating a user (typically using credentials) in exchange for a token pair.
+	// Returns *gocloak.JWT: A pointer to the struct containing the authenticated tokens, including the Access Token and Refresh Token.
+	// Returns error: If the login process fails (e.g., invalid credentials, network error).
+	Login(ctx context.Context, clientId, clientSecret string) (*gocloak.JWT, error)
 
-func (k *KeyCloak) GetClient() *gocloak.GoCloak {
-	return k.client
-}
+	// VerifyToken is used to check the validity and status of a given Access Token with the Keycloak server.
+	// Returns *gocloak.IntroSpectTokenResult: A pointer to the introspection result,
+	// which usually includes an Active boolean field indicating whether the token is currently valid.
+	VerifyToken(ctx context.Context, token, clientId, clientSecret string) (*gocloak.IntroSpectTokenResult, error)
 
-func (k *KeyCloak) Login(ctx context.Context, clientId, clientSecret string) (*gocloak.JWT, error) {
-	return k.client.LoginClient(ctx, clientId, clientSecret, k.Realm)
-}
+	// GetUserInfo retrieves detailed information about the authenticated user associated with the given Access Token.
+	// Returns *gocloak.UserInfo: A pointer to the struct containing user details like name, email, roles, etc.
+	// Returns error: If the user info cannot be retrieved (e.g., token is invalid or expired).
+	GetUserInfo(ctx context.Context, token string) (*gocloak.UserInfo, error)
 
-func (k *KeyCloak) VerifyToken(ctx context.Context, token, clientId, clientSecret string) (*gocloak.IntroSpectTokenResult, error) {
-	return k.client.RetrospectToken(ctx, token, clientId, clientSecret, k.Realm)
-}
-
-func (k *KeyCloak) GetUserInfo(ctx context.Context, token string) (*gocloak.UserInfo, error) {
-	return k.client.GetUserInfo(ctx, token, k.Realm)
-}
-
-func (k *KeyCloak) RevokeToken(ctx context.Context, clientId, clientSecret, token string) error {
-	return k.client.RevokeToken(ctx, k.Realm, clientId, clientSecret, token)
+	// RevokeToken is used to immediately invalidate a given Refresh Token or Access Token,
+	RevokeToken(ctx context.Context, clientId, clientSecret, token string) error
 }

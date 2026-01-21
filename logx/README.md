@@ -80,23 +80,19 @@ Structs used to log HTTP requests and responses:
 ```go
 package main
 
-import (
-	"github.com/BevisDev/godev/logx"
-)
-
 func main() {
-	log := logx.NewLogger(&logx.Config{
-		Profile:    "prod",
-		MaxSize:    100,
-		MaxBackups: 7,
-		MaxAge:     30,
-		Compress:   true,
-		IsRotate:   false,
-		DirName:    "./logs",
-		Filename:   "app.log",
+	log := New(&Config{
+		IsProduction: true,
+		MaxSize:      100,
+		MaxBackups:   7,
+		MaxAge:       30,
+		Compress:     true,
+		IsRotate:     false,
+		DirName:      "./logs",
+		Filename:     "app.log",
 	})
 
-	log.Info("init", "Application started")
+	log.Info("xxx", "Application started")
 }
 
 ```

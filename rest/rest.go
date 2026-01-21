@@ -15,9 +15,9 @@ type Client struct {
 	client *http.Client
 }
 
-// NewClient creates a new Client instance using the provided Options.
+// New creates a new Client instance using the provided Options.
 // It initializes the internal HTTP client and applies the specified timeout in seconds.
-func NewClient(fs ...OptionFunc) *Client {
+func New(fs ...OptionFunc) *Client {
 	opt := withDefaults()
 	for _, fn := range fs {
 		fn(opt)

@@ -64,7 +64,7 @@ func HmacSha256(message, secret string) string {
 	return hex.EncodeToString(hash)
 }
 
-// EncryptAES encrypts plaintext using AES in CFB mode and returns base64-encoded ciphertext.
+// EncryptAES encrypts plaintext using AES in CTR mode and returns base64-encoded ciphertext.
 func EncryptAES(plaintext string, key []byte) (string, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -77,12 +77,12 @@ func EncryptAES(plaintext string, key []byte) (string, error) {
 		return "", err
 	}
 
-	stream := cipher.NewCFBEncrypter(block, iv)
+	stream := cipher.NewCTR(block, iv)
 	stream.XORKeyStream(ciphertext[aes.BlockSize:], []byte(plaintext))
 	return base64.StdEncoding.EncodeToString(ciphertext), nil
 }
 
-// DecryptAES decrypts base64-encoded ciphertext using AES in CFB mode.
+// DecryptAES decrypts base64-encoded ciphertext using AES in CTR mode.
 func DecryptAES(ciphertext string, key []byte) (string, error) {
 	data, err := base64.StdEncoding.DecodeString(ciphertext)
 	if err != nil {
@@ -100,7 +100,7 @@ func DecryptAES(ciphertext string, key []byte) (string, error) {
 
 	iv := data[:aes.BlockSize]
 	data = data[aes.BlockSize:]
-	stream := cipher.NewCFBDecrypter(block, iv)
+	stream := cipher.NewCTR(block, iv)
 	stream.XORKeyStream(data, data)
 
 	return string(data), nil

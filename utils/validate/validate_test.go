@@ -132,7 +132,7 @@ func TestMustSucceed(t *testing.T) {
 	}
 }
 
-func TestIsPointer(t *testing.T) {
+func TestIsNonNilPointer(t *testing.T) {
 	a := 5
 	var pNil *int
 
@@ -141,19 +141,19 @@ func TestIsPointer(t *testing.T) {
 		input   interface{}
 		wantErr bool
 	}{
-		{"pointer int", &a, true},
-		{"non-pointer", a, false},
-		{"nil", nil, false},
-		{"nil pointer", pNil, false},
+		{"pointer int", &a, true},    // IsPointer returns nil (no error) for pointer
+		{"non-pointer", a, false},    // IsPointer returns error for non-pointer
+		{"nil", nil, false},          // IsPointer returns error for nil
+		{"nil pointer", pNil, false}, // IsPointer returns error for nil pointer (nil value)
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := IsPointer(tt.input)
-			if (err != nil) != tt.wantErr {
+			result := IsNonNilPointer(tt.input)
+			if result != tt.wantErr {
 				t.Errorf(
-					"IsPointer(%v) error = %v; wantErr = %v",
-					tt.input, err, tt.wantErr,
+					"IsNonNilPointer(%v) result = %v; wantErr = %v",
+					tt.input, result, tt.wantErr,
 				)
 			}
 		})

@@ -2,6 +2,8 @@ package jsonx
 
 import (
 	"encoding/json"
+
+	"github.com/BevisDev/godev/utils/validate"
 )
 
 func ToJSONBytes(v any) ([]byte, error) {
@@ -30,7 +32,11 @@ func ToJSON(v any) string {
 	return string(jsonBytes)
 }
 
-func StructToMap(i interface{}) map[string]interface{} {
+func ObjectToMap(i interface{}) map[string]interface{} {
+	if !validate.IsStruct(i) {
+		return nil
+	}
+
 	raw, err := ToJSONBytes(i)
 	if err != nil {
 		return nil

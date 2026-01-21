@@ -9,7 +9,17 @@ import (
 	"golang.org/x/time/rate"
 )
 
-func New(fs ...OptionFunc) gin.HandlerFunc {
+const (
+	codeTooManyRequests = "TOO_MANY_REQUESTS"
+	codeRequestTimeout  = "REQUEST_TIMEOUT"
+)
+
+type RateLimit struct {
+	*options
+	limiter *rate.Limiter
+}
+
+func New(fs ...OptionFunc) *RateLimit {
 	o := defaultOptions()
 	for _, opt := range fs {
 		if opt != nil {
@@ -17,47 +27,51 @@ func New(fs ...OptionFunc) gin.HandlerFunc {
 		}
 	}
 
-	limiter := rate.NewLimiter(o.rps, o.burst)
-	switch o.mode {
-	case WaitMode:
-		return rateLimitWait(limiter, o)
-	default:
-		return rateLimitAllow(limiter)
+	return &RateLimit{
+		options: o,
+		limiter: rate.NewLimiter(o.rps, o.burst),
 	}
 }
 
-func rateLimitAllow(limiter *rate.Limiter) gin.HandlerFunc {
+func (r *RateLimit) AllowHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !limiter.Allow() {
-			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
-				"code": "TOO_MANY_REQUESTS",
-			})
+		if !r.limiter.Allow() {
+			r.reject(c, errors.New("rate limit exceeded"))
 			return
 		}
-
 		c.Next()
 	}
 }
 
-func rateLimitWait(limiter *rate.Limiter, o *options) gin.HandlerFunc {
+func (r *RateLimit) WaitHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx, cancel := context.WithTimeout(c.Request.Context(), o.timeout)
+		ctx, cancel := context.WithTimeout(c.Request.Context(), r.timeout)
 		defer cancel()
 
-		if err := limiter.Wait(ctx); err != nil {
-			if errors.Is(err, context.DeadlineExceeded) {
-				c.AbortWithStatusJSON(http.StatusRequestTimeout, gin.H{
-					"code": "REQUEST_TIMEOUT",
-				})
-				return
-			}
-
-			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
-				"code": "TOO_MANY_REQUESTS",
-			})
+		if err := r.limiter.Wait(ctx); err != nil {
+			r.reject(c, err)
 			return
 		}
 
 		c.Next()
 	}
+}
+
+func (r *RateLimit) reject(c *gin.Context, err error) {
+	if r.onReject != nil {
+		r.onReject(c, err)
+		return
+	}
+
+	// Default error handling
+	if errors.Is(err, context.DeadlineExceeded) {
+		c.AbortWithStatusJSON(http.StatusRequestTimeout, gin.H{
+			"code": codeRequestTimeout,
+		})
+		return
+	}
+
+	c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
+		"code": codeTooManyRequests,
+	})
 }

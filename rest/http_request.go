@@ -66,7 +66,7 @@ type Response[T any] struct {
 
 func NewRequest[T any](client *Client) HttpClient[T] {
 	if client == nil {
-		client = NewClient()
+		client = New()
 	}
 
 	return &request[T]{
@@ -232,7 +232,7 @@ func (r *request[T]) logRequest(body string) {
 		if !r.skipHeader {
 			log.Header = r.headers
 		}
-		if body != "" && r.logBody(r.headers[consts.ContentType]) {
+		if r.logBody(r.headers[consts.ContentType]) {
 			log.Body = body
 		}
 		r.logger.LogExtRequest(log)
@@ -241,19 +241,19 @@ func (r *request[T]) logRequest(body string) {
 
 	var sb strings.Builder
 	sb.WriteString("\n========== REQUEST INFO ==========\n")
-	fmt.Fprintf(&sb, consts.RID+": %s\n", r.rid)
-	fmt.Fprintf(&sb, consts.Url+": %s\n", r.url)
-	fmt.Fprintf(&sb, consts.Method+": %s\n", r.method)
-	fmt.Fprintf(&sb, consts.Time+": %s\n",
+	fmt.Fprintf(&sb, "%s: %s\n", consts.RID, r.rid)
+	fmt.Fprintf(&sb, "%s: %s\n", consts.Url, r.url)
+	fmt.Fprintf(&sb, "%s: %s\n", consts.Method, r.method)
+	fmt.Fprintf(&sb, "%s: %s\n", consts.Time,
 		datetime.ToString(r.startTime, datetime.DateTimeLayoutMilli))
 	if !validate.IsNilOrEmpty(r.queryParams) {
-		fmt.Fprintf(&sb, consts.Query+": %v\n", r.queryParams)
+		fmt.Fprintf(&sb, "%s: %v\n", consts.Query, r.queryParams)
 	}
 	if !r.skipHeader {
-		fmt.Fprintf(&sb, consts.Header+": %s\n", r.headers)
+		fmt.Fprintf(&sb, "%s: %s\n", consts.Header, r.headers)
 	}
-	if body != "" && r.logBody(r.headers[consts.ContentType]) {
-		fmt.Fprintf(&sb, consts.Body+": %s\n", body)
+	if r.logBody(r.headers[consts.ContentType]) {
+		fmt.Fprintf(&sb, "%s: %s\n", consts.Body, body)
 	}
 	sb.WriteString("==================================\n")
 	log.Println(sb.String())
@@ -284,7 +284,7 @@ func (r *request[T]) execute(request *http.Request) (Response[T], error) {
 	}
 
 	// log response
-	r.logResponse(response, resp.HasBody, resp.Body)
+	r.logResponse(response, resp.Body)
 
 	// check error
 	if resp.StatusCode >= 400 {
@@ -326,8 +326,7 @@ func (r *request[T]) getData(raw []byte) (T, error) {
 	}
 }
 
-func (r *request[T]) logResponse(response *http.Response,
-	hasBody bool, body string) {
+func (r *request[T]) logResponse(response *http.Response, body string) {
 	if r.useLog {
 		logger := &logx.ResponseLogger{
 			RID:      r.rid,
@@ -337,21 +336,21 @@ func (r *request[T]) logResponse(response *http.Response,
 		if !r.skipHeader {
 			logger.Header = response.Header
 		}
-		if hasBody && r.logBody(response.Header.Get(consts.ContentType)) {
+		if r.logBody(response.Header.Get(consts.ContentType)) {
 			logger.Body = body
 		}
 		r.logger.LogExtResponse(logger)
 	} else {
 		var sb strings.Builder
 		sb.WriteString("\n========== RESPONSE INFO ==========\n")
-		fmt.Fprintf(&sb, consts.RID+": %s\n", r.rid)
-		fmt.Fprintf(&sb, consts.Status+": %d\n", response.StatusCode)
-		fmt.Fprintf(&sb, consts.Duration+": %s\n", time.Since(r.startTime))
+		fmt.Fprintf(&sb, "%s: %s\n", consts.RID, r.rid)
+		fmt.Fprintf(&sb, "%s: %d\n", consts.Status, response.StatusCode)
+		fmt.Fprintf(&sb, "%s: %s\n", consts.Duration, time.Since(r.startTime))
 		if !r.skipHeader {
-			fmt.Fprintf(&sb, consts.Header+": %s\n", response.Header)
+			fmt.Fprintf(&sb, "%s: %s\n", consts.Header, response.Header)
 		}
-		if hasBody && r.logBody(response.Header.Get(consts.ContentType)) {
-			fmt.Fprintf(&sb, consts.Body+": %s\n", body)
+		if r.logBody(response.Header.Get(consts.ContentType)) {
+			fmt.Fprintf(&sb, "%s: %s\n", consts.Body, body)
 		}
 		sb.WriteString("==================================\n")
 		log.Println(sb.String())

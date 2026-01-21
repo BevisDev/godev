@@ -20,7 +20,7 @@ type MockResponse struct {
 }
 
 // Setup client
-var client = NewClient()
+var client = New()
 
 func TestRestClient_Get(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -96,7 +96,7 @@ func TestRestClient_Timeout(t *testing.T) {
 	server := httptest.NewServer(slowHandler)
 	defer server.Close()
 
-	clientTimeout := NewClient(
+	clientTimeout := New(
 		WithTimeout(1 * time.Second),
 	)
 

@@ -14,11 +14,11 @@ func (d *DBTime) IsZero() bool {
 }
 
 func (d *DBTime) UnmarshalJSON(b []byte) error {
-	return d.unmarshalLayout(b, DateTimeMillis)
+	return d.unmarshalLayout(b, DateTimeLayoutMilli)
 }
 
 func (d *DBTime) MarshalJSON() ([]byte, error) {
-	return d.marshalLayout(DateTimeMillis)
+	return d.marshalLayout(DateTimeLayoutMilli)
 }
 
 func (d *DBTime) ToTime() *time.Time {
@@ -27,13 +27,13 @@ func (d *DBTime) ToTime() *time.Time {
 }
 
 func (d *DBTime) String() string {
-	return d.stringLayout(DateTimeMillis)
+	return d.stringLayout(DateTimeLayoutMilli)
 }
 
 func (d *DBTime) Scan(value interface{}) error {
-	return d.scanLayout(value, DateTimeMillis)
+	return d.scanLayout(value, DateTimeLayoutMilli)
 }
 
 func (d *DBTime) Value() (driver.Value, error) {
-	return d.valueLayout(DateTimeMillis)
+	return d.valueLayout(DateTimeLayoutMilli)
 }

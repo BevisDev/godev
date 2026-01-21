@@ -33,7 +33,7 @@ type options struct {
 
 func withDefaults() *options {
 	return &options{
-		timeout:                1 * time.Minute,
+		timeout:                5 * time.Second,
 		skipBodyByPaths:        make(map[string]struct{}),
 		skipBodyByContentTypes: make(map[string]struct{}),
 	}

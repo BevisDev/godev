@@ -34,7 +34,7 @@ func main() {
         Realm: "myrealm",
     }
 
-    kc := keycloak.NewClient(cfg)
+    kc := keycloak.New(cfg)
     ctx := context.Background()
 
     token, err := kc.Login(ctx, clientId, clientSecret)

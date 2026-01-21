@@ -13,7 +13,6 @@ type options struct {
 	rps      rate.Limit
 	burst    int
 	timeout  time.Duration
-	mode     Mode
 	onReject func(c *gin.Context, err error)
 }
 
@@ -22,7 +21,6 @@ func defaultOptions() *options {
 		rps:     10,
 		burst:   20,
 		timeout: 100 * time.Millisecond,
-		mode:    AllowMode,
 	}
 }
 
@@ -53,11 +51,5 @@ func WithTimeout(d time.Duration) OptionFunc {
 func WithOnReject(fn func(c *gin.Context, err error)) OptionFunc {
 	return func(o *options) {
 		o.onReject = fn
-	}
-}
-
-func WithMode(Mode Mode) OptionFunc {
-	return func(o *options) {
-		o.mode = Mode
 	}
 }

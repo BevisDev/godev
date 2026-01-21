@@ -5,14 +5,26 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func Timeout(fs ...OptionFunc) gin.HandlerFunc {
+type Timeout struct {
+	*options
+}
+
+func New(fs ...OptionFunc) *Timeout {
 	o := withDefaults()
 	for _, f := range fs {
-		f(o)
+		if f != nil {
+			f(o)
+		}
 	}
 
+	return &Timeout{
+		options: o,
+	}
+}
+
+func (t *Timeout) Handler() gin.HandlerFunc {
 	return timeout.New(
-		timeout.WithTimeout(o.duration),
-		timeout.WithResponse(o.response),
+		timeout.WithTimeout(t.duration),
+		timeout.WithResponse(t.response),
 	)
 }

@@ -87,7 +87,7 @@ var Client *rest.Client
 func main() {
 	ctx := context.Background()
 
-	Client = rest.NewClient(
+	Client = rest.New(
 		rest.WithTimeout(10 * time.Second),
 	)
 

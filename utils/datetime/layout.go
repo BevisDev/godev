@@ -21,9 +21,6 @@ const (
 	// ---- Compact ----
 	DateTimeLayoutCompact = "20060102150405"
 
-	// format ISO 8601 / RFC3339
-	DateTimeMillis = "2006-01-02 15:04:05.000"
-
 	// ---- Time only ----
 	TimeLayout          = "15:04:05"
 	TimeLayoutCompact   = "150405"

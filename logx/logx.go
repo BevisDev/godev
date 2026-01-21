@@ -44,38 +44,27 @@ type ResponseLogger struct {
 
 type AppLogger struct {
 	*Config
-	zap *zap.Logger
+	zap  *zap.Logger
+	cron *cron.Cron
 }
 
-// NewLogger initializes and returns a new application logger (`*AppLogger`) using the Zap logging library.
-//
-// It configures the log encoder format (e.g., JSON or console), the log output (e.g., file path),
-// and log rotation settings based on the provided `ConfigLogger`.
-//
-// The logger includes caller information (`zap.AddCaller`) and uses `zapcore.InfoLevel` by default.
-// Log rotation is handled via Lumberjack based on `MaxSize`, `MaxBackups`, `MaxAge`, and `Compress`.
-//
-// Example:
-//
-//	logger := NewLogger(&Config{
-//	    isProduction: true,
-//	    MaxSize		: 100,             // 100 MB per file
-//	    MaxBackups	: 7,               // keep 7 rotated logs
-//	    MaxAge		: 30,              // keep logs for 30 days
-//	    Compress	: true,            // compress old logs
-//	    IsRotate	: false,           // no daily split
-//	    DirName		: "./logs",
-//	    Filename	: "app.log",
-//	})
-//
-//	logger.Info("Application started")
-func NewLogger(cf *Config) Logger {
-	var l = &AppLogger{Config: cf}
+// New creates and returns a new logger instance using Zap.
+// Configures encoder format (JSON/console), output destination (file/stdout),
+// and log rotation via Lumberjack. Includes caller information and uses InfoLevel by default.
+func New(cf *Config) Logger {
+	l := &AppLogger{
+		Config: cf,
+	}
+
+	// job runner to rotate log every day
+	if cf.IsRotate {
+		l.cron = cron.New()
+	}
+
 	encoder := l.getEncoderLog()
 	writer := l.writeSync()
 
-	var z = new(zap.Logger)
-	z = zap.New(
+	l.zap = zap.New(
 		zapcore.NewCore(
 			encoder,
 			writer,
@@ -83,7 +72,6 @@ func NewLogger(cf *Config) Logger {
 		),
 		zap.AddCaller(),
 	)
-	l.zap = z
 
 	l.zap.Info("[logger] started successfully")
 	return l
@@ -95,7 +83,7 @@ func (l *AppLogger) GetZap() *zap.Logger {
 
 func (l *AppLogger) getEncoderLog() zapcore.Encoder {
 	var encodeConfig zapcore.EncoderConfig
-	// for production
+
 	if l.IsProduction {
 		encodeConfig = zap.NewProductionEncoderConfig()
 		// 1716714967.877995 -> 2024-12-19T20:04:31.255+0700
@@ -110,7 +98,8 @@ func (l *AppLogger) getEncoderLog() zapcore.Encoder {
 		encodeConfig.EncodeCaller = zapcore.ShortCallerEncoder
 		return zapcore.NewJSONEncoder(encodeConfig)
 	}
-	// for other
+
+	// for development
 	encodeConfig = zap.NewDevelopmentEncoderConfig()
 	encodeConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 	encodeConfig.TimeKey = "time"
@@ -129,8 +118,8 @@ func (l *AppLogger) writeSync() zapcore.WriteSyncer {
 		return zapcore.AddSync(os.Stdout)
 	}
 
-	var fileName = getFilename(l.DirName, l.Filename, l.IsRotate)
-	lumber := lumberjack.Logger{
+	fileName := getFilename(l.DirName, l.Filename, l.IsRotate)
+	lumber := &lumberjack.Logger{
 		Filename:   fileName,
 		MaxSize:    l.MaxSize,
 		MaxBackups: l.MaxBackups,
@@ -140,19 +129,16 @@ func (l *AppLogger) writeSync() zapcore.WriteSyncer {
 
 	// job runner to rotate log every day
 	if l.IsRotate {
-		c := cron.New()
-		c.AddFunc("0 0 * * *", func() {
+		l.cron.AddFunc("0 0 * * *", func() {
 			lumber.Filename = getFilename(l.DirName, l.Filename, l.IsRotate)
-			err := lumber.Rotate()
-			if err != nil {
-				log.Println(err)
-				return
+			if err := lumber.Rotate(); err != nil {
+				log.Printf("[logger] failed to rotate log file: %v", err)
 			}
 		})
-		c.Start()
+		l.cron.Start()
 	}
 
-	return zapcore.AddSync(&lumber)
+	return zapcore.AddSync(lumber)
 }
 
 func getFilename(dir, fileName string, isSplit bool) string {
@@ -163,18 +149,10 @@ func getFilename(dir, fileName string, isSplit bool) string {
 	return filepath.Join(dir, fileName)
 }
 
-func (l *AppLogger) mustHaveZap() {
-	if l.zap == nil {
-		panic("logger is not initialized")
-	}
-}
-
 func (l *AppLogger) log(level zapcore.Level,
 	rid, msg string,
 	args ...interface{},
 ) {
-	l.mustHaveZap()
-
 	// format message
 	var message = l.formatMessage(msg, args...)
 
@@ -193,10 +171,6 @@ func (l *AppLogger) log(level zapcore.Level,
 		logging.Warn(message, fields...)
 	case zapcore.ErrorLevel:
 		logging.Error(message, fields...)
-	case zapcore.PanicLevel:
-		logging.Panic(message, fields...)
-	case zapcore.FatalLevel:
-		logging.Fatal(message, fields...)
 	default:
 		logging.Info(message, fields...)
 	}
@@ -206,8 +180,10 @@ func (l *AppLogger) formatMessage(msg string, args ...interface{}) string {
 	if len(args) == 0 {
 		return msg
 	}
+
 	numArgs := len(args)
 
+	// Handle {} placeholder pattern
 	if strings.Contains(msg, "{}") {
 		count := strings.Count(msg, "{}")
 		if count < numArgs {
@@ -217,6 +193,7 @@ func (l *AppLogger) formatMessage(msg string, args ...interface{}) string {
 		return fmt.Sprintf(message, l.deferArgs(args...)...)
 	}
 
+	// Handle printf-style formatting (append formatted values)
 	if strings.Contains(msg, "%") {
 		for _, arg := range args {
 			msg += " :" + l.formatAny(arg)
@@ -224,6 +201,7 @@ func (l *AppLogger) formatMessage(msg string, args ...interface{}) string {
 		return msg
 	}
 
+	// Default: append all args
 	msg += strings.Repeat(":%+v", numArgs)
 	return fmt.Sprintf(msg, l.deferArgs(args...)...)
 }
@@ -241,26 +219,53 @@ func (l *AppLogger) formatAny(v interface{}) string {
 		return "<nil>"
 	}
 
-	// -- error
+	// Handle error type
 	if err, ok := v.(error); ok {
 		return err.Error()
 	}
 
 	rv := reflect.ValueOf(v)
 
-	// Deref multiple levels if it's pointer
+	// Dereference pointers
+	rv, v = l.dereferencePointer(rv)
+	if !rv.IsValid() {
+		return "<nil>"
+	}
+
+	// Handle special types
+	if formatted := l.formatSpecialType(v); formatted != "" {
+		return formatted
+	}
+
+	// Handle complex types (struct, map, slice, array) via JSON
+	if rv.Kind() == reflect.Struct || rv.Kind() == reflect.Map ||
+		rv.Kind() == reflect.Slice || rv.Kind() == reflect.Array {
+		return jsonx.ToJSON(v)
+	}
+
+	// Default formatting
+	if rv.CanInterface() {
+		return fmt.Sprintf("%+v", rv.Interface())
+	}
+	return fmt.Sprintf("<unreadable: %T>", v)
+}
+
+func (l *AppLogger) dereferencePointer(rv reflect.Value) (reflect.Value, interface{}) {
+	v := rv.Interface()
 	for rv.Kind() == reflect.Ptr {
 		if rv.IsNil() {
-			return "<nil>"
+			return reflect.Value{}, nil
 		}
 		rv = rv.Elem()
 		if !rv.IsValid() {
-			return "<invalid>"
+			return reflect.Value{}, nil
 		}
 		v = rv.Interface()
 	}
+	return rv, v
+}
 
-	// special type
+func (l *AppLogger) formatSpecialType(v interface{}) string {
 	switch val := v.(type) {
 	case string:
 		return val
@@ -307,23 +312,19 @@ func (l *AppLogger) formatAny(v interface{}) string {
 			return val.Time.Format(time.RFC3339)
 		}
 		return "<null>"
-	}
-
-	// struct, map, slice: serialize via JSON
-	switch rv.Kind() {
-	case reflect.Struct, reflect.Map, reflect.Slice, reflect.Array:
-		return jsonx.ToJSON(v)
 	default:
-		if rv.CanInterface() {
-			return fmt.Sprintf("%+v", rv.Interface())
-		}
-		return fmt.Sprintf("<unreadable: %T>", v)
+		return ""
 	}
 }
 
 func (l *AppLogger) Sync() {
 	if l.zap != nil {
 		_ = l.zap.Sync()
+	}
+	// Stop cron scheduler if it exists
+	if l.cron != nil {
+		ctx := l.cron.Stop()
+		<-ctx.Done()
 	}
 }
 
@@ -339,94 +340,40 @@ func (l *AppLogger) Warn(rid, msg string, args ...interface{}) {
 	l.log(zapcore.WarnLevel, rid, msg, args...)
 }
 
-func (l *AppLogger) Panic(rid, msg string, args ...interface{}) {
-	l.log(zapcore.PanicLevel, rid, msg, args...)
-}
-
-func (l *AppLogger) Fatal(rid, msg string, args ...interface{}) {
-	l.log(zapcore.FatalLevel, rid, msg, args...)
-}
-
 func (l *AppLogger) LogRequest(req *RequestLogger) {
-	l.mustHaveZap()
-
-	fields := []zap.Field{
-		zap.String(consts.RID, req.RID),
-		zap.String(consts.Url, req.URL),
-		zap.Time(consts.Time, req.Time),
-		zap.String(consts.Method, req.Method),
-	}
-	if req.Query != "" {
-		fields = append(fields, zap.String(consts.Query, req.Query))
-	}
-	if req.Header != nil {
-		fields = append(fields, zap.Any(consts.Header, req.Header))
-	}
-	if req.Body != "" {
-		fields = append(fields, zap.String(consts.Body, req.Body))
-	}
-
-	l.zap.WithOptions(
-		zap.AddCallerSkip(l.CallerConfig.Request.Internal)).
-		Info(
-			"[===== REQUEST INFO =====]",
-			fields...,
-		)
+	l.logRequest(req, "[===== REQUEST INFO =====]", l.CallerConfig.Request.Internal)
 }
 
 func (l *AppLogger) LogResponse(resp *ResponseLogger) {
-	l.mustHaveZap()
-
-	fields := []zap.Field{
-		zap.String(consts.RID, resp.RID),
-		zap.Int(consts.Status, resp.Status),
-		zap.String(consts.Duration, resp.Duration.String()),
-	}
-	if resp.Header != nil {
-		fields = append(fields, zap.Any(consts.Header, resp.Header))
-	}
-	if resp.Body != "" {
-		fields = append(fields, zap.String(consts.Body, resp.Body))
-	}
-
-	l.zap.WithOptions(
-		zap.AddCallerSkip(l.CallerConfig.Response.Internal)).
-		Info(
-			"[===== RESPONSE INFO =====]",
-			fields...,
-		)
+	l.logResponse(resp, "[===== RESPONSE INFO =====]", l.CallerConfig.Response.Internal)
 }
 
 func (l *AppLogger) LogExtRequest(req *RequestLogger) {
-	l.mustHaveZap()
+	l.logRequest(req, "[===== REQUEST EXTERNAL INFO =====]", l.CallerConfig.Request.External)
+}
 
+func (l *AppLogger) LogExtResponse(resp *ResponseLogger) {
+	l.logResponse(resp, "[===== RESPONSE EXTERNAL INFO =====]", l.CallerConfig.Response.External)
+}
+
+func (l *AppLogger) logRequest(req *RequestLogger, message string, callerSkip int) {
 	fields := []zap.Field{
 		zap.String(consts.RID, req.RID),
 		zap.String(consts.Url, req.URL),
 		zap.Time(consts.Time, req.Time),
 		zap.String(consts.Method, req.Method),
 	}
-	if req.Query != "" {
-		fields = append(fields, zap.String(consts.Query, req.Query))
-	}
 	if req.Header != nil {
 		fields = append(fields, zap.Any(consts.Header, req.Header))
 	}
-	if req.Body != "" {
-		fields = append(fields, zap.String(consts.Body, req.Body))
-	}
+	fields = append(fields, zap.String(consts.Query, req.Query))
+	fields = append(fields, zap.String(consts.Body, req.Body))
 
-	l.zap.WithOptions(
-		zap.AddCallerSkip(l.CallerConfig.Request.External)).
-		Info(
-			"[===== REQUEST EXTERNAL INFO =====]",
-			fields...,
-		)
+	l.zap.WithOptions(zap.AddCallerSkip(callerSkip)).
+		Info(message, fields...)
 }
 
-func (l *AppLogger) LogExtResponse(resp *ResponseLogger) {
-	l.mustHaveZap()
-
+func (l *AppLogger) logResponse(resp *ResponseLogger, message string, callerSkip int) {
 	fields := []zap.Field{
 		zap.String(consts.RID, resp.RID),
 		zap.Int(consts.Status, resp.Status),
@@ -435,14 +382,8 @@ func (l *AppLogger) LogExtResponse(resp *ResponseLogger) {
 	if resp.Header != nil {
 		fields = append(fields, zap.Any(consts.Header, resp.Header))
 	}
-	if resp.Body != "" {
-		fields = append(fields, zap.String(consts.Body, resp.Body))
-	}
+	fields = append(fields, zap.String(consts.Body, resp.Body))
 
-	l.zap.WithOptions(
-		zap.AddCallerSkip(l.CallerConfig.Response.External)).
-		Info(
-			"[===== RESPONSE EXTERNAL INFO =====]",
-			fields...,
-		)
+	l.zap.WithOptions(zap.AddCallerSkip(callerSkip)).
+		Info(message, fields...)
 }

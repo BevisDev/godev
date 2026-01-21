@@ -1,9 +1,7 @@
 package types
 
 // VND Money type
-type (
-	VND = int64
-)
+type VND = int64
 
 // SignedInteger Integer type
 type SignedInteger interface {

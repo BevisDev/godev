@@ -19,9 +19,7 @@ type Scheduler struct {
 	jobs map[string]*JobEntry
 }
 
-func NewScheduler(
-	fs ...OptionFunc,
-) *Scheduler {
+func New(fs ...OptionFunc) *Scheduler {
 	options := defaultOptions()
 	for _, f := range fs {
 		f(options)

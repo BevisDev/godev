@@ -16,6 +16,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+type HttpLogger struct {
+	*options
+}
+
 type responseWrapper struct {
 	gin.ResponseWriter
 	body *bytes.Buffer
@@ -26,105 +30,140 @@ func (w *responseWrapper) Write(b []byte) (int, error) {
 	return w.ResponseWriter.Write(b)
 }
 
-func Logger(fs ...OptionFunc) gin.HandlerFunc {
+func New(fs ...OptionFunc) *HttpLogger {
 	o := withDefaults()
 	for _, f := range fs {
 		f(o)
 	}
 
+	return &HttpLogger{
+		options: o,
+	}
+}
+
+func (h *HttpLogger) Handler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		startTime := time.Now()
 
-		// generate state per request and attach state to context
-		var state = random.NewUUID()
-		ctx := utils.SetValueCtx(c.Request.Context(), consts.RID, state)
+		// Generate RID per request and attach to context
+		rid := random.NewUUID()
+		ctx := utils.SetValueCtx(c.Request.Context(), consts.RID, rid)
 		c.Request = c.Request.WithContext(ctx)
 
-		// ===== REQUEST LOG =====
-		var contentType = c.Request.Header.Get(consts.ContentType)
-		var reqBody string
-		if o.skipDefaultContentTypeCheck || !utils.SkipContentType(contentType) {
-			raw, _ := io.ReadAll(c.Request.Body)
-			reqBody = string(raw)
-			c.Request.Body = io.NopCloser(bytes.NewBuffer(raw))
-		}
+		// Read and log request
+		reqBody := h.readRequestBody(c)
+		h.logRequest(c, rid, startTime, reqBody)
 
-		if o.useLog {
-			reqLog := &logx.RequestLogger{
-				RID:    state,
-				URL:    c.Request.URL.String(),
-				Time:   startTime,
-				Query:  c.Request.URL.RawQuery,
-				Method: c.Request.Method,
-				Body:   reqBody,
-			}
-			if !o.skipHeader {
-				reqLog.Header = c.Request.Header
-			}
-			o.logger.LogRequest(reqLog)
-		} else {
-			var sb strings.Builder
-			sb.WriteString("\n========== REQUEST INFO ==========\n")
-			sb.WriteString(fmt.Sprintf(consts.RID+": %s\n", state))
-			sb.WriteString(fmt.Sprintf(consts.Url+": %s\n", c.Request.URL.String()))
-			sb.WriteString(fmt.Sprintf(consts.Method+": %s\n", c.Request.Method))
-			sb.WriteString(fmt.Sprintf(consts.Time+": %s\n",
-				datetime.ToString(startTime, datetime.DateTimeLayoutMilli)))
-			sb.WriteString(fmt.Sprintf(consts.Query+": %v\n", c.Request.URL.RawQuery))
-			if !o.skipHeader {
-				sb.WriteString(fmt.Sprintf(consts.Header+": %s\n", c.Request.Header))
-			}
-			if reqBody != "" {
-				sb.WriteString(fmt.Sprintf(consts.Body+": %s\n", reqBody))
-			}
-			sb.WriteString("==================================\n")
-			log.Println(sb.String())
-		}
+		// Wrap response writer to capture response body
+		buf := h.wrapResponseWriter(c)
 
-		// ===== RESPONSE WRAP =====
-		// wrap the responseWriter to capture the response body
-		buf := &bytes.Buffer{}
-		writer := &responseWrapper{
-			ResponseWriter: c.Writer,
-			body:           buf,
-		}
-		c.Writer = writer
-
-		// process next
+		// Process request
 		c.Next()
 
-		// ===== RESPONSE LOG =====
+		// Log response
 		duration := time.Since(startTime)
-		var resBody string
-		if o.skipDefaultContentTypeCheck || !utils.SkipContentType(c.Writer.Header().Get(consts.ContentType)) {
-			resBody = buf.String()
-		}
-
-		if o.useLog {
-			resLog := &logx.ResponseLogger{
-				RID:      state,
-				Status:   c.Writer.Status(),
-				Duration: duration,
-				Body:     resBody,
-			}
-			if !o.skipHeader {
-				resLog.Header = c.Writer.Header()
-			}
-			o.logger.LogResponse(resLog)
-		} else {
-			var sb strings.Builder
-			sb.WriteString("\n========== RESPONSE INFO ==========\n")
-			sb.WriteString(fmt.Sprintf("state: %s\n", state))
-			sb.WriteString(fmt.Sprintf("status: %d\n", c.Writer.Status()))
-			sb.WriteString(fmt.Sprintf("duration: %s\n", duration))
-			if !o.skipHeader {
-				sb.WriteString(fmt.Sprintf("header: %v\n", c.Writer.Header()))
-			}
-			if resBody != "" {
-				sb.WriteString(fmt.Sprintf("body: %s\n", resBody))
-			}
-			sb.WriteString("==================================\n")
-			log.Println(sb.String())
-		}
+		resBody := h.readResponseBody(buf, c.Writer.Header().Get(consts.ContentType))
+		h.logResponse(c, rid, duration, resBody)
 	}
+}
+
+func (h *HttpLogger) readRequestBody(c *gin.Context) string {
+	contentType := c.Request.Header.Get(consts.ContentType)
+	if h.skipDefaultContentTypeCheck || !utils.SkipContentType(contentType) {
+		raw, _ := io.ReadAll(c.Request.Body)
+		c.Request.Body = io.NopCloser(bytes.NewBuffer(raw))
+		return string(raw)
+	}
+	return ""
+}
+
+func (h *HttpLogger) wrapResponseWriter(c *gin.Context) *bytes.Buffer {
+	buf := &bytes.Buffer{}
+	c.Writer = &responseWrapper{
+		ResponseWriter: c.Writer,
+		body:           buf,
+	}
+	return buf
+}
+
+func (h *HttpLogger) readResponseBody(buf *bytes.Buffer, contentType string) string {
+	if h.skipDefaultContentTypeCheck || !utils.SkipContentType(contentType) {
+		return buf.String()
+	}
+	return ""
+}
+
+func (h *HttpLogger) logRequest(c *gin.Context, rid string, startTime time.Time, reqBody string) {
+	if h.useLog {
+		h.logRequestWithLogx(c, rid, startTime, reqBody)
+	} else {
+		h.logRequestConsole(c, rid, startTime, reqBody)
+	}
+}
+
+func (h *HttpLogger) logRequestWithLogx(c *gin.Context, rid string, startTime time.Time, reqBody string) {
+	reqLog := &logx.RequestLogger{
+		RID:    rid,
+		URL:    c.Request.URL.String(),
+		Time:   startTime,
+		Query:  c.Request.URL.RawQuery,
+		Method: c.Request.Method,
+		Body:   reqBody,
+	}
+	if !h.skipHeader {
+		reqLog.Header = c.Request.Header
+	}
+	h.logger.LogRequest(reqLog)
+}
+
+func (h *HttpLogger) logRequestConsole(c *gin.Context, rid string, startTime time.Time, reqBody string) {
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "\n========== REQUEST INFO ==========\n")
+	fmt.Fprintf(&sb, "%s: %s\n", consts.RID, rid)
+	fmt.Fprintf(&sb, "%s: %s\n", consts.Url, c.Request.URL.String())
+	fmt.Fprintf(&sb, "%s: %s\n", consts.Method, c.Request.Method)
+	fmt.Fprintf(&sb, "%s: %s\n", consts.Time,
+		datetime.ToString(startTime, datetime.DateTimeLayoutMilli))
+	fmt.Fprintf(&sb, "%s: %v\n", consts.Query, c.Request.URL.RawQuery)
+	if !h.skipHeader {
+		fmt.Fprintf(&sb, "%s: %s\n", consts.Header, c.Request.Header)
+	}
+	fmt.Fprintf(&sb, "%s: %s\n", consts.Body, reqBody)
+	fmt.Fprintf(&sb, "==================================\n")
+	log.Println(sb.String())
+}
+
+func (h *HttpLogger) logResponse(c *gin.Context, rid string, duration time.Duration, resBody string) {
+	if h.useLog {
+		h.logResponseWithLogx(c, rid, duration, resBody)
+	} else {
+		h.logResponseConsole(c, rid, duration, resBody)
+	}
+}
+
+func (h *HttpLogger) logResponseWithLogx(c *gin.Context, rid string, duration time.Duration, resBody string) {
+	resLog := &logx.ResponseLogger{
+		RID:      rid,
+		Status:   c.Writer.Status(),
+		Duration: duration,
+		Body:     resBody,
+	}
+	if !h.skipHeader {
+		resLog.Header = c.Writer.Header()
+	}
+	h.logger.LogResponse(resLog)
+}
+
+func (h *HttpLogger) logResponseConsole(c *gin.Context, rid string, duration time.Duration, resBody string) {
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "\n========== RESPONSE INFO ==========\n")
+	fmt.Fprintf(&sb, "%s: %s\n", consts.RID, rid)
+	fmt.Fprintf(&sb, "%s: %d\n", consts.Status, c.Writer.Status())
+	fmt.Fprintf(&sb, "%s: %s\n", consts.Duration, duration)
+	if !h.skipHeader {
+		fmt.Fprintf(&sb, "%s: %v\n", consts.Header, c.Writer.Header())
+	}
+	fmt.Fprintf(&sb, "%s: %s\n", consts.Body, resBody)
+	fmt.Fprintf(&sb, "==================================\n")
+	log.Println(sb.String())
 }

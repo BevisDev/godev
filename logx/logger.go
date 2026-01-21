@@ -21,12 +21,6 @@ type Logger interface {
 	// Warn Logs a potentially harmful situation or an unexpected event that isn't an error.
 	Warn(state, msg string, args ...interface{})
 
-	// Panic Logs a message and then panics (a severe, unrecoverable error that usually crashes the Goroutine).
-	Panic(state, msg string, args ...interface{})
-
-	// Fatal Logs a message and then calls os.Exit(1) (terminates the entire application).
-	Fatal(state, msg string, args ...interface{})
-
 	// LogRequest Logs an incoming request to the application (e.g., an HTTP server receiving a client request).
 	LogRequest(req *RequestLogger)
 
