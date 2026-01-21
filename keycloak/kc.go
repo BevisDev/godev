@@ -3,6 +3,7 @@ package keycloak
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/Nerzal/gocloak/v13"
 )
@@ -17,10 +18,13 @@ type keycloak struct {
 // The returned client can be used to authenticate users, manage realms, roles,
 // and perform other Keycloak administrative tasks.
 func New(cf *Config) KeyCloak {
-	return &keycloak{
+	client := &keycloak{
 		client: gocloak.NewClient(fmt.Sprintf("%s:%d", cf.Host, cf.Port)),
 		Config: cf,
 	}
+	
+	log.Println("[keycloak] started successfully")
+	return client
 }
 
 func (k *keycloak) GetClient() *gocloak.GoCloak {

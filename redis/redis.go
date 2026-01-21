@@ -14,12 +14,12 @@ type Cache struct {
 	client *redis.Client
 }
 
-// NewCache initializes a Redis connection using the provided configuration.
+// New initializes a Redis connection using the provided configuration.
 // It creates a new Redis client, verifies the connection using PING,
 // and returns a Cache instance. If `timeout` is zero or negative,
 // it falls back to the default timeout.
 // Returns an error if the connection cannot be established.
-func NewCache(cf *Config) (*Cache, error) {
+func New(cf *Config) (*Cache, error) {
 	if cf == nil {
 		return nil, errors.New("[redis] config is nil")
 	}

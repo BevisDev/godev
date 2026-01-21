@@ -20,7 +20,7 @@ type Config struct {
 
 func (c *Config) withDefaults() {
 	if c.Timeout <= 0 {
-		c.Timeout = 1 * time.Minute
+		c.Timeout = 5 * time.Second
 	}
 	if c.PoolSize <= 0 {
 		c.PoolSize = 10

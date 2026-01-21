@@ -15,7 +15,7 @@ import (
 
 func Run(ctx context.Context, cfg *Config) error {
 	if cfg == nil {
-		return errors.New("config is nil")
+		return errors.New("[server] config is nil")
 	}
 	cfg.withDefaults()
 
@@ -49,7 +49,7 @@ func Run(ctx context.Context, cfg *Config) error {
 		_ = r.SetTrustedProxies(cfg.Proxies)
 	}
 
-	srv := newServer(r, cfg)
+	srv := newHTTPServer(r, cfg)
 	errCh := make(chan error, 1)
 
 	// start server
@@ -89,7 +89,7 @@ func Run(ctx context.Context, cfg *Config) error {
 	return nil
 }
 
-func newServer(handler http.Handler, cfg *Config) *http.Server {
+func newHTTPServer(handler http.Handler, cfg *Config) *http.Server {
 	return &http.Server{
 		Addr:              ":" + cfg.Port,
 		Handler:           handler,

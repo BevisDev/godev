@@ -58,6 +58,7 @@ func New(cf *Config, fs ...OptionFunc) (*RabbitMQ, error) {
 	r.connection = conn
 	r.Queue = newQueue(r)
 	r.Publisher = newPublisher(r)
+	log.Println("[rabbitmq] connected successfully")
 	return r, nil
 }
 
@@ -71,7 +72,6 @@ func (r *RabbitMQ) connect() (*amqp.Connection, error) {
 		return nil, fmt.Errorf("[rabbitmq] connection is nil")
 	}
 
-	log.Println("[rabbitmq] connected successfully")
 	return conn, nil
 }
 
@@ -109,6 +109,7 @@ func (r *RabbitMQ) GetConnection() (*amqp.Connection, error) {
 	for i := 0; i < 5; i++ {
 		conn, err = r.connect()
 		if err == nil {
+			log.Println("[rabbitmq] reconnected successfully")
 			break
 		}
 
