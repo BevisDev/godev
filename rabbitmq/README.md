@@ -29,7 +29,7 @@ cfg := &rabbitmq.Config{
     VHost:    "/",
 }
 
-client, err := rabbitmq.NewRabbitMQ(cfg)
+client, err := rabbitmq.New(cfg)
 if err != nil {
     log.Fatalf("failed to connect RabbitMQ: %v", err)
 }

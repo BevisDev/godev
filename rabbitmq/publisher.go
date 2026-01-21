@@ -8,13 +8,11 @@ import (
 	"github.com/BevisDev/godev/consts"
 	"github.com/BevisDev/godev/utils"
 	"github.com/BevisDev/godev/utils/jsonx"
+	"github.com/BevisDev/godev/utils/str"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-const (
-	// maxMessageSize max size message
-	maxMessageSize = 50000
-)
+const maxMessageSize = 50000 // maxMessageSize max size message
 
 type Publisher struct {
 	mq *RabbitMQ
@@ -27,27 +25,17 @@ func newPublisher(mq *RabbitMQ) *Publisher {
 }
 
 // Send sends a message directly to a single queue (point-to-point).
-func (p *Publisher) Send(ctx context.Context,
-	queueName string,
-	message interface{},
-) error {
+func (p *Publisher) Send(ctx context.Context, queueName string, message interface{}) error {
 	return p.publish(ctx, "", queueName, message)
 }
 
 // PublishEvent publishes an event to a topic exchange using a routing key.
-func (p *Publisher) PublishEvent(ctx context.Context,
-	exchange, routingKey string,
-	message interface{},
-) error {
+func (p *Publisher) PublishEvent(ctx context.Context, exchange, routingKey string, message interface{}) error {
 	return p.publish(ctx, exchange, routingKey, message)
 }
 
 // BroadcastEvent publishes an event to all consumers using a fanout exchange.
-func (p *Publisher) BroadcastEvent(
-	ctx context.Context,
-	exchange string,
-	message interface{},
-) error {
+func (p *Publisher) BroadcastEvent(ctx context.Context, exchange string, message interface{}) error {
 	return p.publish(ctx, exchange, "", message)
 }
 
@@ -67,10 +55,10 @@ func (p *Publisher) publish(ctx context.Context,
 			ContentType: contentType,
 			Body:        body,
 			Headers: amqp.Table{
-				Xstate: utils.GetRID(ctx),
+				XRid: utils.GetRID(ctx),
 			},
 		}
-		if p.mq.PersistentMsg {
+		if p.mq.persistentMsg {
 			publishing.DeliveryMode = amqp.Persistent
 		}
 
@@ -105,7 +93,7 @@ func (p *Publisher) buildMessage(message interface{}) (string, []byte, error) {
 		int, int8, int16, int32, int64,
 		uint, uint8, uint16, uint32, uint64,
 		float32, float64:
-		body = []byte(fmt.Sprint(v))
+		body = []byte(str.ToString(v))
 	default:
 		var err error
 		body, err = jsonx.ToJSONBytes(v)
@@ -114,7 +102,6 @@ func (p *Publisher) buildMessage(message interface{}) (string, []byte, error) {
 		}
 		contentType = consts.ApplicationJSON
 	}
-	// message can not exceed max size
 	if len(body) > maxMessageSize {
 		return "", nil, fmt.Errorf("message is too large: %d", len(body))
 	}

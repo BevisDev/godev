@@ -2,30 +2,33 @@ package rabbitmq
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"log"
 	"sync"
+	"time"
 
+	"github.com/BevisDev/godev/consts"
+	"github.com/BevisDev/godev/utils"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
+// Consumer defines the interface for message consumers.
 type Consumer interface {
-	// Queue returns the queue name to consume from
+	// Queue returns the queue name to consume from.
 	Queue() string
 
-	// Handle processes a single message
-	Handle(ctx context.Context, d amqp.Delivery) error
-
-	// OnError is called when Handle returns an error (optional hook)
-	OnError(ctx context.Context, d amqp.Delivery, err error)
+	// Handle processes a single message. Returns nil to ack, error to requeue.
+	Handle(ctx context.Context, msg Message) error
 }
 
+// ConsumerManager manages multiple consumers with auto-reconnect and error handling.
 type ConsumerManager struct {
 	*RabbitMQ
 	consumers []Consumer
 	wg        sync.WaitGroup
 }
 
+// Register creates a new ConsumerManager for the given RabbitMQ instance.
 func Register(r *RabbitMQ) *ConsumerManager {
 	return &ConsumerManager{
 		RabbitMQ:  r,
@@ -33,128 +36,140 @@ func Register(r *RabbitMQ) *ConsumerManager {
 	}
 }
 
+// Register adds one or more consumers to the manager.
 func (m *ConsumerManager) Register(consumers ...Consumer) {
 	m.consumers = append(m.consumers, consumers...)
 }
 
-// Start starts and manages all defined message consumers in separate goroutines.
-//
-// It launches each consumer defined in the `consumersList` and monitors them in a loop.
-// If a consumer exits with an error or panics, it will automatically be restarted
-// after a short delay. If the main context is canceled, all consumers are stopped gracefully.
-//
-// Each consumer function must match the signature `func(ctx context.Context) error`.
+// Start starts all registered consumers in separate goroutines until context is canceled.
 func (m *ConsumerManager) Start(ctx context.Context) {
 	if len(m.consumers) == 0 {
-		log.Println("No consumers registered")
+		log.Println("[rabbitmq] no consumers registered")
+		return
 	}
 
-	log.Printf("Starting %d consumer(s)\n", len(m.consumers))
-
+	log.Printf("[rabbitmq] consumer(s) %d are starting", len(m.consumers))
 	for _, consumer := range m.consumers {
 		m.wg.Add(1)
-		c := consumer
-		fmt.Print(c)
-		//go m.Run(ctx, c)
+		go m.run(ctx, consumer)
 	}
-	log.Println("Consumers started successfully")
 
-	// wait for context cancellation
+	log.Println("[rabbitmq] all consumers started successfully")
 	<-ctx.Done()
 
-	log.Println("Shutting down all consumers...")
+	log.Println("[rabbitmq] shutting down all consumers...")
 	m.wg.Wait()
-	log.Println("All consumers stopped")
+	log.Println("[rabbitmq] all consumers stopped")
 }
 
-//
-//func (m *ConsumerManager) Run(ctx context.Context, consumer Consumer) {
-//	defer m.wg.Done()
-//
-//	queue := consumer.Queue()
-//
-//	for {
-//		select {
-//		case <-ctx.Done():
-//			return
-//		default:
-//			err := m.handleConsumer(ctx, consumer)
-//
-//			if err != nil {
-//				consecutiveErrors++
-//				m.logger.Error(ctx, "Consumer [%s] error: %v (consecutive errors: %d)",
-//					queue, err, consecutiveErrors)
-//
-//				// Check max retries
-//				if m.config.MaxRetries > 0 && consecutiveErrors >= m.config.MaxRetries {
-//					m.logger.Error(ctx, "Consumer [%s] exceeded max retries (%d), stopping",
-//						queue, m.config.MaxRetries)
-//					return
-//				}
-//
-//				// Handle AMQP connection errors
-//				var amqpErr *amqp091.Error
-//				if errors.As(err, &amqpErr) {
-//					if amqpErr.Code == 504 || amqpErr.Code == 320 {
-//						m.logger.Warn(ctx, "Consumer [%s] connection error, reconnecting...", queue)
-//						if reconnectErr := m.client.Reconnect(); reconnectErr != nil {
-//							m.logger.Error(ctx, "Failed to reconnect: %v", reconnectErr)
-//						}
-//						time.Sleep(m.config.ReconnectDelay)
-//						continue
-//					}
-//				}
-//
-//				time.Sleep(m.config.RetryDelay)
-//			} else {
-//				// Reset counter on successful run
-//				consecutiveErrors = 0
-//			}
-//		}
-//	}
-//}
-//
-//func (m *ConsumerManager) Ha(ctx context.Context, consumer Consumer) {
-//	defer m.wg.Done()
-//
-//	queue := consumer.Queue()
-//	for {
-//		select {
-//		case <-ctx.Done():
-//			return
-//		default:
-//			err := m.handleConsumer(ctx, consumer)
-//
-//			if err != nil {
-//				consecutiveErrors++
-//				m.logger.Error(ctx, "Consumer [%s] error: %v (consecutive errors: %d)",
-//					queue, err, consecutiveErrors)
-//
-//				// Check max retries
-//				if m.config.MaxRetries > 0 && consecutiveErrors >= m.config.MaxRetries {
-//					m.logger.Error(ctx, "Consumer [%s] exceeded max retries (%d), stopping",
-//						queue, m.config.MaxRetries)
-//					return
-//				}
-//
-//				// Handle AMQP connection errors
-//				var amqpErr *amqp091.Error
-//				if errors.As(err, &amqpErr) {
-//					if amqpErr.Code == 504 || amqpErr.Code == 320 {
-//						m.logger.Warn(ctx, "Consumer [%s] connection error, reconnecting...", queue)
-//						if reconnectErr := m.client.Reconnect(); reconnectErr != nil {
-//							m.logger.Error(ctx, "Failed to reconnect: %v", reconnectErr)
-//						}
-//						time.Sleep(m.config.ReconnectDelay)
-//						continue
-//					}
-//				}
-//
-//				time.Sleep(m.config.RetryDelay)
-//			} else {
-//				// Reset counter on successful run
-//				consecutiveErrors = 0
-//			}
-//		}
-//	}
-//}
+// run runs a single consumer with auto error handling and reconnection.
+func (m *ConsumerManager) run(ctx context.Context, consumer Consumer) {
+	defer m.wg.Done()
+
+	queueName := consumer.Queue()
+	consecutiveErrors := 0
+	const maxConsecutiveErrors = 10
+	const retryDelay = 5 * time.Second
+
+	for {
+		select {
+		case <-ctx.Done():
+			log.Printf("[rabbitmq] consumer [%s] stopped by context cancellation", queueName)
+			return
+		default:
+			err := m.consume(ctx, consumer)
+
+			if err != nil {
+				consecutiveErrors++
+				log.Printf("[rabbitmq] consumer [%s] error: %v (consecutive errors: %d)",
+					queueName, err, consecutiveErrors)
+
+				if consecutiveErrors >= maxConsecutiveErrors {
+					log.Printf("[rabbitmq] consumer [%s] exceeded max consecutive errors (%d), stopping",
+						queueName, maxConsecutiveErrors)
+					return
+				}
+
+				var amqpErr *amqp.Error
+				if errors.As(err, &amqpErr) {
+					if amqpErr.Code == 504 || amqpErr.Code == 320 || amqpErr.Code == 501 {
+						log.Printf("[WARNING][rabbitmq] consumer [%s] connection error, reconnecting...", queueName)
+						time.Sleep(retryDelay)
+						continue
+					}
+				}
+				time.Sleep(retryDelay)
+			} else {
+				consecutiveErrors = 0
+			}
+		}
+	}
+}
+
+// consume sets up the consumer and processes messages from the queue.
+func (m *ConsumerManager) consume(ctx context.Context, consumer Consumer) error {
+	queueName := consumer.Queue()
+
+	ch, err := m.GetChannel()
+	if err != nil {
+		return err
+	}
+	defer ch.Close()
+
+	if err := m.Queue.DeclareSimple(queueName); err != nil {
+		return err
+	}
+
+	if err := ch.Qos(1, 0, false); err != nil {
+		return err
+	}
+
+	msgs, err := ch.ConsumeWithContext(
+		ctx,
+		queueName,
+		"",    // consumer tag (empty = auto-generated)
+		false, // auto-ack (false = manual ack)
+		false, // exclusive
+		false, // no-local
+		false, // no-wait
+		nil,   // args
+	)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("[rabbitmq] consumer [%s] started consuming messages", queueName)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case delivery, ok := <-msgs:
+			if !ok {
+				return errors.New("message channel closed")
+			}
+
+			msg := Message{Delivery: delivery}
+			msgCtx := m.createMessageContext(msg)
+
+			if err := consumer.Handle(msgCtx, msg); err != nil {
+				log.Printf("[rabbitmq] consumer [%s] handle error: %v", queueName, err)
+				msg.Requeue()
+			} else {
+				msg.Commit()
+			}
+		}
+	}
+}
+
+// createMessageContext creates a new context with x-rid from message headers.
+func (m *ConsumerManager) createMessageContext(msg Message) context.Context {
+	newCtx := utils.NewCtx()
+	if xRid := msg.Header(XRid); xRid != nil {
+		if s, ok := xRid.(string); ok && s != "" {
+			newCtx = utils.SetValueCtx(newCtx, consts.RID, s)
+		}
+	}
+
+	return newCtx
+}

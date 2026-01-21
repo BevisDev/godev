@@ -7,7 +7,7 @@ import (
 )
 
 func NewMQTest() (*RabbitMQ, error) {
-	mq, err := NewMQ(&Config{
+	mq, err := New(&Config{
 		Host:     "localhost",
 		Port:     5672,
 		Username: "admin",

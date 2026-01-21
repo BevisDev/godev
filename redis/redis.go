@@ -3,6 +3,7 @@ package redis
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 
 	"github.com/redis/go-redis/v9"
@@ -20,7 +21,7 @@ type Cache struct {
 // Returns an error if the connection cannot be established.
 func NewCache(cf *Config) (*Cache, error) {
 	if cf == nil {
-		return nil, errors.New("config is nil")
+		return nil, errors.New("[redis] config is nil")
 	}
 	cf.withDefaults()
 
@@ -31,6 +32,11 @@ func NewCache(cf *Config) (*Cache, error) {
 	}
 
 	c.client = rdb
+	if err := c.Ping(context.Background()); err != nil {
+		return nil, fmt.Errorf("[redis] ping failed: %w", err)
+	}
+
+	log.Println("[redis] connected successfully")
 	return c, nil
 }
 
@@ -42,12 +48,14 @@ func (r *Cache) connect() (*redis.Client, error) {
 		PoolSize: r.PoolSize,
 	})
 
-	if _, err := rdb.Ping(context.Background()).Result(); err != nil {
-		return nil, err
-	}
-
-	log.Printf("[redis] connected %d successfully", r.DB)
 	return rdb, nil
+}
+
+func (r *Cache) Ping(ctx context.Context) error {
+	if _, err := r.client.Ping(ctx).Result(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (r *Cache) Close() {

@@ -2,7 +2,7 @@ package rabbitmq
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -16,6 +16,7 @@ type ChannelHandler func(ch *amqp.Channel) error
 
 type RabbitMQ struct {
 	*Config
+	*options
 	Queue      *Queue
 	Publisher  *Publisher
 	connection *amqp.Connection
@@ -23,25 +24,31 @@ type RabbitMQ struct {
 }
 
 const (
-	// Xstate is the header key used to store the RequestID (or trace ID)
+	// XRid is the header key used to store the RequestID (or trace ID)
 	// when publishing, and consumers to retrieve it for logging or tracing.
-	Xstate = "x-state"
+	XRid = "x-rid"
 )
 
-// NewMQ creates a new RabbitMQ client using the provided configuration.
+// New creates a new RabbitMQ client using the provided configuration.
 //
 // It connects to the broker using the AMQP protocol, establishes a connection,
 // opens a channel, and returns a `*RabbitMQ` instance.
 //
 // Returns an error if the configuration is nil, the connection fails,
 // or the channel cannot be created.
-func NewMQ(cf *Config) (*RabbitMQ, error) {
+func New(cf *Config, fs ...OptionFunc) (*RabbitMQ, error) {
 	if cf == nil {
-		return nil, errors.New("config is nil")
+		return nil, fmt.Errorf("[rabbitmq] config is nil")
+	}
+
+	opt := withDefaults()
+	for _, f := range fs {
+		f(opt)
 	}
 
 	r := &RabbitMQ{
-		Config: cf,
+		Config:  cf,
+		options: opt,
 	}
 	conn, err := r.connect()
 	if err != nil {
@@ -54,11 +61,6 @@ func NewMQ(cf *Config) (*RabbitMQ, error) {
 	return r, nil
 }
 
-func (r *RabbitMQ) Bootstrap() error {
-
-	return nil
-}
-
 func (r *RabbitMQ) connect() (*amqp.Connection, error) {
 	conn, err := amqp.Dial(r.URL())
 	if err != nil {
@@ -66,10 +68,10 @@ func (r *RabbitMQ) connect() (*amqp.Connection, error) {
 	}
 
 	if conn == nil {
-		return nil, errors.New("connection is nil")
+		return nil, fmt.Errorf("[rabbitmq] connection is nil")
 	}
 
-	log.Println("RabbitMQ connected successfully")
+	log.Println("[rabbitmq] connected successfully")
 	return conn, nil
 }
 
@@ -111,7 +113,7 @@ func (r *RabbitMQ) GetConnection() (*amqp.Connection, error) {
 		}
 
 		sleep := time.Second * time.Duration(1<<i)
-		log.Printf("RabbitMQ is attempting to reconnect in %s, (err: %v)", sleep, err)
+		log.Printf("[rabbitmq] is attempting to reconnect in %s..., (err: %v)", sleep, err)
 		time.Sleep(sleep)
 	}
 	if conn == nil {
@@ -123,7 +125,6 @@ func (r *RabbitMQ) GetConnection() (*amqp.Connection, error) {
 }
 
 // GetChannel returns a new channel from the current connection.
-// Returns an error if the connection is not available.
 func (r *RabbitMQ) GetChannel() (*amqp.Channel, error) {
 	conn, err := r.GetConnection()
 	if err != nil {
@@ -142,53 +143,3 @@ func (r *RabbitMQ) WithChannel(fn ChannelHandler) error {
 
 	return fn(ch)
 }
-
-// Consume is used to start receiving messages
-// handler func(...) is a callback function that is executed every time a new message
-// Returns an error if the consumption process cannot be started
-//func (r *RabbitMQ) Consume(ctx context.Context,
-//	queueName string,
-//	handler ConsumerHandler,
-//) error {
-//	ch, err := r.GetChannel()
-//	if err != nil {
-//		return fmt.Errorf("failed to get channel: %w", err)
-//	}
-//	defer ch.Close()
-//
-//	if err := r.declareQueueWithChannel(ch, queueName); err != nil {
-//		return err
-//	}
-//
-//	msgs, err := ch.ConsumeWithContext(ctx,
-//		queueName,
-//		"",
-//		false,
-//		false,
-//		false,
-//		false,
-//		nil,
-//	)
-//	if err != nil {
-//		return err
-//	}
-//
-//	for item := range msgs {
-//		var msg = Message{
-//			item,
-//		}
-//		// create new context
-//		newCtx := utils.NewCtx()
-//
-//		// get x-state
-//		xState := msg.Header(Xstate)
-//		if xState != nil {
-//			if s, ok := xState.(string); ok {
-//				newCtx = utils.SetValueCtx(newCtx, consts.RID, s)
-//			}
-//		}
-//		go handler(newCtx, msg)
-//	}
-//
-//	return nil
-//}
