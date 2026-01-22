@@ -25,9 +25,8 @@ type options struct {
 	rabbitmqConf  *rabbitmq.Config
 	keycloakConf  *keycloak.Config
 
-	restOn     bool
-	restLogger bool
-	restOpts   []rest.OptionFunc
+	restOn   bool
+	restOpts []rest.OptionFunc
 
 	schedulerOn  bool
 	schedulerOpt []scheduler.OptionFunc
@@ -78,10 +77,9 @@ func WithKeycloak(cfg *keycloak.Config) OptionFunc {
 }
 
 // WithRestClient configures REST HTTP client.
-func WithRestClient(useLogger bool, opts ...rest.OptionFunc) OptionFunc {
+func WithRestClient(opts ...rest.OptionFunc) OptionFunc {
 	return func(o *options) {
 		o.restOn = true
-		o.restLogger = useLogger
 		o.restOpts = opts
 	}
 }

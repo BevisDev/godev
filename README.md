@@ -205,7 +205,7 @@ defer cache.Close()
 err = redis.With[User](cache).
 	Key("user:1").
 	Value(user).
-	Expire(3600, "sec").
+	Expire(10 * time.Second).
 	Set(ctx)
 ```
 
@@ -245,9 +245,9 @@ GoDev follows a modular architecture where each package is independent and can b
 ```
 ┌─────────────────────────────────────────┐
 │           Framework (Bootstrap)         │
-│  - Lifecycle Management                │
-│  - Service Initialization              │
-│  - Graceful Shutdown                   │
+│  - Lifecycle Management                 │
+│  - Service Initialization               │
+│  - Graceful Shutdown                    │
 └─────────────────────────────────────────┘
            │
            ├─── Database ─── Redis ─── RabbitMQ
