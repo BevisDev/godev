@@ -2,39 +2,62 @@ package redis
 
 import (
 	"context"
+	"reflect"
 	"time"
 
 	"github.com/BevisDev/godev/utils"
 	"github.com/BevisDev/godev/utils/jsonx"
+	"github.com/BevisDev/godev/utils/str"
 	"github.com/BevisDev/godev/utils/validate"
 )
 
-type ChainSet[T any] struct {
-	*Chain[T]
+// setBuilder represents a builder set for Redis set operations with type safety.
+type setBuilder[T any] struct {
+	cache      *Cache
+	key        string
+	values     []interface{}
+	expiration time.Duration
 }
 
-func WithSet[T any](cache *Cache) ChainSetExec[T] {
-	return &ChainSet[T]{
-		Chain: withChain[T](cache),
+// WithSet creates a new set builder set for type T.
+func WithSet[T any](c *Cache) *setBuilder[T] {
+	return &setBuilder[T]{
+		cache: c,
 	}
 }
 
-func (c *ChainSet[T]) Key(k string) ChainSetExec[T] {
-	c.Chain.Key(k)
+// Key specifies a single key to operate on for the next execution command.
+func (c *setBuilder[T]) Key(k string) *setBuilder[T] {
+	c.key = k
 	return c
 }
 
-func (c *ChainSet[T]) Values(values interface{}) ChainSetExec[T] {
-	c.Chain.Values(values)
+// Values specifies multiple values to be stored with the key.
+func (c *setBuilder[T]) Values(values interface{}) *setBuilder[T] {
+	v := reflect.ValueOf(values)
+
+	if v.Kind() != reflect.Slice {
+		c.values = append(c.values, convertValue(values))
+		return c
+	}
+
+	for i := 0; i < v.Len(); i++ {
+		val := v.Index(i).Interface()
+		c.values = append(c.values, convertValue(val))
+	}
+
 	return c
 }
 
-func (c *ChainSet[T]) Expire(d time.Duration) ChainSetExec[T] {
-	c.Chain.Expire(d)
+// Expire sets the Time-To-Live (TTL) for the key.
+func (c *setBuilder[T]) Expire(d time.Duration) *setBuilder[T] {
+	c.expiration = d
 	return c
 }
 
-func (c *ChainSet[T]) Add(ctx context.Context) error {
+// Add adds one or more members to the set.
+// Returns an error if the key or values are missing, or if the operation fails.
+func (c *setBuilder[T]) Add(ctx context.Context) error {
 	if c.key == "" {
 		return ErrMissingKey
 	}
@@ -42,8 +65,8 @@ func (c *ChainSet[T]) Add(ctx context.Context) error {
 		return ErrMissingValues
 	}
 
-	rdb := c.GetClient()
-	ct, cancel := utils.NewCtxTimeout(ctx, c.Timeout)
+	rdb := c.cache.GetClient()
+	ct, cancel := utils.NewCtxTimeout(ctx, c.cache.cf.Timeout)
 	defer cancel()
 
 	if err := rdb.SAdd(ct, c.key, c.values...).Err(); err != nil {
@@ -56,7 +79,9 @@ func (c *ChainSet[T]) Add(ctx context.Context) error {
 	return nil
 }
 
-func (c *ChainSet[T]) Remove(ctx context.Context) error {
+// Remove removes one or more members from the set.
+// Returns an error if the key or values are missing, or if the operation fails.
+func (c *setBuilder[T]) Remove(ctx context.Context) error {
 	if c.key == "" {
 		return ErrMissingKey
 	}
@@ -64,8 +89,8 @@ func (c *ChainSet[T]) Remove(ctx context.Context) error {
 		return ErrMissingValues
 	}
 
-	rdb := c.GetClient()
-	ct, cancel := utils.NewCtxTimeout(ctx, c.Timeout)
+	rdb := c.cache.GetClient()
+	ct, cancel := utils.NewCtxTimeout(ctx, c.cache.cf.Timeout)
 	defer cancel()
 
 	if err := rdb.SRem(ct, c.key, c.values...).Err(); err != nil {
@@ -75,25 +100,29 @@ func (c *ChainSet[T]) Remove(ctx context.Context) error {
 	return nil
 }
 
-func (c *ChainSet[T]) Contains(ctx context.Context, val interface{}) (bool, error) {
+// Contains checks if a value exists in the set.
+// Returns an error if the key is missing, or if the operation fails.
+func (c *setBuilder[T]) Contains(ctx context.Context, val interface{}) (bool, error) {
 	if c.key == "" {
 		return false, ErrMissingKey
 	}
 
-	rdb := c.GetClient()
-	ct, cancel := utils.NewCtxTimeout(ctx, c.Timeout)
+	rdb := c.cache.GetClient()
+	ct, cancel := utils.NewCtxTimeout(ctx, c.cache.cf.Timeout)
 	defer cancel()
 
 	return rdb.SIsMember(ct, c.key, val).Result()
 }
 
-func (c *ChainSet[T]) GetAll(ctx context.Context) ([]*T, error) {
+// GetAll returns all members of the set.
+// Returns an error if the key is missing, or if the operation fails.
+func (c *setBuilder[T]) GetAll(ctx context.Context) ([]*T, error) {
 	if c.key == "" {
 		return nil, ErrMissingKey
 	}
 
-	rdb := c.GetClient()
-	ct, cancel := utils.NewCtxTimeout(ctx, c.Timeout)
+	rdb := c.cache.GetClient()
+	ct, cancel := utils.NewCtxTimeout(ctx, c.cache.cf.Timeout)
 	defer cancel()
 
 	res, err := rdb.SMembers(ct, c.key).Result()
@@ -113,18 +142,29 @@ func (c *ChainSet[T]) GetAll(ctx context.Context) ([]*T, error) {
 	return result, nil
 }
 
-func (c *ChainSet[T]) Size(ctx context.Context) (int64, error) {
+// Size returns the number of elements in the set.
+// Returns an error if the key is missing, or if the operation fails.
+func (c *setBuilder[T]) Size(ctx context.Context) (int64, error) {
 	if c.key == "" {
 		return 0, ErrMissingKey
 	}
 
-	rdb := c.GetClient()
-	ct, cancel := utils.NewCtxTimeout(ctx, c.Timeout)
+	rdb := c.cache.GetClient()
+	ct, cancel := utils.NewCtxTimeout(ctx, c.cache.cf.Timeout)
 	defer cancel()
 
 	return rdb.SCard(ct, c.key).Result()
 }
 
-func (c *ChainSet[T]) Delete(ct context.Context) error {
-	return c.Chain.Delete(ct)
+// Delete removes the specified key from Redis.
+func (c *setBuilder[T]) Delete(ct context.Context) error {
+	if str.IsEmpty(c.key) {
+		return ErrMissingKey
+	}
+
+	rdb := c.cache.GetClient()
+	ctx, cancel := utils.NewCtxTimeout(ct, c.cache.cf.Timeout)
+	defer cancel()
+
+	return rdb.Del(ctx, c.key).Err()
 }

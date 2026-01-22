@@ -36,7 +36,7 @@ type Bootstrap struct {
 	Keycloak  keycloak.KeyCloak
 	Rest      *rest.Client
 	Scheduler *scheduler.Scheduler
-	httpApp   *server.HTTPApp
+	HTTPApp   *server.HTTPApp
 
 	// Lifecycle hooks
 	beforeInit  []func(ctx context.Context) error
@@ -240,15 +240,19 @@ func (b *Bootstrap) Init(ctx context.Context) error {
 			Shutdown: func(ctx context.Context) error {
 				if b.Logger != nil {
 					b.Logger.Sync()
+					b.Logger = nil
 				}
 				if b.Database != nil {
 					b.Database.Close()
+					b.Database = nil
 				}
 				if b.Redis != nil {
 					b.Redis.Close()
+					b.Redis = nil
 				}
 				if b.RabbitMQ != nil {
 					b.RabbitMQ.Close()
+					b.RabbitMQ = nil
 				}
 				return nil
 			},
@@ -279,7 +283,7 @@ func (b *Bootstrap) Start(ctx context.Context) error {
 	// Run before start hooks
 	for _, fn := range b.beforeStart {
 		if err := fn(ctx); err != nil {
-			return fmt.Errorf("before start hook failed: %w", err)
+			return fmt.Errorf("[bootstrap] before start hook failed: %w", err)
 		}
 	}
 
@@ -292,11 +296,11 @@ func (b *Bootstrap) Start(ctx context.Context) error {
 
 	// Start HTTP server if configured
 	if b.serverConf != nil {
-		b.httpApp = server.New(b.serverConf)
-		if err := b.httpApp.Start(); err != nil {
+		b.HTTPApp = server.New(b.serverConf)
+		if err := b.HTTPApp.Start(); err != nil {
 			return fmt.Errorf("[bootstrap] failed to start HTTP server: %w", err)
 		}
-		// Server errors are handled internally by httpApp
+		// Server errors are handled internally by HTTPApp
 		// We don't need to monitor errCh separately since Start() is non-blocking
 	}
 
@@ -348,35 +352,35 @@ func (b *Bootstrap) Stop(ctx context.Context) error {
 	}
 
 	// Stop HTTP server if configured
-	if b.httpApp != nil {
-		if err := b.httpApp.Stop(ctx); err != nil {
+	if b.HTTPApp != nil {
+		if err := b.HTTPApp.Stop(ctx); err != nil {
 			log.Printf("[bootstrap] HTTP server stop error: %v", err)
 		} else {
 			log.Println("[bootstrap] HTTP server stopped")
 		}
 	}
 
-	// Stop scheduler (it stops automatically when context is cancelled)
-	if b.Scheduler != nil {
-		log.Println("[bootstrap] scheduler stopping...")
+	if b.Logger != nil {
+		b.Logger.Sync()
+		b.Logger = nil
 	}
 
 	// Close RabbitMQ
 	if b.RabbitMQ != nil {
 		b.RabbitMQ.Close()
-		log.Println("[bootstrap] RabbitMQ closed")
+		b.RabbitMQ = nil
 	}
 
 	// Close Redis
 	if b.Redis != nil {
 		b.Redis.Close()
-		log.Println("[bootstrap] Redis closed")
+		b.Redis = nil
 	}
 
 	// Close Database
 	if b.Database != nil {
 		b.Database.Close()
-		log.Println("[bootstrap] database closed")
+		b.Database = nil
 	}
 
 	// Run after stop hooks

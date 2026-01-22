@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/go-redis/redismock/v9"
 	"github.com/stretchr/testify/assert"
@@ -12,7 +13,10 @@ import (
 func TestChainSet_StringValue(t *testing.T) {
 	ctx := context.Background()
 	rdb, mock := redismock.NewClientMock()
-	cache := &Cache{client: rdb, Config: &Config{Timeout: 5}}
+	cache := &Cache{
+		client: rdb,
+		cf:     &Config{Timeout: 5 * time.Second},
+	}
 
 	set := WithSet[string](cache).Key("test:set")
 
@@ -24,27 +28,27 @@ func TestChainSet_StringValue(t *testing.T) {
 
 	// --- Test Size
 	mock.ExpectSCard("test:set").SetVal(3)
-	size, err := set.Size(ctx)
+	size, err := set.Key("test:set").Size(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, int64(3), size)
 	assert.NoError(t, mock.ExpectationsWereMet())
 
 	// --- Test Contains true
 	mock.ExpectSIsMember("test:set", "a").SetVal(true)
-	ok, err := set.Contains(ctx, "a")
+	ok, err := set.Key("test:set").Contains(ctx, "a")
 	assert.NoError(t, err)
 	assert.True(t, ok)
 	assert.NoError(t, mock.ExpectationsWereMet())
 
 	// --- Test Remove
 	mock.ExpectSRem("test:set", "a").SetVal(1)
-	err = set.Values("a").Remove(ctx)
+	err = set.Key("test:set").Values("a").Remove(ctx)
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
 
 	// --- Test GetAll
 	mock.ExpectSMembers("test:set").SetVal([]string{"a", "b", "c"})
-	vals, err := set.GetAll(ctx)
+	vals, err := set.Key("test:set").GetAll(ctx)
 	assert.NoError(t, err)
 	assert.Len(t, vals, 3)
 	assert.Equal(t, "a", *vals[0])
@@ -54,7 +58,7 @@ func TestChainSet_StringValue(t *testing.T) {
 
 	// --- Test Delete
 	mock.ExpectDel("test:set").SetVal(1)
-	err = set.Delete(ctx)
+	err = set.Key("test:set").Delete(ctx)
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
@@ -62,7 +66,10 @@ func TestChainSet_StringValue(t *testing.T) {
 func TestChainSet_StructValue(t *testing.T) {
 	ctx := context.Background()
 	rdb, mock := redismock.NewClientMock()
-	cache := &Cache{client: rdb, Config: &Config{Timeout: 5}}
+	cache := &Cache{
+		client: rdb,
+		cf:     &Config{Timeout: 5 * time.Second},
+	}
 
 	set := WithSet[User](cache).Key("user:set")
 
@@ -86,14 +93,14 @@ func TestChainSet_StructValue(t *testing.T) {
 
 	// --- Test Size
 	mock.ExpectSCard("user:set").SetVal(2)
-	size, err := set.Size(ctx)
+	size, err := set.Key("user:set").Size(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, int64(2), size)
 	assert.NoError(t, mock.ExpectationsWereMet())
 
 	// --- Test Contains
 	mock.ExpectSIsMember("user:set", vals[0]).SetVal(true)
-	ok, err := set.Contains(ctx, users[0])
+	ok, err := set.Key("user:set").Contains(ctx, users[0])
 	assert.NoError(t, err)
 	assert.True(t, ok)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -103,7 +110,7 @@ func TestChainSet_StructValue(t *testing.T) {
 		string(vals[0].([]byte)),
 		string(vals[1].([]byte)),
 	})
-	valsOut, err := set.GetAll(ctx)
+	valsOut, err := set.Key("user:set").GetAll(ctx)
 	assert.NoError(t, err)
 	assert.Len(t, valsOut, 2)
 	assert.Equal(t, users[0].Name, (*valsOut[0]).Name)
@@ -114,7 +121,10 @@ func TestChainSet_StructValue(t *testing.T) {
 func TestChainSet_WithEnum(t *testing.T) {
 	ctx := context.Background()
 	rdb, mock := redismock.NewClientMock()
-	cache := &Cache{client: rdb, Config: &Config{Timeout: 5}}
+	cache := &Cache{
+		client: rdb,
+		cf:     &Config{Timeout: 5 * time.Second},
+	}
 
 	set := WithSet[Status](cache).Key("status:set")
 
@@ -128,14 +138,14 @@ func TestChainSet_WithEnum(t *testing.T) {
 
 	// --- Test Contains
 	mock.ExpectSIsMember("status:set", string(StatusPending)).SetVal(true)
-	ok, err := set.Contains(ctx, StatusPending)
+	ok, err := set.Key("status:set").Contains(ctx, StatusPending)
 	assert.NoError(t, err)
 	assert.True(t, ok)
 	assert.NoError(t, mock.ExpectationsWereMet())
 
 	// --- Test GetAll
 	mock.ExpectSMembers("status:set").SetVal([]string{"pending", "approved"})
-	vals, err := set.GetAll(ctx)
+	vals, err := set.Key("status:set").GetAll(ctx)
 	assert.NoError(t, err)
 	assert.Len(t, vals, 2)
 	assert.Equal(t, StatusPending, *vals[0])
@@ -146,7 +156,10 @@ func TestChainSet_WithEnum(t *testing.T) {
 func TestChainSet_ErrorCases(t *testing.T) {
 	ctx := context.Background()
 	rdb, _ := redismock.NewClientMock()
-	cache := &Cache{client: rdb, Config: &Config{Timeout: 5}}
+	cache := &Cache{
+		client: rdb,
+		cf:     &Config{Timeout: 5 * time.Second},
+	}
 
 	set := WithSet[string](cache)
 

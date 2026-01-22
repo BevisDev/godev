@@ -2,62 +2,87 @@ package redis
 
 import (
 	"context"
+	"reflect"
 	"time"
 
 	"github.com/BevisDev/godev/utils"
 	"github.com/BevisDev/godev/utils/jsonx"
+	"github.com/BevisDev/godev/utils/str"
 	"github.com/BevisDev/godev/utils/validate"
 )
 
-type ChainList[T any] struct {
-	*Chain[T]
-	start  int64
-	end    int64
-	setEnd bool
+// listBuilder represents a builder list for Redis list operations with type safety.
+type listBuilder[T any] struct {
+	cache      *Cache
+	key        string
+	values     []interface{}
+	expiration time.Duration
+	start      int64
+	end        int64
+	setEnd     bool
 }
 
-func WithList[T any](cache *Cache) ChainListExec[T] {
-	return &ChainList[T]{
-		Chain: withChain[T](cache),
+// WithList creates a new list builder list for type T.
+func WithList[T any](c *Cache) *listBuilder[T] {
+	return &listBuilder[T]{
+		cache: c,
 	}
 }
 
-func (c *ChainList[T]) Key(k string) ChainListExec[T] {
-	c.Chain.Key(k)
+// Key specifies a single key to operate on for the next execution command.
+func (c *listBuilder[T]) Key(k string) *listBuilder[T] {
+	c.key = k
 	return c
 }
 
-func (c *ChainList[T]) Values(values interface{}) ChainListExec[T] {
-	c.Chain.Values(values)
+// Values specifies multiple values to be stored with the key.
+func (c *listBuilder[T]) Values(values interface{}) *listBuilder[T] {
+	v := reflect.ValueOf(values)
+
+	if v.Kind() != reflect.Slice {
+		c.values = append(c.values, convertValue(values))
+		return c
+	}
+
+	for i := 0; i < v.Len(); i++ {
+		val := v.Index(i).Interface()
+		c.values = append(c.values, convertValue(val))
+	}
+
 	return c
 }
 
-func (c *ChainList[T]) Expire(d time.Duration) ChainListExec[T] {
-	c.Chain.Expire(d)
+// Expire sets the Time-To-Live (TTL) for the key.
+func (c *listBuilder[T]) Expire(d time.Duration) *listBuilder[T] {
+	c.expiration = d
 	return c
 }
 
-func (c *ChainList[T]) Start(start int64) ChainListExec[T] {
+// Start sets the start index for range operations.
+func (c *listBuilder[T]) Start(start int64) *listBuilder[T] {
 	c.start = start
 	return c
 }
 
-func (c *ChainList[T]) End(end int64) ChainListExec[T] {
+// End sets the end index for range operations.
+func (c *listBuilder[T]) End(end int64) *listBuilder[T] {
 	c.end = end
 	c.setEnd = true
 	return c
 }
 
-func (c *ChainList[T]) AddFirst(ctx context.Context) error {
-	if c.key == "" {
+// AddFirst inserts one or more values at the head (left) of the list.
+// Returns an error if the key or values are missing, or if the operation fails.
+func (c *listBuilder[T]) AddFirst(ctx context.Context) error {
+	if str.IsEmpty(c.key) {
 		return ErrMissingKey
 	}
 	if validate.IsNilOrEmpty(c.values) {
 		return ErrMissingValues
 	}
 
-	rdb := c.GetClient()
-	ct, cancel := utils.NewCtxTimeout(ctx, c.Timeout)
+	rdb := c.cache.GetClient()
+	ct, cancel := utils.NewCtxTimeout(ctx, c.cache.cf.Timeout)
 	defer cancel()
 
 	if err := rdb.LPush(ct, c.key, c.values...).Err(); err != nil {
@@ -70,7 +95,9 @@ func (c *ChainList[T]) AddFirst(ctx context.Context) error {
 	return nil
 }
 
-func (c *ChainList[T]) Add(ctx context.Context) error {
+// Add inserts one or more values at the tail (right) of the list.
+// Returns an error if the key or values are missing, or if the operation fails.
+func (c *listBuilder[T]) Add(ctx context.Context) error {
 	if c.key == "" {
 		return ErrMissingKey
 	}
@@ -78,8 +105,8 @@ func (c *ChainList[T]) Add(ctx context.Context) error {
 		return ErrMissingValues
 	}
 
-	rdb := c.GetClient()
-	ct, cancel := utils.NewCtxTimeout(ctx, c.Timeout)
+	rdb := c.cache.GetClient()
+	ct, cancel := utils.NewCtxTimeout(ctx, c.cache.cf.Timeout)
 	defer cancel()
 
 	if err := rdb.RPush(ct, c.key, c.values...).Err(); err != nil {
@@ -92,18 +119,21 @@ func (c *ChainList[T]) Add(ctx context.Context) error {
 	return nil
 }
 
-func (c *ChainList[T]) PopFront(ctx context.Context) (*T, error) {
+// PopFront retrieves and removes the first element (head) of the list.
+// Returns nil if the list is empty (redis.Nil error).
+// Returns an error if the key is missing, or if the operation fails.
+func (c *listBuilder[T]) PopFront(ctx context.Context) (*T, error) {
 	if c.key == "" {
 		return nil, ErrMissingKey
 	}
 
-	rdb := c.GetClient()
-	ct, cancel := utils.NewCtxTimeout(ctx, c.Timeout)
+	rdb := c.cache.GetClient()
+	ct, cancel := utils.NewCtxTimeout(ctx, c.cache.cf.Timeout)
 	defer cancel()
 
 	val, err := rdb.LPop(ct, c.key).Result()
 	if err != nil {
-		if c.IsNil(err) {
+		if c.cache.IsNil(err) {
 			return nil, nil
 		}
 		return nil, err
@@ -116,18 +146,21 @@ func (c *ChainList[T]) PopFront(ctx context.Context) (*T, error) {
 	return &t, nil
 }
 
-func (c *ChainList[T]) Pop(ctx context.Context) (*T, error) {
+// Pop retrieves and removes the last element (tail) of the list.
+// Returns nil if the list is empty (redis.Nil error).
+// Returns an error if the key is missing, or if the operation fails.
+func (c *listBuilder[T]) Pop(ctx context.Context) (*T, error) {
 	if c.key == "" {
 		return nil, ErrMissingKey
 	}
 
-	rdb := c.GetClient()
-	ct, cancel := utils.NewCtxTimeout(ctx, c.Timeout)
+	rdb := c.cache.GetClient()
+	ct, cancel := utils.NewCtxTimeout(ctx, c.cache.cf.Timeout)
 	defer cancel()
 
 	val, err := rdb.RPop(ct, c.key).Result()
 	if err != nil {
-		if c.IsNil(err) {
+		if c.cache.IsNil(err) {
 			return nil, nil
 		}
 		return nil, err
@@ -140,13 +173,16 @@ func (c *ChainList[T]) Pop(ctx context.Context) (*T, error) {
 	return &t, nil
 }
 
-func (c *ChainList[T]) GetRange(ctx context.Context) ([]*T, error) {
+// GetRange returns a slice of elements between the specified start and stop indexes.
+// If end is not set, returns all elements from start to the end of the list.
+// Returns an error if the key is missing, or if the operation fails.
+func (c *listBuilder[T]) GetRange(ctx context.Context) ([]*T, error) {
 	if c.key == "" {
 		return nil, ErrMissingKey
 	}
 
-	rdb := c.GetClient()
-	ct, cancel := utils.NewCtxTimeout(ctx, c.Timeout)
+	rdb := c.cache.GetClient()
+	ct, cancel := utils.NewCtxTimeout(ctx, c.cache.cf.Timeout)
 	defer cancel()
 
 	end := c.end
@@ -169,13 +205,16 @@ func (c *ChainList[T]) GetRange(ctx context.Context) ([]*T, error) {
 	return result, nil
 }
 
-func (c *ChainList[T]) Get(ctx context.Context, index int64) (*T, error) {
+// Get retrieves the element at the specified index from the Redis list.
+// Returns nil if the index is out of range.
+// Returns an error if the key is missing, or if the operation fails.
+func (c *listBuilder[T]) Get(ctx context.Context, index int64) (*T, error) {
 	if c.key == "" {
 		return nil, ErrMissingKey
 	}
 
-	rdb := c.GetClient()
-	ct, cancel := utils.NewCtxTimeout(ctx, c.Timeout)
+	rdb := c.cache.GetClient()
+	ct, cancel := utils.NewCtxTimeout(ctx, c.cache.cf.Timeout)
 	defer cancel()
 
 	vals, err := rdb.LRange(ct, c.key, index, index).Result()
@@ -194,18 +233,29 @@ func (c *ChainList[T]) Get(ctx context.Context, index int64) (*T, error) {
 	return &t, nil
 }
 
-func (c *ChainList[T]) Size(ctx context.Context) (int64, error) {
+// Size returns the number of elements in the list.
+// Returns an error if the key is missing, or if the operation fails.
+func (c *listBuilder[T]) Size(ctx context.Context) (int64, error) {
 	if c.key == "" {
 		return 0, ErrMissingKey
 	}
 
-	rdb := c.GetClient()
-	ct, cancel := utils.NewCtxTimeout(ctx, c.Timeout)
+	rdb := c.cache.GetClient()
+	ct, cancel := utils.NewCtxTimeout(ctx, c.cache.cf.Timeout)
 	defer cancel()
 
 	return rdb.LLen(ct, c.key).Result()
 }
 
-func (c *ChainList[T]) Delete(ct context.Context) error {
-	return c.Chain.Delete(ct)
+// Delete removes the specified key from Redis.
+func (c *listBuilder[T]) Delete(ct context.Context) error {
+	if str.IsEmpty(c.key) {
+		return ErrMissingKey
+	}
+
+	rdb := c.cache.GetClient()
+	ctx, cancel := utils.NewCtxTimeout(ct, c.cache.cf.Timeout)
+	defer cancel()
+
+	return rdb.Del(ctx, c.key).Err()
 }

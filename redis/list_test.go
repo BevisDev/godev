@@ -16,8 +16,9 @@ func TestChainList(t *testing.T) {
 
 	rdb, mock := redismock.NewClientMock()
 
-	cache := &Cache{client: rdb,
-		Config: &Config{
+	cache := &Cache{
+		client: rdb,
+		cf: &Config{
 			Timeout: 5 * time.Second,
 		},
 	}
@@ -36,7 +37,7 @@ func TestChainList(t *testing.T) {
 	// Test Size
 	mock.ExpectLLen("test:list").SetVal(3)
 
-	size, err := list.Size(ctx)
+	size, err := list.Key("test:list").Size(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, int64(3), size)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -44,7 +45,7 @@ func TestChainList(t *testing.T) {
 	// Test Get index
 	mock.ExpectLRange("test:list", int64(0), int64(0)).SetVal([]string{"a"})
 
-	val, err := list.Get(ctx, 0)
+	val, err := list.Key("test:list").Get(ctx, 0)
 	assert.NoError(t, err)
 	assert.NotNil(t, val)
 	assert.Equal(t, "a", *val)
@@ -53,7 +54,7 @@ func TestChainList(t *testing.T) {
 	// Test GetRange
 	mock.ExpectLRange("test:list", int64(0), int64(-1)).SetVal([]string{"a", "b", "c"})
 
-	vals, err := list.GetRange(ctx)
+	vals, err := list.Key("test:list").Start(0).GetRange(ctx)
 	assert.NoError(t, err)
 	assert.Len(t, vals, 3)
 	assert.Equal(t, "a", *vals[0])
@@ -64,7 +65,7 @@ func TestChainList(t *testing.T) {
 	// Test PopFront
 	mock.ExpectLPop("test:list").SetVal("a")
 
-	first, err := list.PopFront(ctx)
+	first, err := list.Key("test:list").PopFront(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, "a", *first)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -72,7 +73,7 @@ func TestChainList(t *testing.T) {
 	// Test Pop (RPop)
 	mock.ExpectRPop("test:list").SetVal("c")
 
-	last, err := list.Pop(ctx)
+	last, err := list.Key("test:list").Pop(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, "c", *last)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -81,8 +82,9 @@ func TestChainList(t *testing.T) {
 func TestChainList_WithStruct(t *testing.T) {
 	ctx := context.Background()
 	rdb, mock := redismock.NewClientMock()
-	cache := &Cache{client: rdb,
-		Config: &Config{
+	cache := &Cache{
+		client: rdb,
+		cf: &Config{
 			Timeout: 5 * time.Second,
 		},
 	}
@@ -112,7 +114,7 @@ func TestChainList_WithStruct(t *testing.T) {
 	// --- Size ---
 	mock.ExpectLLen("user:list").SetVal(int64(len(users)))
 
-	size, err := list.Size(ctx)
+	size, err := list.Key("user:list").Size(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, int64(2), size)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -121,7 +123,7 @@ func TestChainList_WithStruct(t *testing.T) {
 	mock.ExpectLRange("user:list", 0, 0).
 		SetVal([]string{string(vals[0].([]byte))})
 
-	val, err := list.Get(ctx, 0)
+	val, err := list.Key("user:list").Get(ctx, 0)
 	assert.NoError(t, err)
 	assert.NotNil(t, val)
 	assert.Equal(t, users[0].ID, (*val).ID)
@@ -132,7 +134,7 @@ func TestChainList_WithStruct(t *testing.T) {
 	mock.ExpectLRange("user:list", int64(0), int64(-1)).
 		SetVal([]string{string(vals[0].([]byte)), string(vals[1].([]byte))})
 
-	valsOut, err := list.GetRange(ctx)
+	valsOut, err := list.Key("user:list").Start(0).GetRange(ctx)
 	assert.NoError(t, err)
 	assert.Len(t, valsOut, 2)
 	assert.Equal(t, users[0].ID, (*valsOut[0]).ID)
@@ -143,7 +145,7 @@ func TestChainList_WithStruct(t *testing.T) {
 	mock.ExpectLPop("user:list").
 		SetVal(string(vals[0].([]byte)))
 
-	first, err := list.PopFront(ctx)
+	first, err := list.Key("user:list").PopFront(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, users[0].ID, (*first).ID)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -151,7 +153,7 @@ func TestChainList_WithStruct(t *testing.T) {
 	// --- Pop ---
 	mock.ExpectRPop("user:list").
 		SetVal(string(vals[1].([]byte)))
-	last, err := list.Pop(ctx)
+	last, err := list.Key("user:list").Pop(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, users[1].ID, (*last).ID)
 	assert.NoError(t, mock.ExpectationsWereMet())

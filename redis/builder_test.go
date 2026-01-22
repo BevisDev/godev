@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/go-redis/redismock/v9"
 	"github.com/redis/go-redis/v9"
@@ -32,8 +33,8 @@ func TestRedisCache_SetAndGet(t *testing.T) {
 	rdb, mock := redismock.NewClientMock()
 	cache := &Cache{
 		client: rdb,
-		Config: &Config{
-			Timeout: 5,
+		cf: &Config{
+			Timeout: 5 * time.Second,
 		},
 	}
 	ctx := context.Background()
@@ -54,8 +55,8 @@ func TestRedisCache_Delete(t *testing.T) {
 	rdb, mock := redismock.NewClientMock()
 	cache := &Cache{
 		client: rdb,
-		Config: &Config{
-			Timeout: 5,
+		cf: &Config{
+			Timeout: 5 * time.Second,
 		},
 	}
 	ctx := context.Background()
@@ -70,8 +71,8 @@ func TestRedisCache_GetByPrefix(t *testing.T) {
 	rdb, mock := redismock.NewClientMock()
 	cache := &Cache{
 		client: rdb,
-		Config: &Config{
-			Timeout: 5,
+		cf: &Config{
+			Timeout: 5 * time.Second,
 		},
 	}
 	ctx := context.Background()
@@ -100,8 +101,8 @@ func TestRedisCache_IsNil(t *testing.T) {
 	rdb, _ := redismock.NewClientMock()
 	cache := &Cache{
 		client: rdb,
-		Config: &Config{
-			Timeout: 5,
+		cf: &Config{
+			Timeout: 5 * time.Second,
 		},
 	}
 
@@ -113,8 +114,8 @@ func TestRedisCache_Publish(t *testing.T) {
 	rdb, mock := redismock.NewClientMock()
 	cache := &Cache{
 		client: rdb,
-		Config: &Config{
-			Timeout: 5,
+		cf: &Config{
+			Timeout: 5 * time.Second,
 		},
 	}
 	ctx := context.Background()
@@ -137,8 +138,8 @@ func TestRedisCache_Publish_JSON(t *testing.T) {
 	rdb, mock := redismock.NewClientMock()
 	cache := &Cache{
 		client: rdb,
-		Config: &Config{
-			Timeout: 5,
+		cf: &Config{
+			Timeout: 5 * time.Second,
 		},
 	}
 	ctx := context.Background()
@@ -170,8 +171,8 @@ func TestSetIfNotExists(t *testing.T) {
 	rdb, mock := redismock.NewClientMock()
 	cache := &Cache{
 		client: rdb,
-		Config: &Config{
-			Timeout: 5,
+		cf: &Config{
+			Timeout: 5 * time.Second,
 		},
 	}
 
@@ -201,8 +202,8 @@ func TestSetIfNotExists_EnumValue(t *testing.T) {
 	rdb, mock := redismock.NewClientMock()
 	cache := &Cache{
 		client: rdb,
-		Config: &Config{
-			Timeout: 5,
+		cf: &Config{
+			Timeout: 5 * time.Second,
 		},
 	}
 	chain := With[Status](cache)

@@ -18,6 +18,7 @@ type Config struct {
 	Timeout  time.Duration // timeout for Redis operations in seconds
 }
 
+// withDefaults applies default values to the configuration if they are not set.
 func (c *Config) withDefaults() {
 	if c.Timeout <= 0 {
 		c.Timeout = 5 * time.Second
@@ -27,6 +28,7 @@ func (c *Config) withDefaults() {
 	}
 }
 
+// Addr returns the Redis server address in the format "host:port".
 func (c *Config) Addr() string {
 	return fmt.Sprintf("%s:%d", c.Host, c.Port)
 }
