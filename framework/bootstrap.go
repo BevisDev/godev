@@ -21,6 +21,7 @@ import (
 	"github.com/BevisDev/godev/rest"
 	"github.com/BevisDev/godev/scheduler"
 	"github.com/gin-gonic/gin"
+	"golang.org/x/sync/errgroup"
 )
 
 // Bootstrap manages application lifecycle and dependencies.
@@ -139,78 +140,62 @@ func (b *Bootstrap) Init(ctx context.Context) error {
 	}
 
 	// Init services in parallel (except logger which must be first)
-	errCh := make(chan error, 6)
-	var wg sync.WaitGroup
+	g, ctx := errgroup.WithContext(ctx)
 
 	// Database
 	if b.dbConf != nil && b.Database == nil {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		g.Go(func() error {
 			db, err := database.New(b.dbConf)
 			if err != nil {
-				errCh <- fmt.Errorf("[database] failed to connect: %w", err)
-				return
+				return fmt.Errorf("[database] %w", err)
 			}
 			b.Database = db
-		}()
+			return nil
+		})
 	}
 
 	// Redis
 	if b.redisConf != nil && b.Redis == nil {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		g.Go(func() error {
 			cache, err := redis.New(b.redisConf)
 			if err != nil {
-				errCh <- fmt.Errorf("[redis] failed to connect: %w", err)
-				return
+				return fmt.Errorf("[redis] %w", err)
 			}
 			b.Redis = cache
-		}()
+			return nil
+		})
 	}
 
 	// RabbitMQ
 	if b.rabbitmqConf != nil && b.RabbitMQ == nil {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		g.Go(func() error {
 			mq, err := rabbitmq.New(b.rabbitmqConf)
 			if err != nil {
-				errCh <- fmt.Errorf("[rabbitmq] failed to connect: %w", err)
-				return
+				return fmt.Errorf("[rabbitmq] %w", err)
 			}
 			b.RabbitMQ = mq
-		}()
+			return nil
+		})
 	}
 
 	// Keycloak
 	if b.keycloakConf != nil && b.Keycloak == nil {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		g.Go(func() error {
 			b.Keycloak = keycloak.New(b.keycloakConf)
-		}()
+			return nil
+		})
 	}
 
 	// Scheduler
 	if b.schedulerOn && b.Scheduler == nil {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		g.Go(func() error {
 			b.Scheduler = scheduler.New(b.schedulerOpt...)
-		}()
+			return nil
+		})
 	}
 
-	// Wait for services to complete
-	wg.Wait()
-	close(errCh)
-
-	// Check for errors
-	select {
-	case err := <-errCh:
+	if err := g.Wait(); err != nil {
 		return err
-	default:
 	}
 
 	// REST client: init after logger is ready (may need logger)
