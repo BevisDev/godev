@@ -2,7 +2,6 @@ package datetime
 
 import (
 	"encoding/json"
-	"fmt"
 	"testing"
 	"time"
 )
@@ -160,10 +159,8 @@ func TestDate_InStruct_JSON(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fmt.Println(string(b))
-
 	expected := `{"birth_date":null}`
 	if string(b) != expected {
-		t.Errorf("json.Marshal() = %s; want %s", b, expected)
+		t.Errorf("json.Marshal() = %s; want %s", string(b), expected)
 	}
 }

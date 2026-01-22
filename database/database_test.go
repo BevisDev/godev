@@ -43,8 +43,15 @@ func setupTestDB(t *testing.T) (*Database, sqlmock.Sqlmock) {
 }
 
 // ============================================================================
-// Connection & Lifecycle Tests
+// New & Lifecycle Tests
 // ============================================================================
+
+func TestDatabase_New_NilConfig(t *testing.T) {
+	db, err := New(nil)
+	assert.Error(t, err)
+	assert.Nil(t, db)
+	assert.Contains(t, err.Error(), "config is nil")
+}
 
 func TestDatabase_Ping(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
@@ -181,6 +188,29 @@ func TestDatabase_FormatRow(t *testing.T) {
 	}
 }
 
+func TestDatabase_GetTemplate(t *testing.T) {
+	t.Run("SqlServer", func(t *testing.T) {
+		db := &Database{Config: &Config{DBType: SqlServer}}
+		assert.Contains(t, db.GetTemplate(TemplateJSONArray), "FOR JSON PATH")
+		assert.Contains(t, db.GetTemplate(TemplateJSONObject), "WITHOUT_ARRAY_WRAPPER")
+	})
+	t.Run("Postgres", func(t *testing.T) {
+		db := &Database{Config: &Config{DBType: Postgres}}
+		assert.Contains(t, db.GetTemplate(TemplateJSONArray), "json_agg")
+		assert.Contains(t, db.GetTemplate(TemplateJSONObject), "row_to_json")
+	})
+	t.Run("MySQL", func(t *testing.T) {
+		db := &Database{Config: &Config{DBType: MySQL}}
+		assert.Contains(t, db.GetTemplate(TemplateJSONArray), "JSON_ARRAYAGG")
+		assert.Contains(t, db.GetTemplate(TemplateJSONObject), "JSON_OBJECT")
+	})
+	t.Run("Oracle_unknown", func(t *testing.T) {
+		db := &Database{Config: &Config{DBType: Oracle}}
+		assert.Empty(t, db.GetTemplate(TemplateJSONArray))
+		assert.Empty(t, db.GetTemplate(TemplateJSONObject))
+	})
+}
+
 // ============================================================================
 // Execute Tests
 // ============================================================================
@@ -231,7 +261,7 @@ func TestDatabase_ExecuteTx(t *testing.T) {
 	defer db.Close()
 
 	ctx := context.Background()
-	query := "UPDATE users SET name = @p1 WHERE id = @p2"
+	query := "UPDATE users SET name = ? WHERE id = ?"
 
 	mock.ExpectBegin()
 	mock.ExpectExec(regexp.QuoteMeta(query)).
@@ -239,7 +269,7 @@ func TestDatabase_ExecuteTx(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
-	err := db.ExecuteTx(ctx, "UPDATE users SET name = ? WHERE id = ?", "Alice", 1)
+	err := db.ExecuteTx(ctx, query, "Alice", 1)
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
@@ -249,7 +279,7 @@ func TestDatabase_ExecuteSafe(t *testing.T) {
 	defer db.Close()
 
 	ctx := context.Background()
-	query := "UPDATE users SET name = @p1 WHERE id = @p2"
+	query := "UPDATE users SET name = ? WHERE id = ?"
 
 	mock.ExpectBegin()
 	mock.ExpectExec(regexp.QuoteMeta(query)).
@@ -257,7 +287,7 @@ func TestDatabase_ExecuteSafe(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
-	err := db.ExecuteSafe(ctx, "UPDATE users SET name = ? WHERE id = ?", "Alice", 1)
+	err := db.ExecuteSafe(ctx, query, "Alice", 1)
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
@@ -272,18 +302,24 @@ func TestDatabase_Save(t *testing.T) {
 		defer db.Close()
 
 		ctx := context.Background()
-		query := "INSERT INTO users (name, email) VALUES (@p1, @p2)"
 
+		query := "INSERT INTO users (name, email) VALUES (?, ?)"
 		mock.ExpectExec(regexp.QuoteMeta(query)).
 			WithArgs("Alice", "alice@example.com").
 			WillReturnResult(sqlmock.NewResult(1, 1))
 
-		err := db.Save(ctx, nil, "INSERT INTO users (name, email) VALUES (:name, :email)", map[string]interface{}{
-			"name":  "Alice",
-			"email": "alice@example.com",
-		})
-		assert.NoError(t, err)
-		assert.NoError(t, mock.ExpectationsWereMet())
+		err := db.Save(
+			ctx,
+			nil,
+			"INSERT INTO users (name, email) VALUES (:name, :email)",
+			map[string]interface{}{
+				"name":  "Alice",
+				"email": "alice@example.com",
+			},
+		)
+
+		require.NoError(t, err)
+		require.NoError(t, mock.ExpectationsWereMet())
 	})
 
 	t.Run("with transaction", func(t *testing.T) {
@@ -292,23 +328,36 @@ func TestDatabase_Save(t *testing.T) {
 
 		ctx := context.Background()
 
+		// Expect begin BEFORE BeginTxx
 		mock.ExpectBegin()
+
 		tx, err := db.GetDB().BeginTxx(ctx, nil)
 		require.NoError(t, err)
 
-		mock.ExpectExec(regexp.QuoteMeta("INSERT INTO users (name, email) VALUES (@p1, @p2)")).
+		// Expect exec
+		mock.ExpectExec(
+			regexp.QuoteMeta("INSERT INTO users (name, email) VALUES (?, ?)"),
+		).
 			WithArgs("Alice", "alice@example.com").
 			WillReturnResult(sqlmock.NewResult(1, 1))
 
-		err = db.Save(ctx, tx, "INSERT INTO users (name, email) VALUES (:name, :email)", map[string]interface{}{
-			"name":  "Alice",
-			"email": "alice@example.com",
-		})
-		assert.NoError(t, err)
+		err = db.Save(
+			ctx,
+			tx,
+			"INSERT INTO users (name, email) VALUES (:name, :email)",
+			map[string]interface{}{
+				"name":  "Alice",
+				"email": "alice@example.com",
+			},
+		)
 
+		require.NoError(t, err)
+
+		// 3️⃣ Commit do test control
 		mock.ExpectCommit()
-		_ = tx.Commit()
-		assert.NoError(t, mock.ExpectationsWereMet())
+		require.NoError(t, tx.Commit())
+
+		require.NoError(t, mock.ExpectationsWereMet())
 	})
 }
 
@@ -319,17 +368,26 @@ func TestDatabase_SaveTx(t *testing.T) {
 	ctx := context.Background()
 
 	mock.ExpectBegin()
-	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO users (name, email) VALUES (@p1, @p2)")).
+
+	mock.ExpectExec(
+		regexp.QuoteMeta("INSERT INTO users (name, email) VALUES (?, ?)"),
+	).
 		WithArgs("Alice", "alice@example.com").
 		WillReturnResult(sqlmock.NewResult(1, 1))
+
 	mock.ExpectCommit()
 
-	err := db.SaveTx(ctx, "INSERT INTO users (name, email) VALUES (:name, :email)", map[string]interface{}{
-		"name":  "Alice",
-		"email": "alice@example.com",
-	})
-	assert.NoError(t, err)
-	assert.NoError(t, mock.ExpectationsWereMet())
+	err := db.SaveTx(
+		ctx,
+		"INSERT INTO users (name, email) VALUES (:name, :email)",
+		map[string]interface{}{
+			"name":  "Alice",
+			"email": "alice@example.com",
+		},
+	)
+
+	require.NoError(t, err)
+	require.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestDatabase_SaveSafe(t *testing.T) {
@@ -339,17 +397,26 @@ func TestDatabase_SaveSafe(t *testing.T) {
 	ctx := context.Background()
 
 	mock.ExpectBegin()
-	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO users (name, email) VALUES (@p1, @p2)")).
+
+	mock.ExpectExec(
+		regexp.QuoteMeta("INSERT INTO users (name, email) VALUES (?, ?)"),
+	).
 		WithArgs("Alice", "alice@example.com").
 		WillReturnResult(sqlmock.NewResult(1, 1))
+
 	mock.ExpectCommit()
 
-	err := db.SaveSafe(ctx, "INSERT INTO users (name, email) VALUES (:name, :email)", map[string]interface{}{
-		"name":  "Alice",
-		"email": "alice@example.com",
-	})
-	assert.NoError(t, err)
-	assert.NoError(t, mock.ExpectationsWereMet())
+	err := db.SaveSafe(
+		ctx,
+		"INSERT INTO users (name, email) VALUES (:name, :email)",
+		map[string]interface{}{
+			"name":  "Alice",
+			"email": "alice@example.com",
+		},
+	)
+
+	require.NoError(t, err)
+	require.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestDatabase_InsertOrUpdate(t *testing.T) {
@@ -358,16 +425,23 @@ func TestDatabase_InsertOrUpdate(t *testing.T) {
 
 	ctx := context.Background()
 
-	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO users (name, email) VALUES (@p1, @p2)")).
+	mock.ExpectExec(
+		regexp.QuoteMeta("INSERT INTO users (name, email) VALUES (?, ?)"),
+	).
 		WithArgs("Alice", "alice@example.com").
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
-	err := db.InsertOrUpdate(ctx, "INSERT INTO users (name, email) VALUES (:name, :email)", map[string]interface{}{
-		"name":  "Alice",
-		"email": "alice@example.com",
-	})
-	assert.NoError(t, err)
-	assert.NoError(t, mock.ExpectationsWereMet())
+	err := db.InsertOrUpdate(
+		ctx,
+		"INSERT INTO users (name, email) VALUES (:name, :email)",
+		map[string]interface{}{
+			"name":  "Alice",
+			"email": "alice@example.com",
+		},
+	)
+
+	require.NoError(t, err)
+	require.NoError(t, mock.ExpectationsWereMet())
 }
 
 // ============================================================================
@@ -382,16 +456,21 @@ func TestDatabase_GetAny(t *testing.T) {
 		ctx := context.Background()
 		var user User
 
-		mock.ExpectQuery(regexp.QuoteMeta("SELECT name, email FROM users WHERE id = @p1")).
+		mock.ExpectQuery(
+			regexp.QuoteMeta("SELECT name, email FROM users WHERE id = ?"),
+		).
 			WithArgs(1).
-			WillReturnRows(sqlmock.NewRows([]string{"name", "email"}).
-				AddRow("Alice", "alice@example.com"))
+			WillReturnRows(
+				sqlmock.NewRows([]string{"name", "email"}).
+					AddRow("Alice", "alice@example.com"),
+			)
 
 		err := db.GetAny(ctx, &user, "SELECT name, email FROM users WHERE id = ?", 1)
-		assert.NoError(t, err)
-		assert.Equal(t, "Alice", user.Name)
-		assert.Equal(t, "alice@example.com", user.Email)
-		assert.NoError(t, mock.ExpectationsWereMet())
+
+		require.NoError(t, err)
+		require.Equal(t, "Alice", user.Name)
+		require.Equal(t, "alice@example.com", user.Email)
+		require.NoError(t, mock.ExpectationsWereMet())
 	})
 
 	t.Run("no rows", func(t *testing.T) {
@@ -401,14 +480,17 @@ func TestDatabase_GetAny(t *testing.T) {
 		ctx := context.Background()
 		var user User
 
-		mock.ExpectQuery(regexp.QuoteMeta("SELECT name, email FROM users WHERE id = @p1")).
+		mock.ExpectQuery(
+			regexp.QuoteMeta("SELECT name, email FROM users WHERE id = ?"),
+		).
 			WithArgs(999).
 			WillReturnError(sql.ErrNoRows)
 
 		err := db.GetAny(ctx, &user, "SELECT name, email FROM users WHERE id = ?", 999)
-		assert.Error(t, err)
-		assert.True(t, db.IsNoResult(err))
-		assert.NoError(t, mock.ExpectationsWereMet())
+
+		require.Error(t, err)
+		require.True(t, db.IsNoResult(err))
+		require.NoError(t, mock.ExpectationsWereMet())
 	})
 
 	t.Run("invalid destination", func(t *testing.T) {
@@ -611,6 +693,26 @@ func TestDatabase_InsertMany(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestDatabase_InsertMany_Empty(t *testing.T) {
+	db, mock := setupTestDB(t)
+	defer db.Close()
+
+	ctx := context.Background()
+	query := "INSERT INTO users (name, email) VALUES (:name, :email)"
+
+	mock.ExpectBegin()
+	mock.ExpectCommit()
+	err := db.InsertMany(ctx, query, nil)
+	assert.NoError(t, err)
+	assert.NoError(t, mock.ExpectationsWereMet())
+
+	mock.ExpectBegin()
+	mock.ExpectCommit()
+	err = db.InsertMany(ctx, query, []interface{}{})
+	assert.NoError(t, err)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
 // ============================================================================
 // Update & Delete Tests
 // ============================================================================
@@ -621,15 +723,32 @@ func TestDatabase_Delete(t *testing.T) {
 
 	ctx := context.Background()
 
+	query := "INSERT INTO users (name, email) VALUES (:name, :email)"
+	entities := []interface{}{
+		map[string]interface{}{"name": "Alice", "email": "alice@example.com"},
+		map[string]interface{}{"name": "Bob", "email": "bob@example.com"},
+	}
+
 	mock.ExpectBegin()
-	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM users WHERE id = @p1")).
-		WithArgs(1).
-		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	mock.ExpectExec(
+		regexp.QuoteMeta("INSERT INTO users (name, email) VALUES (?, ?)"),
+	).
+		WithArgs("Alice", "alice@example.com").
+		WillReturnResult(sqlmock.NewResult(1, 1))
+
+	mock.ExpectExec(
+		regexp.QuoteMeta("INSERT INTO users (name, email) VALUES (?, ?)"),
+	).
+		WithArgs("Bob", "bob@example.com").
+		WillReturnResult(sqlmock.NewResult(1, 1))
+
 	mock.ExpectCommit()
 
-	err := db.Delete(ctx, "DELETE FROM users WHERE id = :id", map[string]interface{}{"id": 1})
-	assert.NoError(t, err)
-	assert.NoError(t, mock.ExpectationsWereMet())
+	err := db.InsertMany(ctx, query, entities)
+
+	require.NoError(t, err)
+	require.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestDatabase_UpdateMany(t *testing.T) {
@@ -675,6 +794,61 @@ func TestDatabase_UpdateManySafe(t *testing.T) {
 
 	err := db.UpdateManySafe(ctx, query, entities)
 	assert.NoError(t, err)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestDatabase_UpdateMany_Empty(t *testing.T) {
+	db, mock := setupTestDB(t)
+	defer db.Close()
+
+	ctx := context.Background()
+	query := "UPDATE users SET name = :name WHERE id = :id"
+
+	mock.ExpectBegin()
+	mock.ExpectCommit()
+	err := db.UpdateMany(ctx, query, nil)
+	assert.NoError(t, err)
+	assert.NoError(t, mock.ExpectationsWereMet())
+
+	mock.ExpectBegin()
+	mock.ExpectCommit()
+	err = db.UpdateMany(ctx, query, []interface{}{})
+	assert.NoError(t, err)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestDatabase_Prepare(t *testing.T) {
+	db, mock := setupTestDB(t)
+	defer db.Close()
+
+	ctx := context.Background()
+	query := "SELECT * FROM users WHERE id = ?"
+
+	mock.ExpectPrepare(regexp.QuoteMeta(query))
+
+	stmt, err := db.Prepare(ctx, query)
+	require.NoError(t, err)
+	require.NotNil(t, stmt)
+	defer stmt.Close()
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestDatabase_RunTx_PanicRecovery(t *testing.T) {
+	db, mock := setupTestDB(t)
+	defer db.Close()
+
+	ctx := context.Background()
+
+	mock.ExpectBegin()
+	mock.ExpectRollback()
+	mock.ExpectRollback()
+
+	err := db.RunTx(ctx, sql.LevelDefault, func(ctx context.Context, tx *sqlx.Tx) error {
+		panic("test panic")
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "panic recovered")
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 

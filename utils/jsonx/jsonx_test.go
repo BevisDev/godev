@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type Person struct {
@@ -172,17 +173,20 @@ func TestClonePerson(t *testing.T) {
 	}
 
 	cloned, err := Clone(original)
-	if err != nil {
-		t.Fatalf("Clone failed: %v", err)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, original, cloned)
 
-	if cloned != original {
-		t.Errorf("Cloned object does not match original. Got %+v", cloned)
-	}
-
-	// Modify cloned to ensure it's not the same reference (deep copy)
 	cloned.Name = "Alice"
-	if original.Name == cloned.Name {
-		t.Errorf("Original changed when cloned modified!")
-	}
+	assert.NotEqual(t, original.Name, cloned.Name, "clone should be independent")
+}
+
+func TestFromJSON_InvalidJSON(t *testing.T) {
+	_, err := FromJSON[Person](`{invalid json`)
+	assert.Error(t, err)
+}
+
+func TestClone_UnmarshalError(t *testing.T) {
+	ch := make(chan int)
+	_, err := Clone(ch)
+	assert.Error(t, err)
 }

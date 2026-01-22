@@ -75,6 +75,20 @@ func TestRetrospectToken_Success(t *testing.T) {
 	mockKC.AssertExpectations(t)
 }
 
+func TestRetrospectToken_Error(t *testing.T) {
+	mockKC := new(MockKeyCloak)
+	ctx := context.TODO()
+	mockKC.On("RetrospectToken", ctx, "bad", "client", "secret", "realm").
+		Return(nil, errors.New("invalid token"))
+
+	result, err := mockKC.RetrospectToken(ctx, "bad", "client", "secret", "realm")
+
+	assert.Error(t, err)
+	assert.Nil(t, result)
+	assert.EqualError(t, err, "invalid token")
+	mockKC.AssertExpectations(t)
+}
+
 func TestGetUserInfo_Success(t *testing.T) {
 	mockKC := new(MockKeyCloak)
 	expected := &gocloak.UserInfo{

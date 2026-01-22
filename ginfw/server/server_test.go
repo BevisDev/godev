@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNew_SetupCalled(t *testing.T) {
@@ -18,13 +20,14 @@ func TestNew_SetupCalled(t *testing.T) {
 		},
 	})
 
-	if app == nil {
-		t.Fatal("expected HTTPApp to be created")
-	}
+	require.NotNil(t, app)
+	assert.True(t, setupCalled)
+}
 
-	if !setupCalled {
-		t.Fatal("expected Setup to be called")
-	}
+func TestNew_NilConfig_Panics(t *testing.T) {
+	assert.Panics(t, func() {
+		_ = New(nil)
+	})
 }
 
 func TestHTTPApp_Stop_ShutdownCalled(t *testing.T) {
@@ -42,21 +45,14 @@ func TestHTTPApp_Stop_ShutdownCalled(t *testing.T) {
 	cancel()
 
 	err := app.Stop(ctx)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if !shutdownCalled {
-		t.Fatal("expected Shutdown hook to be called")
-	}
+	require.NoError(t, err)
+	assert.True(t, shutdownCalled)
 }
 
 func TestHTTPApp_Run_ContextCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	app := New(&Config{
-		Port: "8080",
-	})
+	app := New(&Config{Port: "8080"})
 
 	go func() {
 		time.Sleep(10 * time.Millisecond)
@@ -64,9 +60,7 @@ func TestHTTPApp_Run_ContextCancel(t *testing.T) {
 	}()
 
 	err := app.Run(ctx)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 }
 
 func TestHTTPApp_Stop_ShutdownTimeout(t *testing.T) {
@@ -76,22 +70,16 @@ func TestHTTPApp_Stop_ShutdownTimeout(t *testing.T) {
 		Port:            "8080",
 		ShutdownTimeout: 100 * time.Millisecond,
 		Shutdown: func(ctx context.Context) error {
-			// Wait for context to be cancelled (by timeout)
 			<-ctx.Done()
 			return ctx.Err()
 		},
 	})
 
-	// Use background context (not cancelled) so that WithTimeout can create a proper timeout
 	ctx := context.Background()
 
 	err := app.Stop(ctx)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
 	elapsed := time.Since(start)
-	if elapsed < 100*time.Millisecond {
-		t.Fatalf("shutdown timeout not respected: elapsed %v, expected at least 100ms", elapsed)
-	}
+	assert.GreaterOrEqual(t, elapsed, 100*time.Millisecond, "shutdown timeout not respected")
 }

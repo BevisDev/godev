@@ -23,6 +23,11 @@ func createTempFile(t *testing.T, dir, name, content string) string {
 
 func TestReadAsBytesAndString(t *testing.T) {
 	dir, err := CreateDirTemp(PrefixTempDir)
+	if err != nil {
+		t.Fatalf("CreateDirTemp: %v", err)
+	}
+	defer DelAll(dir)
+
 	content := "hello world"
 	filePath := createTempFile(t, dir, "file.txt", content)
 
@@ -40,6 +45,13 @@ func TestReadAsBytesAndString(t *testing.T) {
 	}
 	if s != content {
 		t.Errorf("ReadAsString got %q, want %q", s, content)
+	}
+}
+
+func TestReadAsBytes_MissingFile(t *testing.T) {
+	_, err := ReadAsBytes("/nonexistent/path/file.txt")
+	if err == nil {
+		t.Error("expected error for missing file")
 	}
 }
 

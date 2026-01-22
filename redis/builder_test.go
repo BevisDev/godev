@@ -10,6 +10,7 @@ import (
 	"github.com/go-redis/redismock/v9"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type User struct {
@@ -33,22 +34,47 @@ func TestRedisCache_SetAndGet(t *testing.T) {
 	rdb, mock := redismock.NewClientMock()
 	cache := &Cache{
 		client: rdb,
-		cf: &Config{
-			Timeout: 5 * time.Second,
-		},
+		cf:     &Config{Timeout: 5 * time.Second},
 	}
 	ctx := context.Background()
 
 	mock.ExpectSet("key", "value", 0).SetVal("OK")
 	err := With[string](cache).Key("key").Value("value").Set(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	mock.ExpectGet("key").SetVal("value")
 	result, err := With[string](cache).Key("key").Get(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
+	require.NotNil(t, result)
 	assert.Equal(t, "value", *result)
 
-	assert.NoError(t, mock.ExpectationsWereMet())
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestRedisCache_Get_KeyNotFound(t *testing.T) {
+	rdb, mock := redismock.NewClientMock()
+	cache := &Cache{client: rdb, cf: &Config{Timeout: 5 * time.Second}}
+	ctx := context.Background()
+
+	mock.ExpectGet("missing").SetErr(redis.Nil)
+
+	result, err := With[string](cache).Key("missing").Get(ctx)
+	require.NoError(t, err)
+	assert.Nil(t, result)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestRedisCache_Set_WithTTL(t *testing.T) {
+	rdb, mock := redismock.NewClientMock()
+	cache := &Cache{client: rdb, cf: &Config{Timeout: 5 * time.Second}}
+	ctx := context.Background()
+	ttl := 10 * time.Second
+
+	mock.ExpectSet("ttlkey", "val", ttl).SetVal("OK")
+
+	err := With[string](cache).Key("ttlkey").Value("val").Expire(ttl).Set(ctx)
+	require.NoError(t, err)
+	require.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestRedisCache_Delete(t *testing.T) {
@@ -200,29 +226,27 @@ func TestSetIfNotExists(t *testing.T) {
 func TestSetIfNotExists_EnumValue(t *testing.T) {
 	ctx := context.Background()
 	rdb, mock := redismock.NewClientMock()
-	cache := &Cache{
-		client: rdb,
-		cf: &Config{
-			Timeout: 5 * time.Second,
-		},
-	}
+	cache := &Cache{client: rdb, cf: &Config{Timeout: 5 * time.Second}}
 	chain := With[Status](cache)
 
-	// if key is not exists return true
 	chain.Key("statusKey").Value(StatusPending.String())
 	mock.ExpectSetNX("statusKey", StatusPending.String(), 0).SetVal(true)
-
 	ok, err := chain.SetIfNotExists(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, ok)
-	assert.NoError(t, mock.ExpectationsWereMet())
+	require.NoError(t, mock.ExpectationsWereMet())
 
-	// key is existed return false
 	chain.Key("statusKey").Value(StatusCompleted.String())
 	mock.ExpectSetNX("statusKey", StatusCompleted.String(), 0).SetVal(false)
-
 	ok, err = chain.SetIfNotExists(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, ok)
-	assert.NoError(t, mock.ExpectationsWereMet())
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestRedisCache_New_NilConfig(t *testing.T) {
+	c, err := New(nil)
+	assert.Error(t, err)
+	assert.Nil(t, c)
+	assert.Contains(t, err.Error(), "config is nil")
 }
