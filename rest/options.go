@@ -21,7 +21,7 @@ type options struct {
 	// skipHeader Skip logging HTTP headers if true
 	skipHeader bool
 
-	// skipBodyByPaths defines API paths for which request/response bodies should not be logged.
+	// skipBodyByPaths defines API paths for which httpRequest/response bodies should not be logged.
 	skipBodyByPaths map[string]struct{}
 
 	// skipBodyContentTypes defines content types for which bodies should not be logged.

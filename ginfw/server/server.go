@@ -13,18 +13,19 @@ import (
 	"github.com/pkg/errors"
 )
 
-func Run(ctx context.Context, cfg *Config) error {
-	if cfg == nil {
-		return errors.New("[server] config is nil")
-	}
+type HTTPApp struct {
+	*Config
+	engine *gin.Engine
+	server *http.Server
+	errCh  chan error
+}
+
+// New creates a new HTTPApp instance with the provided configuration.
+// It initializes the Gin engine, applies configuration, and sets up the HTTP server.
+func New(cfg *Config) *HTTPApp {
 	cfg.withDefaults()
 
-	// Set up signal handling for graceful shutdown
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
-	defer signal.Stop(sig)
-
-	// gin engine
+	// Initialize Gin engine based on production mode
 	var r *gin.Engine
 	if cfg.IsProduction {
 		gin.SetMode(gin.ReleaseMode)
@@ -41,51 +42,37 @@ func Run(ctx context.Context, cfg *Config) error {
 		r = gin.Default()
 	}
 
+	// Apply setup hook if provided
 	if cfg.Setup != nil {
 		cfg.Setup(r)
 	}
 
+	// Configure trusted proxies
 	if len(cfg.Proxies) > 0 {
 		_ = r.SetTrustedProxies(cfg.Proxies)
 	}
 
 	srv := newHTTPServer(r, cfg)
-	errCh := make(chan error, 1)
 
-	// start server
+	return &HTTPApp{
+		Config: cfg,
+		engine: r,
+		server: srv,
+		errCh:  make(chan error, 1),
+	}
+}
+
+// Start starts the HTTP server in a goroutine.
+// Returns immediately after starting the server.
+// Use Run() to start and wait for shutdown signals.
+func (h *HTTPApp) Start() error {
 	go func() {
-		log.Printf("server listening on :%s", cfg.Port)
-		if err := srv.ListenAndServe(); err != nil &&
+		log.Printf("[server] listening on :%s", h.Port)
+		if err := h.server.ListenAndServe(); err != nil &&
 			!errors.Is(err, http.ErrServerClosed) {
-			errCh <- err
+			h.errCh <- err
 		}
 	}()
-
-	select {
-	case <-ctx.Done():
-		log.Println("context cancelled")
-	case <-sig:
-		log.Println("shutdown signal received")
-	case err := <-errCh:
-		return err
-	}
-
-	// graceful shutdown
-	shutdownCtx, cancel := utils.NewCtxTimeout(ctx, cfg.ShutdownTimeout)
-	defer cancel()
-
-	if cfg.Shutdown != nil {
-		if err := cfg.Shutdown(shutdownCtx); err != nil {
-			log.Printf("shutdown error: %v", err)
-		}
-	}
-
-	if err := srv.Shutdown(shutdownCtx); err != nil {
-		_ = srv.Close()
-		return err
-	}
-
-	log.Println("server stopped")
 	return nil
 }
 
@@ -98,4 +85,56 @@ func newHTTPServer(handler http.Handler, cfg *Config) *http.Server {
 		WriteTimeout:      cfg.WriteTimeout,
 		IdleTimeout:       cfg.IdleTimeout,
 	}
+}
+
+// Stop gracefully stops the HTTP server.
+// It calls the Shutdown hook (if configured) and then shuts down the HTTP server.
+// The context is used to control the shutdown timeout.
+func (h *HTTPApp) Stop(ctx context.Context) error {
+	shutdownCtx, cancel := utils.NewCtxTimeout(ctx, h.ShutdownTimeout)
+	defer cancel()
+
+	// Call custom shutdown hook if provided
+	if h.Shutdown != nil {
+		if err := h.Shutdown(shutdownCtx); err != nil {
+			log.Printf("[server] shutdown hook error: %v", err)
+		}
+	}
+
+	// Shutdown HTTP server
+	if err := h.server.Shutdown(shutdownCtx); err != nil {
+		_ = h.server.Close()
+		return err
+	}
+
+	log.Println("[server] stopped")
+	return nil
+}
+
+// Run starts the HTTP server and blocks until a shutdown signal is received.
+// It handles SIGINT and SIGTERM signals for graceful shutdown.
+// Returns an error if the server fails to start or encounters an error.
+func (h *HTTPApp) Run(ctx context.Context) error {
+	// Set up signal handling for graceful shutdown
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(sig)
+
+	// Start server
+	if err := h.Start(); err != nil {
+		return err
+	}
+
+	// Wait for shutdown signal or error
+	select {
+	case <-ctx.Done():
+		log.Println("[server] root context cancelled")
+	case <-sig:
+		log.Println("[server] shutdown signal received")
+	case err := <-h.errCh:
+		return err
+	}
+
+	// Graceful shutdown
+	return h.Stop(ctx)
 }

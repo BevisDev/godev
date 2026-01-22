@@ -31,7 +31,7 @@ func TestRestClient_Get(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	// Setup request
+	// Setup httpRequest
 	type resultStruct struct {
 		Message string `json:"message"`
 	}
@@ -100,7 +100,7 @@ func TestRestClient_Timeout(t *testing.T) {
 		WithTimeout(1 * time.Second),
 	)
 
-	// Do request
+	// Do httpRequest
 	start := time.Now()
 	_, err := NewRequest[any](clientTimeout).
 		URL(server.URL).

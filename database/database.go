@@ -14,79 +14,89 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+const (
+	// MaxParams defines the maximum number of parameters allowed
+	// To avoid hitting this hard limit, it's recommended to stay under 2000.
+	// This value is used to determine safe batch sizes for bulk operations
+	maxParams = 2000
+)
+
 // Database represents a database connection along with configuration
 // settings and options for query logging.
 //
-// Fields:
-//   - DB: the sqlx.DB connection instance.
-//   - TimeoutSec: default query timeout in seconds.
-//   - showQuery: if true, executed SQL queries will be logged.
-//   - kindDB: the type of database (e.g., mysql, postgres, sqlserver).
+// It embeds *Config to provide access to database configuration,
+// and maintains an internal sqlx.DB connection for executing queries.
 type Database struct {
 	*Config
-	db *sqlx.DB // DB is the initialized sqlx.DB connection.
+	db *sqlx.DB // db is the initialized sqlx.DB connection.
 }
 
-// New creates a new `*Database` instance from the given ConfigDB.
+// New creates a new Database instance from the given Config.
 //
-// It initializes connection settings (pool, timeout), connects to the
-// appropriate database based on the `Kind` (e.g., SQL Server, Postgres),
+// It applies default values, initializes connection settings (pool, timeout),
+// connects to the appropriate database based on DBType (e.g., SQL Server, Postgres),
 // and performs a ping to verify connectivity.
-func New(cf *Config) (*Database, error) {
-	if cf == nil {
-		return nil, errors.New("config is nil")
+func New(cfg *Config) (*Database, error) {
+	if cfg == nil {
+		return nil, errors.New("[database] config is nil")
 	}
 
-	var db = &Database{Config: cf}
+	// Apply defaults
+	cfg.withDefaults()
 
-	// initialize connection
+	db := &Database{Config: cfg}
+
+	// Initialize connection
 	dbx, err := db.connect()
 	if err != nil {
 		return nil, err
 	}
 	db.db = dbx
 
-	return db, err
-}
-
-func (d *Database) connect() (*sqlx.DB, error) {
-	var (
-		db  *sqlx.DB
-		err error
-		cf  = d.Config
-	)
-	// get connection string
-	connStr := cf.getDSN()
-	if connStr == "" {
-		return nil, errors.New("[database] unsupported type " + cf.DBType.String())
-	}
-
-	// connect
-	db, err = sqlx.Connect(cf.DBType.GetDriver(), connStr)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to database: %w", err)
-	}
-
-	// set pool
-	db.SetMaxOpenConns(cf.MaxOpenConns)
-	db.SetMaxIdleConns(cf.MaxIdleConns)
-	db.SetConnMaxIdleTime(cf.MaxIdleTimeSec)
-	db.SetConnMaxLifetime(cf.MaxLifeTimeSec)
-
-	// ping check connection
-	if err = db.Ping(); err != nil {
-		return nil, fmt.Errorf("ping database failed: %w", err)
-	}
-
-	log.Printf("connect db %s success \n", cf.DBName)
 	return db, nil
 }
 
-func (d *Database) Ping() error {
-	db := d.GetDB()
-	return db.Ping()
+// connect establishes a database connection using the configured settings.
+func (d *Database) connect() (*sqlx.DB, error) {
+	cfg := d.Config
+
+	// Get connection string
+	connStr := cfg.getDSN()
+	if connStr == "" {
+		return nil, fmt.Errorf("[database] unsupported database type: %s", cfg.DBType.String())
+	}
+
+	// Connect to database
+	db, err := sqlx.Connect(cfg.DBType.GetDriver(), connStr)
+	if err != nil {
+		return nil, fmt.Errorf("[database] failed to connect: %w", err)
+	}
+
+	// Configure connection pool
+	db.SetMaxOpenConns(cfg.MaxOpenConns)
+	db.SetMaxIdleConns(cfg.MaxIdleConns)
+	db.SetConnMaxIdleTime(cfg.MaxIdleTime)
+	db.SetConnMaxLifetime(cfg.MaxLifeTime)
+
+	// Verify connection
+	if err := db.Ping(); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("[database] ping failed: %w", err)
+	}
+
+	log.Printf("[database] connected to %s successfully", cfg.DBName)
+	return db, nil
 }
 
+// Ping verifies the database connection is still alive.
+func (d *Database) Ping() error {
+	if d.db == nil {
+		return errors.New("[database] ping error")
+	}
+	return d.db.Ping()
+}
+
+// Close closes the database connection and releases resources.
 func (d *Database) Close() {
 	if d.db != nil {
 		_ = d.db.Close()
@@ -94,13 +104,15 @@ func (d *Database) Close() {
 	}
 }
 
+// GetDB returns the underlying sqlx.DB connection.
 func (d *Database) GetDB() *sqlx.DB {
 	return d.db
 }
 
+// ViewQuery logs the SQL query if ShowQuery is enabled.
 func (d *Database) ViewQuery(query string) {
 	if d.ShowQuery {
-		log.Printf("Query: %s\n", query)
+		log.Printf("[database] query: %s", query)
 	}
 }
 
@@ -109,13 +121,15 @@ func (d *Database) IsNoResult(err error) bool {
 	return errors.Is(err, sql.ErrNoRows)
 }
 
-func (d *Database) MustBePtr(dest interface{}) (err error) {
+// MustBePtr validates that dest is a non-nil pointer.
+func (d *Database) MustBePtr(dest interface{}) error {
 	if !validate.IsNonNilPointer(dest) {
-		return errors.New("must be a pointer")
+		return errors.New("[database] destination must be a non-nil pointer")
 	}
-	return
+	return nil
 }
 
+// GetTemplate returns the SQL template for the given template type and database type.
 func (d *Database) GetTemplate(template TemplateJSON) string {
 	if tempDB, ok := TemplateDBMap[d.DBType]; ok {
 		if tpl, ok := tempDB[template]; ok {
@@ -125,59 +139,69 @@ func (d *Database) GetTemplate(template TemplateJSON) string {
 	return ""
 }
 
+// FormatRow formats a parameter placeholder for the current database type.
+// For MySQL, returns "?"; for others, returns formatted placeholder with index (e.g., "$1", "@p1").
 func (d *Database) FormatRow(idx int) string {
-	var p = d.DBType.GetPlaceHolder()
-	if MySQL == d.DBType {
-		return p
+	placeholder := d.DBType.GetPlaceHolder()
+	if d.DBType == MySQL {
+		return placeholder
 	}
-	return fmt.Sprintf("%s%d", p, idx)
+	return fmt.Sprintf("%s%d", placeholder, idx)
 }
 
+// rebind processes the query string and arguments for database-specific placeholder binding.
+// It handles IN clauses and rebinds placeholders according to the database type.
 func (d *Database) rebind(query string, args ...interface{}) (string, []interface{}, error) {
-	var err error
-
-	// if query using IN
+	// Handle IN clauses (expand slice arguments)
 	if strings.Contains(strings.ToUpper(query), "IN") {
+		var err error
 		query, args, err = sqlx.In(query, args...)
 		if err != nil {
-			return query, args, err
+			return query, args, fmt.Errorf("[database] failed to expand IN clause: %w", err)
 		}
 	}
 
+	// Rebind placeholders for current database type
 	db := d.GetDB()
 	query = db.Rebind(query)
 
 	d.ViewQuery(query)
-	return query, args, err
+	return query, args, nil
 }
 
-func (d *Database) RunTx(c context.Context, level sql.IsolationLevel,
+// RunTx runs a function within a database transaction with the specified isolation level.
+//
+// It handles transaction lifecycle (begin, commit, rollback) and recovers from panics.
+// If the function returns an error or panics, the transaction is rolled back.
+func (d *Database) RunTx(ctx context.Context, level sql.IsolationLevel,
 	fn func(ctx context.Context, tx *sqlx.Tx) error,
 ) error {
-	ctx, cancel := utils.NewCtxTimeout(c, d.Timeout)
+	txCtx, cancel := utils.NewCtxTimeout(ctx, d.Timeout)
 	defer cancel()
 
 	db := d.GetDB()
-	tx, err := db.BeginTxx(ctx, &sql.TxOptions{
+	tx, err := db.BeginTxx(txCtx, &sql.TxOptions{
 		Isolation: level,
 	})
 	if err != nil {
-		return fmt.Errorf("begin transaction failed: %w", err)
+		return fmt.Errorf("[database] failed to begin transaction: %w", err)
 	}
 
 	defer func() {
 		if p := recover(); p != nil {
 			_ = tx.Rollback()
-			err = fmt.Errorf("panic recovered in transaction: %v\n%s", p, debug.Stack())
+			err = fmt.Errorf("[database] panic recovered in transaction: %v\n%s", p, debug.Stack())
 		}
 		if err != nil {
 			_ = tx.Rollback()
 		} else {
-			err = tx.Commit()
+			if commitErr := tx.Commit(); commitErr != nil {
+				err = fmt.Errorf("[database] failed to commit transaction: %w", commitErr)
+			}
 		}
 	}()
 
-	err = fn(ctx, tx)
+	err = fn(txCtx, tx)
 	return err
 }
 
@@ -232,18 +256,17 @@ func (d *Database) GetAny(c context.Context, dest interface{}, query string, arg
 
 // Execute runs the given SQL query with optional arguments.
 // If a transaction is provided, the query runs within it.
-// Otherwise, it executes directly on the database.
+// Otherwise, it executes directly on the database connection.
 func (d *Database) Execute(ctx context.Context, query string, tx *sqlx.Tx, args ...interface{}) error {
 	d.ViewQuery(query)
-	var err error
 
-	if tx == nil {
-		db := d.GetDB()
-		_, err = db.ExecContext(ctx, query, args...)
-	} else {
-		_, err = tx.ExecContext(ctx, query, args...)
+	if tx != nil {
+		_, err := tx.ExecContext(ctx, query, args...)
+		return err
 	}
 
+	db := d.GetDB()
+	_, err := db.ExecContext(ctx, query, args...)
 	return err
 }
 
@@ -263,24 +286,29 @@ func (d *Database) ExecuteSafe(ctx context.Context, query string, args ...interf
 	})
 }
 
-// ExecReturningId executes a query
-// that returns a single auto-generated ID.
-//
-// If tx is nil, the query is executed using the default connection;
-// otherwise, it runs within the provided transaction.
+// ExecReturningId executes a query that returns a single auto-generated ID.
 //
 // Returns the generated ID and any error encountered.
-func (d *Database) ExecReturningId(ctx context.Context, query string, args ...interface{}) (id int, err error) {
+func (d *Database) ExecReturningId(ctx context.Context, query string, args ...interface{}) (int, error) {
 	d.ViewQuery(query)
 
 	db := d.GetDB()
-	err = db.QueryRowxContext(ctx, query, args...).Scan(&id)
-	return
+	var id int
+	err := db.QueryRowxContext(ctx, query, args...).Scan(&id)
+	if err != nil {
+		return 0, fmt.Errorf("[database] failed to get returned ID: %w", err)
+	}
+	return id, nil
 }
 
+// Prepare creates a prepared statement for later execution.
 func (d *Database) Prepare(ctx context.Context, query string) (*sqlx.Stmt, error) {
 	db := d.GetDB()
-	return db.PreparexContext(ctx, query)
+	stmt, err := db.PreparexContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("[database] failed to prepare statement: %w", err)
+	}
+	return stmt, nil
 }
 
 // Save executes a query with named parameters.
@@ -350,7 +378,9 @@ func (d *Database) SaveTx(ctx context.Context, query string, args interface{}) (
 	})
 }
 
-func (d *Database) SaveSafe(ctx context.Context, query string, args interface{}) (err error) {
+// SaveSafe executes a query with named parameters within a transaction
+// using serializable isolation level for maximum safety.
+func (d *Database) SaveSafe(ctx context.Context, query string, args interface{}) error {
 	return d.RunTx(ctx, sql.LevelSerializable, func(ctx context.Context, tx *sqlx.Tx) error {
 		return d.Save(ctx, tx, query, args)
 	})
@@ -400,6 +430,7 @@ func (d *Database) InsertReturning(c context.Context, query string, dest interfa
 // InsertBulk inserts multiple rows into the given table using bulk INSERT.
 //
 // It builds placeholders dynamically and executes the insert in a single query.
+// Automatically batches large inserts to avoid parameter limits.
 //
 // Params:
 //   - table:     Table name.
@@ -415,11 +446,11 @@ func (d *Database) InsertReturning(c context.Context, query string, dest interfa
 func (d *Database) InsertBulk(ctx context.Context, table string, row int, colNames []string, args ...interface{}) error {
 	col := len(colNames)
 	if col <= 0 {
-		return errors.New("size column must be greater than 0")
+		return errors.New("[database] column count must be greater than 0")
 	}
 
 	if len(args) != row*col {
-		return fmt.Errorf("expected %d arguments, got %d", row*col, len(args))
+		return fmt.Errorf("[database] expected %d arguments for %d rows with %d columns, got %d", row*col, row, col, len(args))
 	}
 
 	return d.RunTx(ctx, sql.LevelDefault, func(ctx context.Context, tx *sqlx.Tx) error {
@@ -445,6 +476,8 @@ func (d *Database) InsertBulk(ctx context.Context, table string, row int, colNam
 	})
 }
 
+// InsertBatch executes a single batch INSERT statement with the provided arguments.
+// This is a helper method used by InsertBulk for batching large inserts.
 func (d *Database) InsertBatch(ctx context.Context, tx *sqlx.Tx,
 	table string, colNames []string,
 	col int, row int, args []interface{},

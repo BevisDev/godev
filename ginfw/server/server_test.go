@@ -8,20 +8,18 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func TestRun_SetupCalled(t *testing.T) {
+func TestNew_SetupCalled(t *testing.T) {
 	setupCalled := false
 
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	err := Run(ctx, &Config{
+	app := New(&Config{
 		Port: "8080",
 		Setup: func(r *gin.Engine) {
 			setupCalled = true
 		},
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+
+	if app == nil {
+		t.Fatal("expected HTTPApp to be created")
 	}
 
 	if !setupCalled {
@@ -29,13 +27,10 @@ func TestRun_SetupCalled(t *testing.T) {
 	}
 }
 
-func TestRun_ShutdownCalled(t *testing.T) {
+func TestHTTPApp_Stop_ShutdownCalled(t *testing.T) {
 	shutdownCalled := false
 
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	err := Run(ctx, &Config{
+	app := New(&Config{
 		Port: "8080",
 		Shutdown: func(ctx context.Context) error {
 			shutdownCalled = true
@@ -43,6 +38,10 @@ func TestRun_ShutdownCalled(t *testing.T) {
 		},
 	})
 
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := app.Stop(ctx)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -52,42 +51,47 @@ func TestRun_ShutdownCalled(t *testing.T) {
 	}
 }
 
-func TestRun_ContextCancel(t *testing.T) {
+func TestHTTPApp_Run_ContextCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	go func() {
-		cancel()
-	}()
-
-	err := Run(ctx, &Config{
+	app := New(&Config{
 		Port: "8080",
 	})
 
+	go func() {
+		time.Sleep(10 * time.Millisecond)
+		cancel()
+	}()
+
+	err := app.Run(ctx)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
-func TestRun_ShutdownTimeout(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
+func TestHTTPApp_Stop_ShutdownTimeout(t *testing.T) {
 	start := time.Now()
 
-	err := Run(ctx, &Config{
+	app := New(&Config{
 		Port:            "8080",
 		ShutdownTimeout: 100 * time.Millisecond,
 		Shutdown: func(ctx context.Context) error {
+			// Wait for context to be cancelled (by timeout)
 			<-ctx.Done()
 			return ctx.Err()
 		},
 	})
 
+	// Use background context (not cancelled) so that WithTimeout can create a proper timeout
+	ctx := context.Background()
+
+	err := app.Stop(ctx)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if time.Since(start) < 100*time.Millisecond {
-		t.Fatal("shutdown timeout not respected")
+	elapsed := time.Since(start)
+	if elapsed < 100*time.Millisecond {
+		t.Fatalf("shutdown timeout not respected: elapsed %v, expected at least 100ms", elapsed)
 	}
 }

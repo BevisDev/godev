@@ -4,46 +4,46 @@ import (
 	"context"
 )
 
-type HttpClient[T any] interface {
-	// URL sets the request URL.
-	URL(url string) HttpClient[T]
+type HTTPClient[T any] interface {
+	// URL sets the httpRequest URL.
+	URL(url string) HTTPClient[T]
 
 	// QueryParams contains query parameters to be appended to the URL (?key=value).
-	QueryParams(query map[string]string) HttpClient[T]
+	QueryParams(query map[string]string) HTTPClient[T]
 
 	// PathParams contains path parameters to replace placeholders in the URL (e.g., ":id").
-	PathParams(params map[string]string) HttpClient[T]
+	PathParams(params map[string]string) HTTPClient[T]
 
-	// Headers sets HTTP headers for the request.
-	Headers(headers map[string]string) HttpClient[T]
+	// Headers sets HTTP headers for the httpRequest.
+	Headers(headers map[string]string) HTTPClient[T]
 
-	// Body sets the request body (JSON or raw).
-	Body(body any) HttpClient[T]
+	// Body sets the httpRequest body (JSON or raw).
+	Body(body any) HTTPClient[T]
 
 	// BodyForm sets form-encoded body parameters.
-	BodyForm(bodyForm map[string]string) HttpClient[T]
+	BodyForm(bodyForm map[string]string) HTTPClient[T]
 
-	// GET sends an HTTP GET request using the provided context.
-	// It returns an error if the request fails or the response cannot be processed.
-	GET(c context.Context) (Response[T], error)
+	// GET sends an HTTP GET httpRequest using the provided context.
+	// It returns an error if the httpRequest fails or the response cannot be processed.
+	GET(c context.Context) (HTTPResponse[T], error)
 
-	// POST sends an HTTP POST request with a JSON or byte body using the provided context.
-	// Returns an error if the request fails or response processing fails
-	POST(c context.Context) (Response[T], error)
+	// POST sends an HTTP POST httpRequest with a JSON or byte body using the provided context.
+	// Returns an error if the httpRequest fails or response processing fails
+	POST(c context.Context) (HTTPResponse[T], error)
 
-	// PostForm sends an HTTP POST request with form-data (application/x-www-form-urlencoded) body.
+	// PostForm sends an HTTP POST httpRequest with form-data (application/x-www-form-urlencoded) body.
 	// The body is taken from BodyForm. Returns an error on failure.
-	PostForm(c context.Context) (Response[T], error)
+	PostForm(c context.Context) (HTTPResponse[T], error)
 
-	// PUT sends an HTTP PUT request using the provided context.
-	// Returns an error if the request or response handling fails.
-	PUT(c context.Context) (Response[T], error)
+	// PUT sends an HTTP PUT httpRequest using the provided context.
+	// Returns an error if the httpRequest or response handling fails.
+	PUT(c context.Context) (HTTPResponse[T], error)
 
-	// PATCH sends an HTTP PATCH request using the provided context.
+	// PATCH sends an HTTP PATCH httpRequest using the provided context.
 	// Returns an error on failure.
-	PATCH(c context.Context) (Response[T], error)
+	PATCH(c context.Context) (HTTPResponse[T], error)
 
-	// DELETE sends an HTTP DELETE request using the provided context.
-	// Returns an error if the request fails or response cannot be handled.
-	DELETE(c context.Context) (Response[T], error)
+	// DELETE sends an HTTP DELETE httpRequest using the provided context.
+	// Returns an error if the httpRequest fails or response cannot be handled.
+	DELETE(c context.Context) (HTTPResponse[T], error)
 }

@@ -12,7 +12,7 @@ import (
 // and connection string customization. The `DBType` field determines the target
 // database type (e.g., MySQL, Postgres, SQL Server, Oracle).
 type Config struct {
-	// Kind specifies the type of database (e.g., types.MySQL, types.Postgres).
+	// DBType specifies the type of database (e.g., MySQL, Postgres, SqlServer, Oracle).
 	DBType DBType
 
 	// DBName is the name of the target database
@@ -39,11 +39,11 @@ type Config struct {
 	// MaxIdleConns sets the maximum number of idle connections in the pool.
 	MaxIdleConns int
 
-	// MaxIdleTimeSec is the maximum amount of time (in seconds) a connection can remain idle.
-	MaxIdleTimeSec time.Duration
+	// MaxIdleTime is the maximum amount of time a connection can remain idle.
+	MaxIdleTime time.Duration
 
-	// MaxLifeTimeSec is the maximum amount of time (in seconds) a connection can be reused.
-	MaxLifeTimeSec time.Duration
+	// MaxLifeTime is the maximum amount of time a connection can be reused.
+	MaxLifeTime time.Duration
 
 	// ShowQuery enables SQL query logging when set to true.
 	ShowQuery bool
@@ -52,25 +52,7 @@ type Config struct {
 	Params map[string]string
 }
 
-const (
-	// DefaultMaxOpenConn is the maximum number of open connections (default: 50).
-	defaultMaxOpenConn = 50
-
-	// DefaultMaxIdleConn is the maximum number of idle connections kept in the pool (default: 50).
-	defaultMaxIdleConn = 50
-
-	// DefaultConnMaxIdleTime is the max idle time in seconds before a connection is closed (default: 5s).
-	defaultConnMaxIdleTime = 5
-
-	// DefaultConnMaxLifetime is the max lifetime in seconds for a connection before recycling (default: 3600s / 1h).
-	defaultConnMaxLifetime = 3600
-
-	// MaxParams defines the maximum number of parameters allowed
-	// To avoid hitting this hard limit, it's recommended to stay under 2000.
-	// This value is used to determine safe batch sizes for bulk operations
-	maxParams = 2000
-)
-
+// withDefaults applies default values to config fields if they are zero or invalid.
 func (c *Config) withDefaults() {
 	if c.Timeout <= 0 {
 		c.Timeout = 1 * time.Minute
@@ -81,11 +63,11 @@ func (c *Config) withDefaults() {
 	if c.MaxIdleConns <= 0 {
 		c.MaxIdleConns = 50
 	}
-	if c.MaxIdleTimeSec <= 0 {
-		c.MaxIdleTimeSec = 5 * time.Second
+	if c.MaxIdleTime <= 0 {
+		c.MaxIdleTime = 5 * time.Second
 	}
-	if c.MaxLifeTimeSec <= 0 {
-		c.MaxLifeTimeSec = 3600 * time.Second
+	if c.MaxLifeTime <= 0 {
+		c.MaxLifeTime = 3600 * time.Second
 	}
 }
 

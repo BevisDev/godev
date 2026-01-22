@@ -28,6 +28,7 @@ type Chain[T any] struct {
 	values  []interface{}
 }
 
+// Builder creates a new query builder chain for type T.
 func Builder[T any](db *Database) ChainExec[T] {
 	return &Chain[T]{
 		Database: db,
@@ -39,6 +40,7 @@ func (d *Chain[T]) From(table string) ChainExec[T] {
 	return d
 }
 
+// clone creates a deep copy of the chain to allow method chaining without mutation.
 func (d *Chain[T]) clone() *Chain[T] {
 	c := *d
 
@@ -98,13 +100,15 @@ func (d *Chain[T]) Top(n int) ChainExec[T] {
 }
 
 func (d *Chain[T]) Limit(n int) ChainExec[T] {
-	d.limit = n
-	return d
+	c := d.clone()
+	c.limit = n
+	return c
 }
 
 func (d *Chain[T]) Offset(n int) ChainExec[T] {
-	d.offset = n
-	return d
+	c := d.clone()
+	c.offset = n
+	return c
 }
 
 func (d *Chain[T]) OrderBy(order string) ChainExec[T] {
@@ -113,6 +117,7 @@ func (d *Chain[T]) OrderBy(order string) ChainExec[T] {
 	return c
 }
 
+// ToSql builds and returns the SQL query string and arguments from the chain.
 func (d *Chain[T]) ToSql() (string, []interface{}) {
 	var sb strings.Builder
 	sb.WriteString("SELECT ")
@@ -169,7 +174,7 @@ func (d *Chain[T]) getAny(c context.Context) (*T, error) {
 		return nil, err
 	}
 
-	ctx, cancel := utils.NewCtxTimeout(c, d.TimeoutSec)
+	ctx, cancel := utils.NewCtxTimeout(c, d.Timeout)
 	defer cancel()
 
 	db := d.GetDB()
@@ -200,7 +205,7 @@ func (d *Chain[T]) FindAll(c context.Context) ([]*T, error) {
 		return nil, err
 	}
 
-	ctx, cancel := utils.NewCtxTimeout(c, d.TimeoutSec)
+	ctx, cancel := utils.NewCtxTimeout(c, d.Timeout)
 	defer cancel()
 
 	db := d.GetDB()
