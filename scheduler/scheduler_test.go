@@ -28,9 +28,12 @@ func TestScheduler_RegisterJob_Success(t *testing.T) {
 
 	job := &mockJob{name: "job1"}
 
-	s.Register(job, JobConfig{
-		Cron: "*/1 * * * *",
-		IsOn: true,
+	s.Register(&JobEntry{
+		Job: job,
+		Config: JobConfig{
+			Cron: "*/1 * * * *",
+			IsOn: true,
+		},
 	})
 
 	s.Start(t.Context())
@@ -44,9 +47,12 @@ func TestScheduler_RegisterJob_Success(t *testing.T) {
 func TestScheduler_RegisterJob_Disabled(t *testing.T) {
 	s := New()
 
-	s.Register(&mockJob{name: "job1"}, JobConfig{
-		Cron: "*/1 * * * *",
-		IsOn: false,
+	s.Register(&JobEntry{
+		Job: &mockJob{name: "job1"},
+		Config: JobConfig{
+			Cron: "*/1 * * * *",
+			IsOn: false,
+		},
 	})
 
 	s.Start(t.Context())
@@ -59,9 +65,12 @@ func TestScheduler_RegisterJob_Disabled(t *testing.T) {
 func TestScheduler_RegisterJob_EmptyCron(t *testing.T) {
 	s := New()
 
-	s.Register(&mockJob{name: "job1"}, JobConfig{
-		Cron: "",
-		IsOn: true,
+	s.Register(&JobEntry{
+		Job: &mockJob{name: "job1"},
+		Config: JobConfig{
+			Cron: "",
+			IsOn: true,
+		},
 	})
 
 	s.Start(t.Context())
@@ -79,9 +88,12 @@ func TestScheduler_JobPanicRecovered(t *testing.T) {
 		panic: true,
 	}
 
-	s.Register(job, JobConfig{
-		Cron: "*/1 * * * * *",
-		IsOn: true,
+	s.Register(&JobEntry{
+		Job: job,
+		Config: JobConfig{
+			Cron: "*/1 * * * * *",
+			IsOn: true,
+		},
 	})
 
 	// should not panic

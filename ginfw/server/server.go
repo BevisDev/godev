@@ -129,8 +129,8 @@ func (h *HTTPApp) Run(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		log.Println("[server] root context cancelled")
-	case <-sig:
-		log.Println("[server] shutdown signal received")
+	case s := <-sig:
+		log.Printf("[server] received signal %v", s)
 	case err := <-h.errCh:
 		return err
 	}

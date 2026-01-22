@@ -38,16 +38,13 @@ func New(fs ...OptionFunc) *Scheduler {
 	}
 }
 
-func (s *Scheduler) Register(job Job, cfg JobConfig) {
-	name := job.Name()
-
-	if _, ok := s.jobs[name]; ok {
-		log.Printf("[scheduler] job %s already registered, override", name)
-	}
-
-	s.jobs[name] = &JobEntry{
-		Job:    job,
-		Config: cfg,
+func (s *Scheduler) Register(jobs ...*JobEntry) {
+	for _, item := range jobs {
+		name := item.Job.Name()
+		if _, ok := s.jobs[name]; ok {
+			log.Printf("[scheduler] job %s already registered, override", name)
+		}
+		s.jobs[name] = item
 	}
 }
 

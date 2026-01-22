@@ -16,8 +16,6 @@ import (
 type OptionFunc func(*options)
 
 type options struct {
-	services int
-
 	loggerConf    *logx.Config
 	dbConf        *database.Config
 	migrationConf *migration.Config

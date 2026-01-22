@@ -64,13 +64,10 @@ func New(opts ...OptionFunc) *Bootstrap {
 		cancel:  cancel,
 	}
 
-	s := 0
-	for i, opt := range opts {
+	for _, opt := range opts {
 		opt(b.options)
-		s += i
 	}
 
-	b.services = s
 	return b
 }
 
@@ -200,7 +197,7 @@ func (b *Bootstrap) Init(ctx context.Context) error {
 
 	// REST client: init after logger is ready (may need logger)
 	// If logger is not in options, inject it automatically
-	if b.restOn && b.Rest != nil {
+	if b.restOn && b.Rest == nil {
 		opts := b.restOpts
 		// Check if WithLogger is already in options by checking if logger was passed
 		// Since we can't easily check, we'll always inject logger if available
@@ -405,14 +402,14 @@ func (b *Bootstrap) Run(ctx context.Context) error {
 }
 
 // Health checks the health of all configured services.
-func (b *Bootstrap) Health(ctx context.Context) map[string]error {
-	health := make(map[string]error)
+func (b *Bootstrap) Health(ctx context.Context) map[string]interface{} {
+	health := make(map[string]interface{})
 
 	if b.Database != nil {
 		if err := b.Database.Ping(); err != nil {
 			health["database"] = err
 		} else {
-			health["database"] = nil
+			health["database"] = "OK"
 		}
 	}
 
@@ -423,7 +420,7 @@ func (b *Bootstrap) Health(ctx context.Context) map[string]error {
 		if err := b.Redis.Ping(ctxTimeout); err != nil {
 			health["redis"] = err
 		} else {
-			health["redis"] = nil
+			health["redis"] = "OK"
 		}
 	}
 
@@ -432,7 +429,7 @@ func (b *Bootstrap) Health(ctx context.Context) map[string]error {
 		if err != nil || conn == nil || conn.IsClosed() {
 			health["rabbitmq"] = fmt.Errorf("connection not available")
 		} else {
-			health["rabbitmq"] = nil
+			health["rabbitmq"] = "OK"
 		}
 	}
 
