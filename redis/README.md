@@ -29,31 +29,57 @@ It includes connection pooling, timeout management, and automatic JSON serializa
 
 Configuration struct for connecting to Redis:
 
-| Field        | Description                                |
-|--------------|--------------------------------------------|
-| `Host`       | Redis server hostname or IP.               |
-| `Port`       | Redis server port.                         |
-| `Password`   | Password for authentication (if required). |
-| `DB`         | Redis database index (default 0).          |
-| `PoolSize`   | Maximum number of connections in the pool. |
-| `TimeoutSec` | Timeout for Redis operations in seconds.   |
+| Field        | Type            | Description                                |
+|--------------|-----------------|--------------------------------------------|
+| `Host`       | `string`        | Redis server hostname or IP.               |
+| `Port`       | `int`           | Redis server port.                         |
+| `Password`   | `string`        | Password for authentication (if required). |
+| `DB`         | `int`           | Redis database index (default 0).          |
+| `PoolSize`   | `int`           | Maximum number of connections in the pool. |
+| `Timeout`    | `time.Duration` | Timeout for Redis operations.              |
 
-### `RedisCache`
+### `Cache`
 
-Main struct for Redis operations:
+Main struct for Redis operations (created via `New()`):
 
 | Method        | Description                                          |
 |---------------|------------------------------------------------------|
-| `Set`         | Set a key                                            |
-| `SetMany`     | Set multiple keys at once.                           |
-| `Get`         | Get a key and unmarshal into a struct or basic type. |
-| `GetMany`     | Get multiple keys at once.                           |
-| `GetByPrefix` | Get all keys and values matching a prefix.           |
-| `Delete`      | Delete a key.                                        |
-| `Exists`      | Check if a key exists.                               |
-| `Publish`     | Publish a message to a Redis channel.                |
-| `Subscribe`   | Subscribe to a Redis channel and handle messages.    |
-| `Close`       | Close the Redis client connection.                   |
+| `GetClient()` | Get underlying Redis client                          |
+| `Ping(ctx)`   | Ping Redis server                                    |
+| `Close()`     | Close the Redis client connection                    |
+
+### Chain Operations
+
+Chain-based API for type-safe operations:
+
+| Method | Description |
+|--------|-------------|
+| `With[T](cache *Cache) ChainExec[T]` | Start a chain operation for type T |
+| `Key(key string)` | Set the Redis key |
+| `Value(value T)` | Set the value to store |
+| `Expire(ttl int, unit string)` | Set expiration time |
+| `Set(ctx)` | Execute SET operation |
+| `Get(ctx)` | Execute GET operation |
+| `Delete(ctx)` | Execute DELETE operation |
+| `Exists(ctx)` | Check if key exists |
+
+### List Operations
+
+| Method | Description |
+|--------|-------------|
+| `ListWith[T](cache *Cache) ListExec[T]` | Start list operation |
+| `LPush(ctx)`, `RPush(ctx)` | Push to list |
+| `LPop(ctx)`, `RPop(ctx)` | Pop from list |
+| `LRange(ctx)` | Get list range |
+
+### Set Operations
+
+| Method | Description |
+|--------|-------------|
+| `SetWith[T](cache *Cache) SetExec[T]` | Start set operation |
+| `SAdd(ctx)` | Add to set |
+| `SMembers(ctx)` | Get set members |
+| `SIsMember(ctx)` | Check membership |
 
 ---
 

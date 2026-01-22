@@ -22,15 +22,15 @@ The `Config` struct defines all parameters necessary to establish a database con
 
 | Field                      | Type                | Description                                                                 |
 |:---------------------------|:--------------------|:----------------------------------------------------------------------------|
-| **DBType**                 | `DBType`            | The target database type (e.g., `Postgres`, `MySQL`).                       |
-| **Schema**                 | `string`            | The name of the target database/schema.                                     |
-| **TimeoutSec**             | `int`               | Default timeout (in seconds) for DB operations. Defaults to **60 seconds**. |
+| **DBType**                 | `DBType`            | The target database type (e.g., `Postgres`, `MySQL`, `SqlServer`, `Oracle`). |
+| **DBName**                 | `string`            | The name of the target database/schema.                                     |
+| **Timeout**                | `time.Duration`     | Default timeout for DB operations. Defaults to **60 seconds**.              |
 | **Host**, **Port**         | `string`, `int`     | Server address and port.                                                    |
 | **Username**, **Password** | `string`            | Login credentials.                                                          |
-| **MaxOpenConns**           | `int`               | Maximum number of open connections in the pool.                             |
-| **MaxIdleConns**           | `int`               | Maximum number of idle connections.                                         |
-| **MaxIdleTimeSec**         | `int`               | Maximum time (seconds) a connection can remain idle.                        |
-| **MaxLifeTimeSec**         | `int`               | Maximum time (seconds) a connection can be reused.                          |
+| **MaxOpenConns**           | `int`               | Maximum number of open connections in the pool. Defaults to **50**.         |
+| **MaxIdleConns**           | `int`               | Maximum number of idle connections. Defaults to **50**.                    |
+| **MaxIdleTime**            | `time.Duration`     | Maximum time a connection can remain idle. Defaults to **5 seconds**.       |
+| **MaxLifeTime**            | `time.Duration`     | Maximum time a connection can be reused. Defaults to **3600 seconds**.      |
 | **ShowQuery**              | `bool`              | Enables logging of executed SQL queries.                                    |
 | **Params**                 | `map[string]string` | Optional additional parameters for the connection string.                   |
 
@@ -63,6 +63,7 @@ func main() {
 		Port:      5432,
 		Username:  "user",
 		Password:  "password",
+		Timeout:   5 * time.Second,
 		ShowQuery: true,
 	}
 
@@ -70,8 +71,9 @@ func main() {
 	if err != nil {
 		log.Fatal("Failed to connect to DB:", err)
 	}
+	defer db.Close()
 
-	log.Printf("connect db success")
+	log.Printf("Connected to database successfully")
 }
 
 ```
