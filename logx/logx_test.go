@@ -148,6 +148,23 @@ func TestErrorLog(t *testing.T) {
 	assert.Contains(t, logOutput, "ERR_STATE")
 }
 
+func TestWarnLog(t *testing.T) {
+	buf := &bytes.Buffer{}
+	core := zapcore.NewCore(
+		zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig()),
+		zapcore.AddSync(buf),
+		zapcore.WarnLevel,
+	)
+	zapLogger := zap.New(core)
+
+	logger := &AppLogger{zap: zapLogger}
+	logger.Warn("WARN_STATE", "Careful: {}", "low disk")
+
+	logOutput := buf.String()
+	assert.Contains(t, logOutput, "Careful: low disk")
+	assert.Contains(t, logOutput, "WARN_STATE")
+}
+
 func TestLogRequest(t *testing.T) {
 	tLogger := zaptest.NewLogger(t)
 	appLogger := &AppLogger{

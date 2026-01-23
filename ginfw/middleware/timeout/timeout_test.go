@@ -4,8 +4,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPanicWithoutTimeout_IsRecovered(t *testing.T) {
@@ -21,10 +24,27 @@ func TestPanicWithoutTimeout_IsRecovered(t *testing.T) {
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "/panic", nil)
 
-	// SHOULD NOT PANIC
 	r.ServeHTTP(w, req)
 
-	if w.Code != http.StatusInternalServerError {
-		t.Fatalf("expected 500, got %d", w.Code)
-	}
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+func TestTimeout_Handler_AbortsOnSlowHandler(t *testing.T) {
+	gin.SetMode(gin.ReleaseMode)
+
+	r := gin.New()
+	mw := New(WithTimeout(50 * time.Millisecond))
+	r.Use(mw.Handler())
+
+	r.GET("/slow", func(c *gin.Context) {
+		time.Sleep(200 * time.Millisecond)
+		c.String(http.StatusOK, "ok")
+	})
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/slow", nil)
+
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusGatewayTimeout, w.Code)
 }

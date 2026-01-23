@@ -32,6 +32,21 @@ func TestEncryptDecryptAES(t *testing.T) {
 	}
 }
 
+func TestDecryptAES_WrongKey(t *testing.T) {
+	key := []byte("examplekey123456")
+	plaintext := "secret"
+	ciphertext, err := EncryptAES(plaintext, key)
+	if err != nil {
+		t.Fatalf("EncryptAES: %v", err)
+	}
+
+	wrongKey := []byte("wrongkey1234567890")
+	_, err = DecryptAES(ciphertext, wrongKey)
+	if err == nil {
+		t.Error("expected error when decrypting with wrong key")
+	}
+}
+
 func TestBase64EncodeDecode(t *testing.T) {
 	original := "Test string 123!@#"
 
@@ -44,6 +59,13 @@ func TestBase64EncodeDecode(t *testing.T) {
 
 	if decoded != original {
 		t.Errorf("DecodeBase64(EncodeBase64(%q)) = %q; want %q", original, decoded, original)
+	}
+}
+
+func TestDecodeBase64_Invalid(t *testing.T) {
+	_, err := DecodeBase64("!!!not-valid-base64!!!")
+	if err == nil {
+		t.Error("expected error for invalid base64")
 	}
 }
 

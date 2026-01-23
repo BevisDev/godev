@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type TestConfigStruct struct {
@@ -58,6 +59,22 @@ func setupEnv(vars map[string]string) func() {
 	}
 }
 
+func equalSlice[T comparable](a, b []T) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// =============================================================================
+// MustLoad
+// =============================================================================
+
 func TestMustLoad_MissingFile(t *testing.T) {
 	assert.Panics(t, func() {
 		_ = MustLoad[*TestConfigStruct](&Config{
@@ -65,6 +82,12 @@ func TestMustLoad_MissingFile(t *testing.T) {
 			Extension: "yaml",
 			Profile:   "test",
 		})
+	})
+}
+
+func TestMustLoad_NilConfig(t *testing.T) {
+	assert.Panics(t, func() {
+		_ = MustLoad[TestConfigStruct](nil)
 	})
 }
 
@@ -85,7 +108,9 @@ func TestMustLoad_Success(t *testing.T) {
 		Profile:   "test",
 	})
 
+	require.NotNil(t, resp.Data)
 	assert.Equal(t, "demo-app", resp.Data.AppName)
+	assert.NotEmpty(t, resp.Settings)
 }
 
 func TestMustLoad_AutoEnv(t *testing.T) {
@@ -98,7 +123,7 @@ func TestMustLoad_AutoEnv(t *testing.T) {
 		"SOMEKEY_CLIENT_KEY": "xyz123",
 		"DATABASEAPP_HOST":   "dbHost",
 		"REDISAPP_HOST":      "redisHost",
-		"APP_OVERRIDE":       "app_override", // it overrides
+		"APP_OVERRIDE":       "app_override",
 	})
 	defer cleanup()
 
@@ -110,6 +135,7 @@ func TestMustLoad_AutoEnv(t *testing.T) {
 	})
 
 	cfg := out.Data
+	require.NotNil(t, cfg)
 	assert.Equal(t, "env-app", cfg.AppName)
 	assert.Equal(t, 9090, cfg.Port)
 	assert.Equal(t, "envName", cfg.SomeKey.ClientName)
@@ -123,7 +149,7 @@ func TestMustLoad_AutoEnv(t *testing.T) {
 func TestMustLoad_ReplaceEnv(t *testing.T) {
 	cleanup := setupEnv(map[string]string{
 		"APP_NAME": "expanded-app",
-		"PORT":     "9090", // optional: ensure it doesn't override if not expanded manually
+		"PORT":     "9090",
 	})
 	defer cleanup()
 
@@ -135,26 +161,17 @@ func TestMustLoad_ReplaceEnv(t *testing.T) {
 	})
 
 	cfg := out.Data
+	require.NotNil(t, cfg)
 	assert.Equal(t, "expanded-app", cfg.AppName)
 	assert.Equal(t, 8080, cfg.Port)
 }
 
-func equalSlice[T comparable](a, b []T) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
-}
+// =============================================================================
+// MustMapStruct / MapStruct
+// =============================================================================
 
 func TestMustMapStruct_Panic(t *testing.T) {
-	cfMap := map[string]string{
-		"name": "abc",
-	}
+	cfMap := map[string]string{"name": "abc"}
 
 	assert.Panics(t, func() {
 		_ = MustMapStruct[*TestConfig](cfMap)
@@ -175,49 +192,68 @@ func TestMapStruct_AllTypes(t *testing.T) {
 		"server_profile": "test_profile",
 		"client_name":    "ClientApp",
 	}
-	defer func() {
-		if r := recover(); r != nil {
-			t.Errorf("expected not panic, but function panics")
-		}
-	}()
 
 	cfg := MustMapStruct[TestConfig](cfMap)
-	if cfg.Name != "Alice" {
-		t.Errorf("expected Name=Alice, got %s", cfg.Name)
-	}
-	if cfg.Age != 30 {
-		t.Errorf("expected Age=30, got %d", cfg.Age)
-	}
-	if cfg.Rate32 < 1.229 || cfg.Rate32 > 1.231 { // float32 tolerance
-		t.Errorf("expected Rate32 ~1.23, got %f", cfg.Rate32)
-	}
-	if cfg.Rate64 != 4.56 {
-		t.Errorf("expected Rate64=4.56, got %f", cfg.Rate64)
-	}
-	if !cfg.Active {
-		t.Errorf("expected Active=true, got false")
-	}
-	if !equalSlice(cfg.Tags, []string{"red", "green", "blue"}) {
-		t.Errorf("expected Tags [red green blue], got %#v", cfg.Tags)
-	}
-	if !equalSlice(cfg.Numbers, []int{1, 2, 3, 4}) {
-		t.Errorf("expected Numbers [1 2 3 4], got %#v", cfg.Numbers)
-	}
-	if !equalSlice(cfg.Threshold, []float64{0.1, 0.5, 1.5}) {
-		t.Errorf("expected Threshold [0.1 0.5 1.5], got %#v", cfg.Threshold)
+	require.NotNil(t, cfg)
+
+	assert.Equal(t, "Alice", cfg.Name)
+	assert.Equal(t, 30, cfg.Age)
+	assert.InDelta(t, 1.23, float64(cfg.Rate32), 0.001)
+	assert.Equal(t, 4.56, cfg.Rate64)
+	assert.True(t, cfg.Active)
+	assert.True(t, equalSlice(cfg.Tags, []string{"red", "green", "blue"}))
+	assert.True(t, equalSlice(cfg.Numbers, []int{1, 2, 3, 4}))
+	assert.True(t, equalSlice(cfg.Threshold, []float64{0.1, 0.5, 1.5}))
+	assert.Equal(t, "ServerApp", cfg.Server.Name)
+	assert.Equal(t, "test_profile", cfg.Server.Profile)
+	require.NotNil(t, cfg.Client)
+	assert.Equal(t, "ClientApp", cfg.Client.Name)
+}
+
+func TestMapStruct_EmptyMap(t *testing.T) {
+	cfg := MustMapStruct[TestConfig](map[string]string{})
+	require.NotNil(t, cfg)
+	assert.Empty(t, cfg.Name)
+	assert.Zero(t, cfg.Age)
+	assert.False(t, cfg.Active)
+	assert.Nil(t, cfg.Tags)
+	assert.Nil(t, cfg.Numbers)
+}
+
+func TestMapStruct_UnknownKeysIgnored(t *testing.T) {
+	cfMap := map[string]string{
+		"name":        "Alice",
+		"unknown_key": "ignored",
 	}
 
-	// nested struct
-	// struct
-	if cfg.Server.Name != "ServerApp" {
-		t.Errorf("expected Name=ServerApp, got %s", cfg.Server.Name)
-	}
-	if cfg.Server.Profile != "test_profile" {
-		t.Errorf("expected profile=test_profile, got %s", cfg.Server.Profile)
+	cfg := MustMapStruct[TestConfig](cfMap)
+	require.NotNil(t, cfg)
+	assert.Equal(t, "Alice", cfg.Name)
+}
+
+func TestMapStruct_BoolVariants(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected bool
+	}{
+		{"true", "true", true},
+		{"1", "1", true},
+		{"yes", "yes", true},
+		{"y", "y", true},
+		{"false", "false", false},
+		{"0", "0", false},
+		{"other", "other", false},
 	}
 
-	// *struct
-	if cfg.Client.Name != "ClientApp" {
-		t.Errorf("expected Name=ClientApp, got %s", cfg.Client.Name)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			type C struct {
+				Active bool `config:"active"`
+			}
+			cfg := MustMapStruct[C](map[string]string{"active": tt.input})
+			require.NotNil(t, cfg)
+			assert.Equal(t, tt.expected, cfg.Active)
+		})
 	}
 }
