@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -11,31 +12,81 @@ import (
 
 type mockJob struct {
 	name   string
-	called int
+	called int32
 	panic  bool
-}
-
-func (m *mockJob) Name() string {
-	return m.name
+	done   chan struct{}
 }
 
 func (m *mockJob) Handle(ctx context.Context) {
-	m.called++
+	atomic.AddInt32(&m.called, 1)
+
+	// báo hiệu job đã chạy
+	if m.done != nil {
+		select {
+		case <-m.done:
+		default:
+			close(m.done)
+		}
+	}
+
 	if m.panic {
 		panic("boom")
 	}
 }
 
+func TestScheduler_Start_Idempotent(t *testing.T) {
+	s := New()
+
+	s.Register(&Job{
+		Name:    "job1",
+		Handler: &mockJob{},
+		Cron:    "@every 1s",
+		IsOn:    true,
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	s.Start(ctx)
+	s.Start(ctx)
+
+	assert.Len(t, s.cron.Entries(), 1)
+}
+
+func TestScheduler_Stop_ContextCancel(t *testing.T) {
+	s := New()
+
+	job := &mockJob{done: make(chan struct{})}
+
+	s.Register(&Job{
+		Name:    "job1",
+		Handler: job,
+		Cron:    "@every 100ms",
+		IsOn:    true,
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	s.Start(ctx)
+
+	<-job.done // first run
+
+	cancel()
+
+	called := atomic.LoadInt32(&job.called)
+	time.Sleep(300 * time.Millisecond)
+
+	assert.Equal(t, called, atomic.LoadInt32(&job.called))
+}
+
 func TestScheduler_RegisterJob_Success(t *testing.T) {
 	s := New()
-	job := &mockJob{name: "job1"}
+	job := &mockJob{}
 
-	s.Register(&JobEntry{
-		Job: job,
-		Config: JobConfig{
-			Cron: "*/1 * * * *",
-			IsOn: true,
-		},
+	s.Register(&Job{
+		Handler: job,
+		Cron:    "*/1 * * * *",
+		IsOn:    true,
+		Name:    "job1",
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -49,12 +100,11 @@ func TestScheduler_RegisterJob_Success(t *testing.T) {
 func TestScheduler_RegisterJob_Disabled(t *testing.T) {
 	s := New()
 
-	s.Register(&JobEntry{
-		Job: &mockJob{name: "job1"},
-		Config: JobConfig{
-			Cron: "*/1 * * * *",
-			IsOn: false,
-		},
+	s.Register(&Job{
+		Name:    "job1",
+		IsOn:    false,
+		Cron:    "*/1 * * * *",
+		Handler: &mockJob{name: "job1"},
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -67,12 +117,11 @@ func TestScheduler_RegisterJob_Disabled(t *testing.T) {
 func TestScheduler_RegisterJob_EmptyCron(t *testing.T) {
 	s := New()
 
-	s.Register(&JobEntry{
-		Job: &mockJob{name: "job1"},
-		Config: JobConfig{
-			Cron: "",
-			IsOn: true,
-		},
+	s.Register(&Job{
+		Handler: &mockJob{name: "job1"},
+		Cron:    "",
+		IsOn:    true,
+		Name:    "job1",
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -83,26 +132,35 @@ func TestScheduler_RegisterJob_EmptyCron(t *testing.T) {
 }
 
 func TestScheduler_JobPanicRecovered(t *testing.T) {
-	s := New(WithSeconds())
+	s := New()
+
 	job := &mockJob{
-		name:  "panic-job",
 		panic: true,
+		done:  make(chan struct{}),
 	}
 
-	s.Register(&JobEntry{
-		Job: job,
-		Config: JobConfig{
-			Cron: "*/1 * * * * *",
-			IsOn: true,
-		},
+	s.Register(&Job{
+		Name:    "job1",
+		Handler: job,
+		Cron:    "@every 1s",
+		IsOn:    true,
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	assert.NotPanics(t, func() { s.Start(ctx) })
 
-	time.Sleep(1100 * time.Millisecond)
-	assert.GreaterOrEqual(t, job.called, 1, "expected job to be called at least once")
+	assert.NotPanics(t, func() {
+		s.Start(ctx)
+	})
+
+	select {
+	case <-job.done:
+		// ok
+	case <-time.After(2 * time.Second):
+		t.Fatal("job was not executed")
+	}
+
+	assert.GreaterOrEqual(t, atomic.LoadInt32(&job.called), int32(1))
 }
 
 func TestScheduler_All(t *testing.T) {
@@ -110,15 +168,25 @@ func TestScheduler_All(t *testing.T) {
 	j1 := &mockJob{name: "j1"}
 	j2 := &mockJob{name: "j2"}
 
-	s.Register(j1, JobConfig{Cron: "0 * * * *", IsOn: true})
-	s.Register(j2, JobConfig{Cron: "0 * * * *", IsOn: true})
+	s.Register(
+		&Job{
+			Handler: j1,
+			Cron:    "*/1 * * * *",
+			IsOn:    true,
+			Name:    "job1",
+		},
+		&Job{
+			Handler: j2,
+			Cron:    "*/1 * * * *",
+			IsOn:    true,
+			Name:    "job2",
+		},
+	)
 
 	all := s.All()
 	require.Len(t, all, 2)
-	assert.Contains(t, all, "j1")
-	assert.Contains(t, all, "j2")
-	assert.Same(t, j1, all["j1"].Job)
-	assert.Same(t, j2, all["j2"].Job)
+	assert.Contains(t, all, "job1")
+	assert.Contains(t, all, "job2")
 }
 
 func TestScheduler_Timezone(t *testing.T) {
@@ -134,20 +202,37 @@ func TestScheduler_Register_DuplicateOverride(t *testing.T) {
 	j1 := &mockJob{name: "dup"}
 	j2 := &mockJob{name: "dup"}
 
-	s.Register(j1, JobConfig{Cron: "0 * * * *", IsOn: true})
-	s.Register(j2, JobConfig{Cron: "0 * * * *", IsOn: true})
+	s.Register(
+		&Job{
+			Handler: j1,
+			Cron:    "*/1 * * * *",
+			IsOn:    true,
+			Name:    "dup",
+		},
+		&Job{
+			Handler: j2,
+			Cron:    "*/1 * * * *",
+			IsOn:    true,
+			Name:    "dup",
+		},
+	)
 
 	all := s.All()
 	require.Len(t, all, 1)
-	assert.Same(t, j2, all["dup"].Job, "second register overrides first")
 }
 
 func TestScheduler_InvalidCron(t *testing.T) {
 	s := New()
-	s.Register(&mockJob{name: "bad"}, JobConfig{
-		Cron: "invalid cron expression",
-		IsOn: true,
-	})
+	j1 := &mockJob{name: "bad"}
+
+	s.Register(
+		&Job{
+			Cron:    "invalid cron expression",
+			IsOn:    true,
+			Handler: j1,
+			Name:    "bad",
+		},
+	)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

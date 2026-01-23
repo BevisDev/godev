@@ -4,19 +4,17 @@ import (
 	"context"
 	"log"
 	"runtime/debug"
+	"sync"
 
 	"github.com/BevisDev/godev/utils"
 	"github.com/robfig/cron/v3"
 )
 
-type JobEntry struct {
-	Job    Job
-	Config JobConfig
-}
-
 type Scheduler struct {
-	cron *cron.Cron
-	jobs map[string]*JobEntry
+	cron    *cron.Cron
+	jobs    map[string]*Job
+	started bool
+	mu      sync.Mutex
 }
 
 func New(fs ...OptionFunc) *Scheduler {
@@ -34,22 +32,37 @@ func New(fs ...OptionFunc) *Scheduler {
 
 	return &Scheduler{
 		cron: cron.New(cronOpts...),
-		jobs: make(map[string]*JobEntry),
+		jobs: make(map[string]*Job),
 	}
 }
 
-func (s *Scheduler) Register(jobs ...*JobEntry) {
-	for _, item := range jobs {
-		name := item.Job.Name()
-		if _, ok := s.jobs[name]; ok {
-			log.Printf("[scheduler] job %s already registered, override", name)
+func (s *Scheduler) Register(jobs ...*Job) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for _, job := range jobs {
+		if job == nil || job.Name == "" || job.Cron == "" || job.Handler == nil {
+			continue
 		}
-		s.jobs[name] = item
+
+		if _, ok := s.jobs[job.Name]; ok {
+			log.Printf("[scheduler] job %s already registered, override", job.Name)
+		}
+
+		s.jobs[job.Name] = job
 	}
 }
 
-func (s *Scheduler) All() map[string]*JobEntry {
-	return s.jobs
+func (s *Scheduler) All() map[string]*Job {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	cp := make(map[string]*Job, len(s.jobs))
+	for k, v := range s.jobs {
+		cp[k] = v
+	}
+
+	return cp
 }
 
 func (s *Scheduler) Timezone() string {
@@ -60,37 +73,38 @@ func (s *Scheduler) Timezone() string {
 // based on their cron configuration.
 // It safely wraps job execution with panic recovery.
 func (s *Scheduler) register() {
-	for name, entry := range s.All() {
-		cfg := entry.Config
-		jobName := name
-		job := entry.Job
+	s.mu.Lock()
+	jobs := make(map[string]*Job, len(s.jobs))
+	for k, v := range s.jobs {
+		jobs[k] = v
+	}
+	s.mu.Unlock()
 
-		if cfg.Cron == "" {
-			log.Printf("[scheduler] cron %s not found in config", jobName)
+	for k, v := range jobs {
+		name := k
+		job := v
+
+		if !job.IsOn {
+			log.Printf("[scheduler] job %s is disabled", name)
 			continue
 		}
 
-		if !cfg.IsOn {
-			log.Printf("[scheduler] cron %s is disabled", jobName)
-			continue
-		}
-
-		_, err := s.cron.AddFunc(cfg.Cron, func() {
+		_, err := s.cron.AddFunc(job.Cron, func() {
 			ctx := utils.NewCtx()
 
 			defer func() {
 				if r := recover(); r != nil {
 					log.Printf(
 						"[RECOVER] job %s: %v\n%s",
-						jobName, r, debug.Stack(),
+						name, r, debug.Stack(),
 					)
 				}
 			}()
 
-			job.Handle(ctx)
+			job.Handler.Handle(ctx)
 		})
 		if err != nil {
-			log.Printf("[scheduler] error register cron %s: %v", jobName, err)
+			log.Printf("[scheduler] error register job %s: %v", name, err)
 		}
 	}
 }
@@ -98,6 +112,15 @@ func (s *Scheduler) register() {
 // Start registers all jobs, starts the cron scheduler,
 // and stops it gracefully when the context is canceled.
 func (s *Scheduler) Start(ctx context.Context) {
+	s.mu.Lock()
+	if s.started {
+		s.mu.Unlock()
+		return
+	}
+
+	s.started = true
+	s.mu.Unlock()
+
 	s.register()
 
 	if len(s.cron.Entries()) == 0 {

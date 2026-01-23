@@ -2,12 +2,13 @@ package scheduler
 
 import "context"
 
-type Job interface {
-	Name() string
+type JobHandler interface {
 	Handle(ctx context.Context)
 }
 
-type JobConfig struct {
-	Cron string // cron expression
-	IsOn bool   // enable / disable job
+type Job struct {
+	Name    string // name job
+	Cron    string // cron expression
+	IsOn    bool   // enable / disable job
+	Handler JobHandler
 }
