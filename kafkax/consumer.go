@@ -2,29 +2,49 @@ package kafkax
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 )
 
 type consumer struct {
-	consumer *kafka.Consumer
+	consumer   *kafka.Consumer
+	autoCommit bool
 }
 
 func NewConsumer(cf *Config) (Consumer, error) {
 	cfg := cf.ConsumerConfig
-	c, err := kafka.NewConsumer(&kafka.ConfigMap{
+	configMap := kafka.ConfigMap{
 		clientId:         cf.ClientId,
 		bootstrapServers: cf.BootstrapServers,
-		groupId:          cf.ClientId,
-		autoOffsetReset:  cfg.AutoOffsetReset,
-		enableAutoCommit: cfg.EnableAutoCommit,
-	})
+	}
+
+	autoCommit := true
+	if cfg != nil {
+		if cfg.GroupID != "" {
+			configMap[groupId] = cfg.GroupID
+		} else {
+			configMap[groupId] = cf.ClientId
+		}
+		if cfg.AutoOffsetReset != "" {
+			configMap[autoOffsetReset] = string(cfg.AutoOffsetReset)
+		}
+		autoCommit = cfg.EnableAutoCommit
+		configMap[enableAutoCommit] = cfg.EnableAutoCommit
+	} else {
+		configMap[groupId] = cf.ClientId
+		configMap[autoOffsetReset] = "latest"
+		configMap[enableAutoCommit] = true
+	}
+
+	c, err := kafka.NewConsumer(&configMap)
 	if err != nil {
 		return nil, err
 	}
 
 	return &consumer{
-		consumer: c,
+		consumer:   c,
+		autoCommit: autoCommit,
 	}, nil
 }
 
@@ -34,26 +54,53 @@ func (c *consumer) Close() {
 	}
 }
 
-func (c *consumer) Subscribe(topics []string) error {
-	return c.consumer.SubscribeTopics(topics, nil)
+// Start begins consuming messages from the specified topics and calls the handler for each message.
+// It blocks until an error occurs or the consumer is closed.
+// Default timeout is 100ms per poll.
+func (c *consumer) Start(topics []string, handler Handler) error {
+	return c.StartWithTimeout(topics, handler, 100)
 }
 
-func (c *consumer) Consume(timeoutMs int) (*kafka.Message, error) {
-	ev := c.consumer.Poll(timeoutMs)
-	if ev == nil {
-		return nil, nil
+// StartWithTimeout starts consuming messages with a custom timeout per message poll.
+// It blocks until an error occurs or the consumer is closed.
+func (c *consumer) StartWithTimeout(topics []string, handler Handler, timeoutMs int) error {
+	if handler == nil {
+		return fmt.Errorf("message handler cannot be nil")
 	}
-	switch e := ev.(type) {
-	case *kafka.Message:
-		return e, nil
-	case kafka.Error:
-		return nil, e
-	default:
-		return nil, fmt.Errorf("unknown event type")
-	}
-}
 
-func (c *consumer) CommitMessage(msg *kafka.Message) error {
-	_, err := c.consumer.CommitMessage(msg)
-	return err
+	if err := c.consumer.SubscribeTopics(topics, nil); err != nil {
+		return fmt.Errorf("failed to subscribe to topics: %w", err)
+	}
+
+	log.Printf("Consumer started, subscribed to topics: %v", topics)
+
+	for {
+		ev := c.consumer.Poll(timeoutMs)
+		if ev == nil {
+			continue
+		}
+
+		switch e := ev.(type) {
+		case *kafka.Message:
+			if err := handler.Handle(e); err != nil {
+				log.Printf("Error handling message: %v", err)
+				// Continue consuming even if handler returns error
+				// You can modify this behavior if needed
+			} else if !c.autoCommit {
+				// Auto-commit is disabled, manually commit after successful processing
+				if _, err := c.consumer.CommitMessage(e); err != nil {
+					log.Printf("Failed to commit message: %v", err)
+				}
+			}
+
+		case kafka.Error:
+			if e.IsFatal() {
+				return fmt.Errorf("fatal consumer error: %w", e)
+			}
+			log.Printf("Consumer error: %v", e)
+
+		default:
+			log.Printf("Ignored event: %v", e)
+		}
+	}
 }

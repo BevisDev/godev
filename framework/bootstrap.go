@@ -34,7 +34,7 @@ type Bootstrap struct {
 	Migration migration.Migration
 	Redis     *redis.Cache
 	RabbitMQ  *rabbitmq.RabbitMQ
-	Keycloak  keycloak.KeyCloak
+	Keycloak  *keycloak.KeyCloak
 	Rest      *rest.Client
 	Scheduler *scheduler.Scheduler
 	HTTPApp   *server.HTTPApp
