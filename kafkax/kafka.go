@@ -1,14 +1,15 @@
 package kafkax
 
 type Kafka struct {
+	cfg      *Config
 	producer *Producer
 	consumer *Consumer
 }
 
 func New(cf *Config) (*Kafka, error) {
 	var (
-		c   = new(Kafka)
 		err error
+		c   = &Kafka{cfg: cf}
 	)
 
 	if cf.ProducerConfig != nil {

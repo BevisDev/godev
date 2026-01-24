@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/BevisDev/godev/consts"
-	"github.com/BevisDev/godev/logx"
+	"github.com/BevisDev/godev/logger"
 	"github.com/BevisDev/godev/utils"
 	"github.com/BevisDev/godev/utils/datetime"
 	"github.com/BevisDev/godev/utils/jsonx"
@@ -153,7 +153,7 @@ func (r *HTTPRequest[T]) restTemplate(c context.Context) (HTTPResponse[T], error
 	// log HTTPRequest
 	r.logRequest(body)
 
-	ctx, cancel := utils.NewCtxTimeout(c, r.client.timeout)
+	ctx, cancel := utils.NewCtxTimeout(c, r.client.opt.timeout)
 	defer cancel()
 
 	// create HTTPRequest
@@ -219,8 +219,8 @@ func (r *HTTPRequest[T]) createHTTPRequest(
 }
 
 func (r *HTTPRequest[T]) logRequest(body string) {
-	if r.client.useLog {
-		reqLog := &logx.RequestLogger{
+	if r.client.opt.useLog {
+		reqLog := &logger.RequestLogger{
 			RID:    r.rid,
 			URL:    r.url,
 			Method: r.method,
@@ -229,13 +229,13 @@ func (r *HTTPRequest[T]) logRequest(body string) {
 		if !validate.IsNilOrEmpty(r.queryParams) {
 			reqLog.Query = str.ToString(r.queryParams)
 		}
-		if !r.client.skipHeader {
+		if !r.client.opt.skipHeader {
 			reqLog.Header = r.headers
 		}
 		if r.logBody(r.headers[consts.ContentType]) {
 			reqLog.Body = body
 		}
-		r.client.logger.LogExtRequest(reqLog)
+		r.client.opt.logger.LogExtRequest(reqLog)
 		return
 	}
 
@@ -249,7 +249,7 @@ func (r *HTTPRequest[T]) logRequest(body string) {
 	if !validate.IsNilOrEmpty(r.queryParams) {
 		fmt.Fprintf(&sb, "%s: %v\n", consts.Query, r.queryParams)
 	}
-	if !r.client.skipHeader {
+	if !r.client.opt.skipHeader {
 		fmt.Fprintf(&sb, "%s: %s\n", consts.Header, r.headers)
 	}
 	if r.logBody(r.headers[consts.ContentType]) {
@@ -327,26 +327,26 @@ func (r *HTTPRequest[T]) getData(raw []byte) (T, error) {
 }
 
 func (r *HTTPRequest[T]) logResponse(response *http.Response, body string) {
-	if r.client.useLog {
-		logger := &logx.ResponseLogger{
+	if r.client.opt.useLog {
+		respLogger := &logger.ResponseLogger{
 			RID:      r.rid,
 			Status:   response.StatusCode,
 			Duration: time.Since(r.startTime),
 		}
-		if !r.client.skipHeader {
-			logger.Header = response.Header
+		if !r.client.opt.skipHeader {
+			respLogger.Header = response.Header
 		}
 		if r.logBody(response.Header.Get(consts.ContentType)) {
-			logger.Body = body
+			respLogger.Body = body
 		}
-		r.client.logger.LogExtResponse(logger)
+		r.client.opt.logger.LogExtResponse(respLogger)
 	} else {
 		var sb strings.Builder
 		sb.WriteString("\n========== RESPONSE INFO ==========\n")
 		fmt.Fprintf(&sb, "%s: %s\n", consts.RID, r.rid)
 		fmt.Fprintf(&sb, "%s: %d\n", consts.Status, response.StatusCode)
 		fmt.Fprintf(&sb, "%s: %s\n", consts.Duration, time.Since(r.startTime))
-		if !r.client.skipHeader {
+		if !r.client.opt.skipHeader {
 			fmt.Fprintf(&sb, "%s: %s\n", consts.Header, response.Header)
 		}
 		if r.logBody(response.Header.Get(consts.ContentType)) {
@@ -359,26 +359,26 @@ func (r *HTTPRequest[T]) logResponse(response *http.Response, body string) {
 
 func (r *HTTPRequest[T]) logBody(contentType string) bool {
 	// ---- skip by content-type ----
-	for c, _ := range r.client.skipBodyByContentTypes {
+	for c, _ := range r.client.opt.skipBodyByContentTypes {
 		if strings.HasPrefix(contentType, c) {
 			return false
 		}
 	}
 
 	// ---- check default content-type ----
-	if !r.client.skipDefaultContentTypeCheck && utils.SkipContentType(contentType) {
+	if !r.client.opt.skipDefaultContentTypeCheck && utils.SkipContentType(contentType) {
 		return false
 	}
 
 	// ---- skip by path ----
-	if len(r.client.skipBodyByPaths) > 0 {
+	if len(r.client.opt.skipBodyByPaths) > 0 {
 		parsed, err := url.Parse(r.url)
 		if err != nil {
 			return true
 		}
 		path := parsed.Path
 
-		for p, _ := range r.client.skipBodyByPaths {
+		for p, _ := range r.client.opt.skipBodyByPaths {
 			if p == path {
 				return false
 			}

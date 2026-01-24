@@ -28,7 +28,7 @@
 |---------|-------------|--------|
 | **`framework`** | Application bootstrap with lifecycle management, service initialization, and graceful shutdown | [📖 Read More](framework/README.md) |
 | **`config`** | Configuration management with file loading, environment variables, and placeholder expansion | [📖 Read More](config/README.md) |
-| **`logx`** | Structured logging with Zap, file rotation, and HTTP logging | [📖 Read More](logx/README.md) |
+| **`logger`** | Structured logging with Zap, file rotation, and HTTP logging | [📖 Read More](logger/README.md) |
 
 ### Data & Storage
 
@@ -44,7 +44,7 @@
 | Package | Description | README |
 |---------|-------------|--------|
 | **`ginfw/server`** | Gin HTTP server with graceful shutdown and lifecycle hooks | [📖 Read More](ginfw/server/README.md) |
-| **`ginfw/middleware/logger`** | HTTP request/response logging middleware | [📖 Read More](ginfw/middleware/logger/README.md) |
+| **`ginfw/middleware/httplogger`** | HTTP request/response logging middleware | [📖 Read More](ginfw/middleware/httplogger/README.md) |
 | **`ginfw/middleware/ratelimit`** | Rate limiting middleware with Allow/Wait modes | [📖 Read More](ginfw/middleware/ratelimit/README.md) |
 | **`ginfw/middleware/timeout`** | Request timeout middleware | [📖 Read More](ginfw/middleware/timeout/README.md) |
 | **`rest`** | Type-safe REST client with automatic JSON handling | [📖 Read More](rest/README.md) |
@@ -87,7 +87,7 @@ import (
 	"github.com/BevisDev/godev/database"
 	"github.com/BevisDev/godev/framework"
 	"github.com/BevisDev/godev/ginfw/server"
-	"github.com/BevisDev/godev/logx"
+	"github.com/BevisDev/godev/logger"
 	"github.com/BevisDev/godev/redis"
 	"github.com/gin-gonic/gin"
 )
@@ -98,7 +98,7 @@ func main() {
 	// Initialize application with framework
 	bootstrap := framework.New(
 		// Logger
-		framework.WithLogger(&logx.Config{
+		framework.WithLogger(&logger.Config{
 			IsProduction: false,
 			IsLocal:      true,
 			DirName:      "./logs",
@@ -172,9 +172,9 @@ users, err := database.Builder[User](db).
 #### Logger
 
 ```go
-import "github.com/BevisDev/godev/logx"
+import "github.com/BevisDev/godev/logger"
 
-logger := logx.New(&logx.Config{
+appLogger, _ := logger.New(&logger.Config{
 	IsProduction: true,
 	DirName:      "./logs",
 	Filename:     "app.log",
@@ -183,7 +183,7 @@ logger := logx.New(&logx.Config{
 	MaxAge:      30,
 })
 
-logger.Info("state", "Application started")
+appLogger.Info("state", "Application started")
 ```
 
 #### Redis
@@ -216,7 +216,7 @@ import "github.com/BevisDev/godev/rest"
 
 client := rest.New(
 	rest.WithTimeout(10 * time.Second),
-	rest.WithLogger(logger),
+	rest.WithLogger(appLogger),
 )
 
 user, err := rest.NewRequest[*UserResponse](client).
@@ -268,7 +268,7 @@ Each package includes comprehensive documentation with examples:
 
 - [Framework](framework/README.md) - Application bootstrap and lifecycle
 - [Database](database/README.md) - Database operations and query builder
-- [Logger](logx/README.md) - Structured logging
+- [Logger](logger/README.md) - Structured logging
 - [Redis](redis/README.md) - Redis client and operations
 - [HTTP Server](ginfw/server/README.md) - Gin server setup
 - [REST Client](rest/README.md) - HTTP client utilities
@@ -288,7 +288,7 @@ go test ./...
 
 # Run tests for specific package
 go test ./database/...
-go test ./logx/...
+go test ./logger/...
 ```
 
 ---

@@ -31,13 +31,13 @@ func NewConsumer(cf *Config) (*Consumer, error) {
 			configMap[groupId] = cf.ClientId
 		}
 		if cfg.AutoOffsetReset != "" {
-			configMap[autoOffsetReset] = string(cfg.AutoOffsetReset)
+			configMap[autoOffsetReset] = cfg.AutoOffsetReset.String()
 		}
 		autoCommit = cfg.EnableAutoCommit
 		configMap[enableAutoCommit] = cfg.EnableAutoCommit
 	} else {
 		configMap[groupId] = cf.ClientId
-		configMap[autoOffsetReset] = "latest"
+		configMap[autoOffsetReset] = Latest.String()
 		configMap[enableAutoCommit] = true
 	}
 

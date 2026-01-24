@@ -1,6 +1,6 @@
-# HTTP Logger Middleware (`ginfw/middleware/logger`)
+# HTTP Logger Middleware (`ginfw/middleware/httplogger`)
 
-The `logger` middleware provides comprehensive HTTP request and response logging for Gin applications. It supports both structured logging (via `logx`) and console logging, with flexible configuration options.
+The `httplogger` middleware provides comprehensive HTTP request and response logging for Gin applications. It supports both structured logging (via `logger`) and console logging, with flexible configuration options.
 
 ---
 
@@ -8,7 +8,7 @@ The `logger` middleware provides comprehensive HTTP request and response logging
 
 - ✅ **Request/Response Logging**: Logs all HTTP requests and responses with detailed information
 - ✅ **Request ID (RID)**: Automatically generates and tracks unique request IDs
-- ✅ **Dual Logging Modes**: Supports both structured logging (`logx`) and console logging
+- ✅ **Dual Logging Modes**: Supports both structured logging (`logger`) and console logging
 - ✅ **Body Filtering**: Skip logging request/response bodies based on content type
 - ✅ **Header Control**: Optional header logging
 - ✅ **Context Integration**: Automatically attaches RID to request context
@@ -23,18 +23,16 @@ Main middleware struct that handles HTTP logging.
 
 | Method | Description |
 |--------|-------------|
-| `New(opts ...OptionFunc) *HttpLogger` | Create a new logger middleware instance |
+| `New(opts ...Option) *HttpLogger` | Create a new HTTP logger middleware instance |
 | `Handler() gin.HandlerFunc` | Returns the Gin middleware handler function |
 
 ### Options
 
 | Option | Description |
 |--------|-------------|
-| `WithLogger(logger logx.Logger)` | Enable structured logging with logx |
+| `WithLogger(l *logger.Logger)` | Enable structured logging with logger |
 | `WithSkipHeader()` | Skip logging HTTP headers |
-| `WithSkipBodyByPaths(...string)` | Skip body logging for specific paths |
-| `WithSkipBodyByContentTypes(...string)` | Skip body logging for specific content types |
-| `WithSkipDefaultContentTypeCheck()` | Disable default content-type based filtering |
+| `WithSkipDefaultContentTypeCheck()` | Disable default content-type based body filtering |
 
 ---
 
@@ -46,15 +44,15 @@ Main middleware struct that handles HTTP logging.
 package main
 
 import (
-	"github.com/BevisDev/godev/ginfw/middleware/logger"
+	"github.com/BevisDev/godev/ginfw/middleware/httplogger"
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
 	r := gin.Default()
 
-	// Add logger middleware
-	r.Use(logger.New().Handler())
+	// Add HTTP logger middleware
+	r.Use(httplogger.New().Handler())
 
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
@@ -68,14 +66,14 @@ func main() {
 
 ```go
 import (
-	"github.com/BevisDev/godev/ginfw/middleware/logger"
-	"github.com/BevisDev/godev/logx"
+	"github.com/BevisDev/godev/ginfw/middleware/httplogger"
+	"github.com/BevisDev/godev/logger"
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
 	// Initialize logger
-	appLogger := logx.New(&logx.Config{
+	appLogger, _ := logger.New(&logger.Config{
 		IsProduction: true,
 		DirName:      "./logs",
 		Filename:     "app.log",
@@ -83,9 +81,9 @@ func main() {
 
 	r := gin.Default()
 
-	// Add logger middleware with structured logging
-	r.Use(logger.New(
-		logger.WithLogger(appLogger),
+	// Add HTTP logger middleware with structured logging
+	r.Use(httplogger.New(
+		httplogger.WithLogger(appLogger),
 	).Handler())
 
 	r.GET("/api/users", getUsersHandler)
@@ -96,11 +94,9 @@ func main() {
 ### Advanced Configuration
 
 ```go
-r.Use(logger.New(
-	logger.WithLogger(appLogger),
-	logger.WithSkipHeader(), // Don't log headers
-	logger.WithSkipBodyByPaths("/health", "/metrics"), // Skip body for these paths
-	logger.WithSkipBodyByContentTypes("image/*", "video/*"), // Skip body for media
+r.Use(httplogger.New(
+	httplogger.WithLogger(appLogger),
+	httplogger.WithSkipHeader(), // Don't log headers
 ).Handler())
 ```
 
@@ -156,7 +152,7 @@ Body: {"users":[...]}
 
 ### Structured Logging Mode
 
-When using `logx`, logs are written in JSON format:
+When using `logger`, logs are written in JSON format:
 
 ```json
 {
@@ -199,11 +195,9 @@ func handler(c *gin.Context) {
 
 ## Best Practices
 
-1. **Use structured logging in production**: Enable `logx` logger for better log management
-2. **Skip sensitive data**: Use `WithSkipBodyByPaths` for endpoints that handle sensitive information
-3. **Filter media files**: Use `WithSkipBodyByContentTypes` to avoid logging large binary files
-4. **Skip headers when not needed**: Use `WithSkipHeader()` to reduce log size
-5. **Use RID for tracing**: Access RID from context for distributed tracing
+1. **Use structured logging in production**: Enable `logger` for better log management
+2. **Skip headers when not needed**: Use `WithSkipHeader()` to reduce log size
+3. **Use RID for tracing**: Access RID from context for distributed tracing
 
 ---
 
@@ -214,17 +208,19 @@ The logger middleware works seamlessly with the framework:
 ```go
 import (
 	"github.com/BevisDev/godev/framework"
-	"github.com/BevisDev/godev/ginfw/middleware/logger"
+	"github.com/BevisDev/godev/ginfw/middleware/httplogger"
 	"github.com/BevisDev/godev/ginfw/server"
+	"github.com/BevisDev/godev/logger"
 )
 
 bootstrap := framework.New(
+	framework.WithLogger(&logger.Config{...}),
 	framework.WithServer(&server.Config{
 		Port: "8080",
 		Setup: func(r *gin.Engine) {
-			// Add logger middleware
-			r.Use(logger.New(
-				logger.WithLogger(bootstrap.Logger),
+			// Add HTTP logger middleware
+			r.Use(httplogger.New(
+				httplogger.WithLogger(bootstrap.Logger),
 			).Handler())
 			
 			r.GET("/health", healthHandler)

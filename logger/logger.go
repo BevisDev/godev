@@ -1,9 +1,10 @@
-package logx
+package logger
 
 import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -42,8 +43,8 @@ type ResponseLogger struct {
 	Body     string
 }
 
-type AppLogger struct {
-	*Config
+type Logger struct {
+	cf   *Config
 	zap  *zap.Logger
 	cron *cron.Cron
 }
@@ -51,9 +52,13 @@ type AppLogger struct {
 // New creates and returns a new logger instance using Zap.
 // Configures encoder format (JSON/console), output destination (file/stdout),
 // and log rotation via Lumberjack. Includes caller information and uses InfoLevel by default.
-func New(cf *Config) Logger {
-	l := &AppLogger{
-		Config: cf,
+func New(cf *Config) (*Logger, error) {
+	if cf == nil {
+		return nil, errors.New("config is nil")
+	}
+
+	l := &Logger{
+		cf: cf,
 	}
 
 	// job runner to rotate log every day
@@ -74,17 +79,18 @@ func New(cf *Config) Logger {
 	)
 
 	l.zap.Info("[logger] started successfully")
-	return l
+	return l, nil
 }
 
-func (l *AppLogger) GetZap() *zap.Logger {
+// GetZap returns instance *zap.logger
+func (l *Logger) GetZap() *zap.Logger {
 	return l.zap
 }
 
-func (l *AppLogger) getEncoderLog() zapcore.Encoder {
+func (l *Logger) getEncoderLog() zapcore.Encoder {
 	var encodeConfig zapcore.EncoderConfig
 
-	if l.IsProduction {
+	if l.cf.IsProduction {
 		encodeConfig = zap.NewProductionEncoderConfig()
 		// 1716714967.877995 -> 2024-12-19T20:04:31.255+0700
 		encodeConfig.EncodeTime = zapcore.ISO8601TimeEncoder
@@ -107,30 +113,30 @@ func (l *AppLogger) getEncoderLog() zapcore.Encoder {
 	encodeConfig.CallerKey = "caller"
 	encodeConfig.MessageKey = "message"
 
-	if l.IsLocal {
+	if l.cf.IsLocal {
 		return zapcore.NewConsoleEncoder(encodeConfig)
 	}
 	return zapcore.NewJSONEncoder(encodeConfig)
 }
 
-func (l *AppLogger) writeSync() zapcore.WriteSyncer {
-	if l.IsLocal {
+func (l *Logger) writeSync() zapcore.WriteSyncer {
+	if l.cf.IsLocal {
 		return zapcore.AddSync(os.Stdout)
 	}
 
-	fileName := getFilename(l.DirName, l.Filename, l.IsRotate)
+	fileName := getFilename(l.cf.DirName, l.cf.Filename, l.cf.IsRotate)
 	lumber := &lumberjack.Logger{
 		Filename:   fileName,
-		MaxSize:    l.MaxSize,
-		MaxBackups: l.MaxBackups,
-		MaxAge:     l.MaxAge,
-		Compress:   l.Compress,
+		MaxSize:    l.cf.MaxSize,
+		MaxBackups: l.cf.MaxBackups,
+		MaxAge:     l.cf.MaxAge,
+		Compress:   l.cf.Compress,
 	}
 
 	// job runner to rotate log every day
-	if l.IsRotate {
+	if l.cf.IsRotate {
 		l.cron.AddFunc("0 0 * * *", func() {
-			lumber.Filename = getFilename(l.DirName, l.Filename, l.IsRotate)
+			lumber.Filename = getFilename(l.cf.DirName, l.cf.Filename, l.cf.IsRotate)
 			if err := lumber.Rotate(); err != nil {
 				log.Printf("[logger] failed to rotate log file: %v", err)
 			}
@@ -149,7 +155,7 @@ func getFilename(dir, fileName string, isSplit bool) string {
 	return filepath.Join(dir, fileName)
 }
 
-func (l *AppLogger) log(level zapcore.Level,
+func (l *Logger) log(level zapcore.Level,
 	rid, msg string,
 	args ...interface{},
 ) {
@@ -176,7 +182,7 @@ func (l *AppLogger) log(level zapcore.Level,
 	}
 }
 
-func (l *AppLogger) formatMessage(msg string, args ...interface{}) string {
+func (l *Logger) formatMessage(msg string, args ...interface{}) string {
 	if len(args) == 0 {
 		return msg
 	}
@@ -206,7 +212,7 @@ func (l *AppLogger) formatMessage(msg string, args ...interface{}) string {
 	return fmt.Sprintf(msg, l.deferArgs(args...)...)
 }
 
-func (l *AppLogger) deferArgs(args ...interface{}) []interface{} {
+func (l *Logger) deferArgs(args ...interface{}) []interface{} {
 	out := make([]interface{}, len(args))
 	for i, arg := range args {
 		out[i] = l.formatAny(arg)
@@ -214,7 +220,7 @@ func (l *AppLogger) deferArgs(args ...interface{}) []interface{} {
 	return out
 }
 
-func (l *AppLogger) formatAny(v interface{}) string {
+func (l *Logger) formatAny(v interface{}) string {
 	if v == nil {
 		return "<nil>"
 	}
@@ -250,7 +256,7 @@ func (l *AppLogger) formatAny(v interface{}) string {
 	return fmt.Sprintf("<unreadable: %T>", v)
 }
 
-func (l *AppLogger) dereferencePointer(rv reflect.Value) (reflect.Value, interface{}) {
+func (l *Logger) dereferencePointer(rv reflect.Value) (reflect.Value, interface{}) {
 	v := rv.Interface()
 	for rv.Kind() == reflect.Ptr {
 		if rv.IsNil() {
@@ -265,7 +271,7 @@ func (l *AppLogger) dereferencePointer(rv reflect.Value) (reflect.Value, interfa
 	return rv, v
 }
 
-func (l *AppLogger) formatSpecialType(v interface{}) string {
+func (l *Logger) formatSpecialType(v interface{}) string {
 	switch val := v.(type) {
 	case string:
 		return val
@@ -317,7 +323,9 @@ func (l *AppLogger) formatSpecialType(v interface{}) string {
 	}
 }
 
-func (l *AppLogger) Sync() {
+// Sync Forces any buffered log entries to be written out to the destination.
+// Crucial for ensuring all logs are saved before application exit.
+func (l *Logger) Sync() {
 	if l.zap != nil {
 		_ = l.zap.Sync()
 	}
@@ -328,35 +336,42 @@ func (l *AppLogger) Sync() {
 	}
 }
 
-func (l *AppLogger) Info(rid, msg string, args ...interface{}) {
+// Info Logs an informational message
+func (l *Logger) Info(rid, msg string, args ...interface{}) {
 	l.log(zapcore.InfoLevel, rid, msg, args...)
 }
 
-func (l *AppLogger) Error(rid, msg string, args ...interface{}) {
+// Error Logs a recoverable error that occurred during execution.
+func (l *Logger) Error(rid, msg string, args ...interface{}) {
 	l.log(zapcore.ErrorLevel, rid, msg, args...)
 }
 
-func (l *AppLogger) Warn(rid, msg string, args ...interface{}) {
+// Warn Logs a potentially harmful situation or an unexpected event that isn't an error.
+func (l *Logger) Warn(rid, msg string, args ...interface{}) {
 	l.log(zapcore.WarnLevel, rid, msg, args...)
 }
 
-func (l *AppLogger) LogRequest(req *RequestLogger) {
-	l.logRequest(req, "[===== REQUEST INFO =====]", l.CallerConfig.Request.Internal)
+// LogRequest Logs an incoming request to the application (e.g., an HTTP server receiving a client request).
+func (l *Logger) LogRequest(req *RequestLogger) {
+	l.logRequest(req, "[===== REQUEST INFO =====]", l.cf.CallerConfig.Request.Internal)
 }
 
-func (l *AppLogger) LogResponse(resp *ResponseLogger) {
-	l.logResponse(resp, "[===== RESPONSE INFO =====]", l.CallerConfig.Response.Internal)
+// LogResponse Logs the outgoing response generated by the application for an incoming request.
+func (l *Logger) LogResponse(resp *ResponseLogger) {
+	l.logResponse(resp, "[===== RESPONSE INFO =====]", l.cf.CallerConfig.Response.Internal)
 }
 
-func (l *AppLogger) LogExtRequest(req *RequestLogger) {
-	l.logRequest(req, "[===== REQUEST EXTERNAL INFO =====]", l.CallerConfig.Request.External)
+// LogExtRequest Logs an outgoing request made by the application to an external service (External Request).
+func (l *Logger) LogExtRequest(req *RequestLogger) {
+	l.logRequest(req, "[===== REQUEST EXTERNAL INFO =====]", l.cf.CallerConfig.Request.External)
 }
 
-func (l *AppLogger) LogExtResponse(resp *ResponseLogger) {
-	l.logResponse(resp, "[===== RESPONSE EXTERNAL INFO =====]", l.CallerConfig.Response.External)
+// LogExtResponse Logs the response received from an external service after an outgoing request (External Response).
+func (l *Logger) LogExtResponse(resp *ResponseLogger) {
+	l.logResponse(resp, "[===== RESPONSE EXTERNAL INFO =====]", l.cf.CallerConfig.Response.External)
 }
 
-func (l *AppLogger) logRequest(req *RequestLogger, message string, callerSkip int) {
+func (l *Logger) logRequest(req *RequestLogger, message string, callerSkip int) {
 	fields := []zap.Field{
 		zap.String(consts.RID, req.RID),
 		zap.String(consts.Url, req.URL),
@@ -373,7 +388,7 @@ func (l *AppLogger) logRequest(req *RequestLogger, message string, callerSkip in
 		Info(message, fields...)
 }
 
-func (l *AppLogger) logResponse(resp *ResponseLogger, message string, callerSkip int) {
+func (l *Logger) logResponse(resp *ResponseLogger, message string, callerSkip int) {
 	fields := []zap.Field{
 		zap.String(consts.RID, resp.RID),
 		zap.Int(consts.Status, resp.Status),

@@ -1,4 +1,4 @@
-package logx
+package logger
 
 import (
 	"bytes"
@@ -28,7 +28,7 @@ func ptrTo[T any](v T) *T {
 }
 
 func TestFormatMessage(t *testing.T) {
-	logger := &AppLogger{}
+	logger := &Logger{}
 	now := time.Date(2025, 6, 9, 10, 0, 0, 0, time.UTC)
 
 	tests := []struct {
@@ -123,7 +123,7 @@ func TestInfoLog(t *testing.T) {
 	)
 	zapLogger := zap.New(core)
 
-	logger := &AppLogger{zap: zapLogger}
+	logger := &Logger{zap: zapLogger}
 	logger.Info("TEST_STATE", "Hello {}", "World")
 
 	logOutput := buf.String()
@@ -140,7 +140,7 @@ func TestErrorLog(t *testing.T) {
 	)
 	zapLogger := zap.New(core)
 
-	logger := &AppLogger{zap: zapLogger}
+	logger := &Logger{zap: zapLogger}
 	logger.Error("ERR_STATE", "Something went wrong: {}", "disk full")
 
 	logOutput := buf.String()
@@ -157,7 +157,7 @@ func TestWarnLog(t *testing.T) {
 	)
 	zapLogger := zap.New(core)
 
-	logger := &AppLogger{zap: zapLogger}
+	logger := &Logger{zap: zapLogger}
 	logger.Warn("WARN_STATE", "Careful: {}", "low disk")
 
 	logOutput := buf.String()
@@ -167,9 +167,9 @@ func TestWarnLog(t *testing.T) {
 
 func TestLogRequest(t *testing.T) {
 	tLogger := zaptest.NewLogger(t)
-	appLogger := &AppLogger{
+	appLogger := &Logger{
 		zap: tLogger,
-		Config: &Config{
+		cf: &Config{
 			CallerConfig: CallerConfig{},
 		},
 	}
@@ -189,9 +189,9 @@ func TestLogRequest(t *testing.T) {
 
 func TestLogResponse(t *testing.T) {
 	tLogger := zaptest.NewLogger(t)
-	appLogger := &AppLogger{
+	appLogger := &Logger{
 		zap: tLogger,
-		Config: &Config{
+		cf: &Config{
 			CallerConfig: CallerConfig{},
 		},
 	}

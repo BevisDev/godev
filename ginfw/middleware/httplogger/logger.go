@@ -1,4 +1,4 @@
-package logger
+package httplogger
 
 import (
 	"bytes"
@@ -8,8 +8,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/BevisDev/godev/logger"
+
 	"github.com/BevisDev/godev/consts"
-	"github.com/BevisDev/godev/logx"
 	"github.com/BevisDev/godev/utils"
 	"github.com/BevisDev/godev/utils/datetime"
 	"github.com/BevisDev/godev/utils/random"
@@ -70,7 +71,11 @@ func (h *HttpLogger) Handler() gin.HandlerFunc {
 func (h *HttpLogger) readRequestBody(c *gin.Context) string {
 	contentType := c.Request.Header.Get(consts.ContentType)
 	if h.skipDefaultContentTypeCheck || !utils.SkipContentType(contentType) {
-		raw, _ := io.ReadAll(c.Request.Body)
+		raw, err := io.ReadAll(c.Request.Body)
+		if err != nil {
+			log.Printf("[httplogger] failed to read request body: %v", err)
+			return ""
+		}
 		c.Request.Body = io.NopCloser(bytes.NewBuffer(raw))
 		return string(raw)
 	}
@@ -95,14 +100,14 @@ func (h *HttpLogger) readResponseBody(buf *bytes.Buffer, contentType string) str
 
 func (h *HttpLogger) logRequest(c *gin.Context, rid string, startTime time.Time, reqBody string) {
 	if h.useLog {
-		h.logRequestWithLogx(c, rid, startTime, reqBody)
+		h.logRequestWithLogger(c, rid, startTime, reqBody)
 	} else {
 		h.logRequestConsole(c, rid, startTime, reqBody)
 	}
 }
 
-func (h *HttpLogger) logRequestWithLogx(c *gin.Context, rid string, startTime time.Time, reqBody string) {
-	reqLog := &logx.RequestLogger{
+func (h *HttpLogger) logRequestWithLogger(c *gin.Context, rid string, startTime time.Time, reqBody string) {
+	reqLog := &logger.RequestLogger{
 		RID:    rid,
 		URL:    c.Request.URL.String(),
 		Time:   startTime,
@@ -135,14 +140,14 @@ func (h *HttpLogger) logRequestConsole(c *gin.Context, rid string, startTime tim
 
 func (h *HttpLogger) logResponse(c *gin.Context, rid string, duration time.Duration, resBody string) {
 	if h.useLog {
-		h.logResponseWithLogx(c, rid, duration, resBody)
+		h.logResponseWithLogger(c, rid, duration, resBody)
 	} else {
 		h.logResponseConsole(c, rid, duration, resBody)
 	}
 }
 
-func (h *HttpLogger) logResponseWithLogx(c *gin.Context, rid string, duration time.Duration, resBody string) {
-	resLog := &logx.ResponseLogger{
+func (h *HttpLogger) logResponseWithLogger(c *gin.Context, rid string, duration time.Duration, resBody string) {
+	resLog := &logger.ResponseLogger{
 		RID:      rid,
 		Status:   c.Writer.Status(),
 		Duration: duration,

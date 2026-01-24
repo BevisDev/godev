@@ -3,7 +3,7 @@ package rest
 import (
 	"time"
 
-	"github.com/BevisDev/godev/logx"
+	"github.com/BevisDev/godev/logger"
 )
 
 type Option func(*options)
@@ -13,9 +13,9 @@ type options struct {
 	timeout time.Duration
 
 	// logger instance for logging
-	logger logx.Logger
+	logger *logger.Logger
 
-	// useLog is the flag use logx
+	// useLog is the flag use logger
 	useLog bool
 
 	// skipHeader Skip logging HTTP headers if true
@@ -39,10 +39,12 @@ func withDefaults() *options {
 	}
 }
 
-func WithLogger(logger logx.Logger) Option {
+func WithLogger(logger *logger.Logger) Option {
 	return func(o *options) {
-		o.logger = logger
-		o.useLog = true
+		if logger != nil {
+			o.logger = logger
+			o.useLog = true
+		}
 	}
 }
 

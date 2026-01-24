@@ -39,11 +39,15 @@ const (
 type AutoOffsetReset string
 
 const (
-	Earliest  = AutoOffsetReset("earliest")
-	Beginning = AutoOffsetReset("beginning")
-	Latest    = AutoOffsetReset("latest")
-	Error     = AutoOffsetReset("error")
+	Earliest  AutoOffsetReset = "earliest"
+	Beginning AutoOffsetReset = "beginning"
+	Latest    AutoOffsetReset = "latest"
+	Error     AutoOffsetReset = "error"
 )
+
+func (a AutoOffsetReset) String() string {
+	return string(a)
+}
 
 type Config struct {
 	ClientId         string

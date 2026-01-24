@@ -2,16 +2,20 @@ package kafkax
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 )
 
 type Producer struct {
-	*Config
+	cf       *Config
 	producer *kafka.Producer
 	events   chan kafka.Event
+	mu       sync.Mutex
+	closed   bool
 }
 
 func NewProducer(cf *Config) (*Producer, error) {
@@ -44,11 +48,11 @@ func NewProducer(cf *Config) (*Producer, error) {
 
 	p, err := kafka.NewProducer(&configMap)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("[producer] failed %w", err)
 	}
 
 	prod := &Producer{
-		Config:   cf,
+		cf:       cf,
 		producer: p,
 		events:   make(chan kafka.Event, 100),
 	}
@@ -58,9 +62,19 @@ func NewProducer(cf *Config) (*Producer, error) {
 }
 
 func (p *Producer) Close() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.closed {
+		return
+	}
+	p.closed = true
+
 	if p.producer != nil {
 		p.producer.Flush(5000)
-		close(p.events)
+		if p.events != nil {
+			close(p.events)
+		}
 		p.producer.Close()
 	}
 }
@@ -88,7 +102,17 @@ func (p *Producer) Produce(
 	id, topic string,
 	key, value []byte,
 ) error {
-	return p.producer.Produce(
+	p.mu.Lock()
+	closed := p.closed
+	producer := p.producer
+	events := p.events
+	p.mu.Unlock()
+
+	if closed || producer == nil {
+		return fmt.Errorf("[producer] producer is closed")
+	}
+
+	return producer.Produce(
 		&kafka.Message{
 			TopicPartition: kafka.TopicPartition{
 				Topic:     &topic,
@@ -101,7 +125,7 @@ func (p *Producer) Produce(
 				{Key: "id", Value: []byte(id)},
 			},
 		},
-		p.events,
+		events,
 	)
 }
 
@@ -132,6 +156,16 @@ func (p *Producer) ProduceWithHeaders(
 	key, value []byte,
 	customHeaders map[string]string,
 ) error {
+	p.mu.Lock()
+	closed := p.closed
+	producer := p.producer
+	events := p.events
+	p.mu.Unlock()
+
+	if closed || producer == nil {
+		return fmt.Errorf("[producer] producer is closed")
+	}
+
 	headers := []kafka.Header{
 		{Key: "timestamp", Value: []byte(time.Now().Format(time.RFC3339))},
 		{Key: "id", Value: []byte(id)},
@@ -144,7 +178,7 @@ func (p *Producer) ProduceWithHeaders(
 		})
 	}
 
-	return p.producer.Produce(
+	return producer.Produce(
 		&kafka.Message{
 			TopicPartition: kafka.TopicPartition{
 				Topic:     &topic,
@@ -154,7 +188,7 @@ func (p *Producer) ProduceWithHeaders(
 			Value:   value,
 			Headers: headers,
 		},
-		p.events,
+		events,
 	)
 }
 
@@ -164,7 +198,17 @@ func (p *Producer) ProduceToPartition(
 	partition int32,
 	key, value []byte,
 ) error {
-	return p.producer.Produce(
+	p.mu.Lock()
+	closed := p.closed
+	producer := p.producer
+	events := p.events
+	p.mu.Unlock()
+
+	if closed || producer == nil {
+		return fmt.Errorf("[producer] producer is closed")
+	}
+
+	return producer.Produce(
 		&kafka.Message{
 			TopicPartition: kafka.TopicPartition{
 				Topic:     &topic,
@@ -177,11 +221,18 @@ func (p *Producer) ProduceToPartition(
 				{Key: "id", Value: []byte(id)},
 			},
 		},
-		p.events,
+		events,
 	)
 }
 
 // Flush waits for all pending messages to be delivered.
 func (p *Producer) Flush(timeoutMs int) int {
-	return p.producer.Flush(timeoutMs)
+	p.mu.Lock()
+	producer := p.producer
+	p.mu.Unlock()
+
+	if producer == nil {
+		return 0
+	}
+	return producer.Flush(timeoutMs)
 }

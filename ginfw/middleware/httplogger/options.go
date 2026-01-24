@@ -1,14 +1,14 @@
-package logger
+package httplogger
 
-import "github.com/BevisDev/godev/logx"
+import "github.com/BevisDev/godev/logger"
 
 type Option func(*options)
 
 type options struct {
 	// logger instance for logging
-	logger logx.Logger
+	logger *logger.Logger
 
-	// useLog is the flag use logx
+	// useLog is the flag use logger
 	useLog bool
 
 	// skipHeader Skip logging HTTP headers if true
@@ -26,10 +26,12 @@ func withDefaults() *options {
 	}
 }
 
-func WithLogger(l logx.Logger) Option {
+func WithLogger(l *logger.Logger) Option {
 	return func(o *options) {
-		o.logger = l
-		o.useLog = true
+		if l != nil {
+			o.logger = l
+			o.useLog = true
+		}
 	}
 }
 

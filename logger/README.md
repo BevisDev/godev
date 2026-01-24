@@ -1,6 +1,6 @@
-# Logx Package
+# Logger Package
 
-The `logx` package provides a structured logging solution for Go applications using
+The `logger` package provides a structured logging solution for Go applications using
 the [Zap](https://github.com/uber-go/zap) logging library.
 
 It supports file-based logging with rotation, console logging, structured JSON logging, and flexible caller skip
@@ -47,7 +47,7 @@ Configuration for creating a logger:
 | `Filename`     | Base log filename, e.g., `"app.log"`.                |
 | `CallerConfig` | Caller skip configuration for request/response logs. |
 
-### `AppLogger`
+### `Logger`
 
 Main struct for logging, wrapping a `*zap.Logger`.
 
@@ -81,11 +81,11 @@ Structs used to log HTTP requests and responses:
 package main
 
 import (
-	"github.com/BevisDev/godev/logx"
+	"github.com/BevisDev/godev/logger"
 )
 
 func main() {
-	logger := logx.New(&logx.Config{
+	appLogger, _ := logger.New(&logger.Config{
 		IsProduction: true,
 		IsLocal:      false,
 		MaxSize:      100,
@@ -96,10 +96,10 @@ func main() {
 		DirName:      "./logs",
 		Filename:     "app.log",
 	})
-	defer logger.Sync()
+	defer appLogger.Sync()
 
-	logger.Info("app", "Application started")
-	logger.Error("app", "An error occurred", "error", "something went wrong")
+	appLogger.Info("app", "Application started")
+	appLogger.Error("app", "An error occurred", "error", "something went wrong")
 }
 
 ```

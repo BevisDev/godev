@@ -52,7 +52,7 @@ The internal configuration struct is not exposed.
 | Option                                  | Description                                               |
 |-----------------------------------------|-----------------------------------------------------------|
 | `WithTimeout(time.Duration)`            | Set request timeout                                       |
-| `WithLogger(logx.Logger)`               | Enable request/response logging                           |
+| `WithLogger(logger.Logger)`             | Enable request/response logging                           |
 | `WithSkipHeader()`                      | Skip logging HTTP headers                                 |
 | `WithSkipBodyByPaths(...string)`        | Skip logging body for specific API paths                  |
 | `WithSkipBodyByContentTypes(...string)` | Skip logging body for specific content types              |

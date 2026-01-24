@@ -15,8 +15,8 @@ type ConsumerHandler func(ctx context.Context, msg Message) error
 type ChannelHandler func(ch *amqp.Channel) error
 
 type RabbitMQ struct {
-	*Config
-	*options
+	cf         *Config
+	opt        *options
 	Queue      *Queue
 	Publisher  *Publisher
 	connection *amqp.Connection
@@ -47,8 +47,8 @@ func New(cf *Config, opts ...Option) (*RabbitMQ, error) {
 	}
 
 	r := &RabbitMQ{
-		Config:  cf,
-		options: opt,
+		cf:  cf,
+		opt: opt,
 	}
 	conn, err := r.connect()
 	if err != nil {
@@ -63,7 +63,7 @@ func New(cf *Config, opts ...Option) (*RabbitMQ, error) {
 }
 
 func (r *RabbitMQ) connect() (*amqp.Connection, error) {
-	conn, err := amqp.Dial(r.URL())
+	conn, err := amqp.Dial(r.cf.URL())
 	if err != nil {
 		return nil, err
 	}

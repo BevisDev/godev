@@ -11,7 +11,7 @@ import (
 // It is intended for making REST API calls with consistent timeout settings
 // and optional logging support via AppLogger.
 type Client struct {
-	*options
+	opt    *options
 	client *http.Client
 }
 
@@ -24,8 +24,8 @@ func New(opts ...Option) *Client {
 	}
 
 	c := &Client{
-		client:  new(http.Client),
-		options: opt,
+		client: new(http.Client),
+		opt:    opt,
 	}
 
 	log.Printf("[rest] client started successfully")
@@ -37,5 +37,5 @@ func (r *Client) GetClient() *http.Client {
 }
 
 func (r *Client) SetTimeout(timeout time.Duration) {
-	r.timeout = timeout
+	r.opt.timeout = timeout
 }

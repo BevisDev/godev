@@ -58,7 +58,7 @@ func (p *Publisher) publish(ctx context.Context,
 				XRid: utils.GetRID(ctx),
 			},
 		}
-		if p.mq.persistentMsg {
+		if p.mq.opt.persistentMsg {
 			publishing.DeliveryMode = amqp.Persistent
 		}
 

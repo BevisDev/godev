@@ -13,7 +13,7 @@ Bootstrap framework giúp khởi tạo và quản lý lifecycle của applicatio
 
 ## Supported Services
 
-- **Logger** (logx)
+- **Logger** (logger)
 - **Database** (database)
 - **Redis** (redis)
 - **RabbitMQ** (rabbitmq)
@@ -36,7 +36,7 @@ import (
 	"github.com/BevisDev/godev/database"
 	"github.com/BevisDev/godev/framework"
 	"github.com/BevisDev/godev/ginfw/server"
-	"github.com/BevisDev/godev/logx"
+	"github.com/BevisDev/godev/logger"
 	"github.com/BevisDev/godev/redis"
 	"github.com/gin-gonic/gin"
 )
@@ -47,7 +47,7 @@ func main() {
 	// Create bootstrap with all services
 	bootstrap := framework.New(
 		// Logger
-		framework.WithLogger(&logx.Config{
+		framework.WithLogger(&logger.Config{
 			IsProduction: false,
 			IsLocal:      true,
 			DirName:      "./logs",
@@ -56,13 +56,13 @@ func main() {
 
 		// Database
 		framework.WithDatabase(&database.Config{
-			DBType:    database.MySQL,
-			Host:      "localhost",
-			Port:      3306,
-			DBName:    "mydb",
-			Username:  "user",
-			Password:  "password",
-			Timeout:   5 * time.Second,
+			DBType:   database.MySQL,
+			Host:     "localhost",
+			Port:     3306,
+			DBName:   "mydb",
+			Username: "user",
+			Password: "password",
+			Timeout:  5 * time.Second,
 		}),
 
 		// Redis
@@ -97,7 +97,7 @@ func main() {
 
 ```go
 bootstrap := framework.New(
-	framework.WithLogger(&logx.Config{...}),
+	framework.WithLogger(&logger.Config{...}),
 	framework.WithDatabase(&database.Config{...}),
 )
 
@@ -145,7 +145,7 @@ bootstrap.Run(ctx)
 
 ```go
 bootstrap := framework.New(
-	framework.WithLogger(&logx.Config{...}),
+	framework.WithLogger(&logger.Config{...}),
 	framework.WithDatabase(&database.Config{...}),
 )
 
@@ -174,7 +174,7 @@ bootstrap.Stop(shutdownCtx)
 ```go
 bootstrap := framework.New(
 	// Logger
-	framework.WithLogger(&logx.Config{
+	framework.WithLogger(&logger.Config{
 		IsProduction: true,
 		DirName:      "./logs",
 		Filename:     "app.log",
@@ -250,7 +250,7 @@ bootstrap.Run(ctx)
 bootstrap := framework.New(...)
 
 // After initialization, access services
-logger := bootstrap.GetLogger()
+logger := bootstrap.Logger
 db := bootstrap.GetDatabase()
 redis := bootstrap.GetRedis()
 rabbitmq := bootstrap.GetRabbitMQ()
@@ -267,13 +267,42 @@ users, _ := database.Builder[User](db).From("users").FindAll(ctx)
 
 ```go
 health := bootstrap.Health(ctx)
-for service, err := range health {
-	if err != nil {
+for service, result := range health {
+	if err, ok := result.(error); ok {
 		log.Printf("[health] %s: %v", service, err)
 	} else {
 		log.Printf("[health] %s: OK", service)
 	}
 }
+```
+
+### Custom Health Checkers (từ dự án khác)
+
+Đăng ký thêm health check từ package/dự án khác qua `WithHealthChecker`:
+
+```go
+// Ví dụ: hàm health check từ project khác (external API, custom service, ...)
+func checkPaymentGateway(ctx context.Context) error {
+	// HTTP GET, gRPC ping, etc.
+	resp, err := http.Get("https://payment-api/health")
+	if err != nil {
+		return err
+	}
+	resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("status %d", resp.StatusCode)
+	}
+	return nil
+}
+
+bootstrap := framework.New(
+	framework.WithLogger(&logger.Config{...}),
+	framework.WithHealthChecker("payment_gateway", checkPaymentGateway),
+	framework.WithHealthChecker("custom_service", myproject.CheckCustomService),
+)
+// ...
+health := bootstrap.Health(ctx)
+// health["payment_gateway"], health["custom_service"] sẽ có kết quả
 ```
 
 ### With Config File
@@ -285,7 +314,7 @@ import (
 )
 
 type AppConfig struct {
-	Logger   logx.Config
+	Logger   logger.Config
 	Database database.Config
 	Redis    redis.Config
 	Server   server.Config
@@ -316,7 +345,7 @@ func main() {
 
 ### Options
 
-- `WithLogger(cfg *logx.Config)` - Configure logger
+- `WithLogger(cfg *logger.Config)` - Configure logger
 - `WithDatabase(cfg *database.Config)` - Configure database
 - `WithRedis(cfg *redis.Config)` - Configure Redis
 - `WithRabbitMQ(cfg *rabbitmq.Config)` - Configure RabbitMQ
@@ -324,6 +353,7 @@ func main() {
 - `WithRestClient(opts ...rest.OptionFunc)` - Configure REST client
 - `WithScheduler(opts ...scheduler.OptionFunc)` - Configure scheduler
 - `WithServer(cfg *server.Config)` - Configure HTTP server
+- `WithHealthChecker(name string, fn framework.HealthChecker)` - Register custom health checker (e.g. from other projects)
 
 ### Lifecycle Methods
 
@@ -343,7 +373,7 @@ func main() {
 
 ### Getters
 
-- `GetLogger() logx.Logger`
+- `Logger *logger.Logger` (field, set after Init)
 - `GetDatabase() *database.Database`
 - `GetRedis() *redis.Cache`
 - `GetRabbitMQ() *rabbitmq.RabbitMQ`
@@ -353,7 +383,7 @@ func main() {
 
 ### Utilities
 
-- `Health(ctx context.Context) map[string]error` - Check health of all services
+- `Health(ctx context.Context) map[string]interface{}` - Check health of all services + custom checkers; values are `error` or `"OK"`
 - `Context() context.Context` - Get bootstrap context
 - `Shutdown()` - Trigger graceful shutdown
 

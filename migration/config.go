@@ -5,9 +5,9 @@ import (
 	"time"
 )
 
-// Config holds database migration settings.
+// Config holds database Migration settings.
 type Config struct {
-	// Dir specifies the directory containing migration scripts.
+	// Dir specifies the directory containing Migration scripts.
 	Dir string
 
 	// DBType defines the type of database (e.g., Postgres, MySQL, SQLServer).
@@ -16,7 +16,7 @@ type Config struct {
 	// DB is the active database connection used for applying migrations.
 	DB *sql.DB
 
-	// Timeout sets the maximum duration allowed for each migration operation.
+	// Timeout sets the maximum duration allowed for each Migration operation.
 	Timeout time.Duration
 }
 
