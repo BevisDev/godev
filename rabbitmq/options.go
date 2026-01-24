@@ -1,6 +1,6 @@
 package rabbitmq
 
-type OptionFunc func(*options)
+type Option func(*options)
 
 type options struct {
 	persistentMsg bool // persistentMsg config to set delivery mode when publish message
@@ -12,7 +12,7 @@ func withDefaults() *options {
 	}
 }
 
-func WithPersistentMsg() OptionFunc {
+func WithPersistentMsg() Option {
 	return func(o *options) {
 		o.persistentMsg = true
 	}

@@ -7,7 +7,7 @@ import (
 	"golang.org/x/time/rate"
 )
 
-type OptionFunc func(*options)
+type Option func(*options)
 
 type options struct {
 	rps      rate.Limit
@@ -24,7 +24,7 @@ func defaultOptions() *options {
 	}
 }
 
-func WithRPS(rps int) OptionFunc {
+func WithRPS(rps int) Option {
 	return func(o *options) {
 		if rps > 0 {
 			o.rps = rate.Limit(rps)
@@ -32,7 +32,7 @@ func WithRPS(rps int) OptionFunc {
 	}
 }
 
-func WithBurst(burst int) OptionFunc {
+func WithBurst(burst int) Option {
 	return func(o *options) {
 		if burst > 0 {
 			o.burst = burst
@@ -40,7 +40,7 @@ func WithBurst(burst int) OptionFunc {
 	}
 }
 
-func WithTimeout(d time.Duration) OptionFunc {
+func WithTimeout(d time.Duration) Option {
 	return func(o *options) {
 		if d > 0 {
 			o.timeout = d
@@ -48,7 +48,7 @@ func WithTimeout(d time.Duration) OptionFunc {
 	}
 }
 
-func WithOnReject(fn func(c *gin.Context, err error)) OptionFunc {
+func WithOnReject(fn func(c *gin.Context, err error)) Option {
 	return func(o *options) {
 		o.onReject = fn
 	}

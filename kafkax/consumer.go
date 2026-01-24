@@ -7,12 +7,16 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 )
 
-type consumer struct {
+type Handler interface {
+	Handle(msg *kafka.Message) error
+}
+
+type Consumer struct {
 	consumer   *kafka.Consumer
 	autoCommit bool
 }
 
-func NewConsumer(cf *Config) (Consumer, error) {
+func NewConsumer(cf *Config) (*Consumer, error) {
 	cfg := cf.ConsumerConfig
 	configMap := kafka.ConfigMap{
 		clientId:         cf.ClientId,
@@ -42,28 +46,28 @@ func NewConsumer(cf *Config) (Consumer, error) {
 		return nil, err
 	}
 
-	return &consumer{
+	return &Consumer{
 		consumer:   c,
 		autoCommit: autoCommit,
 	}, nil
 }
 
-func (c *consumer) Close() {
+func (c *Consumer) Close() {
 	if c.consumer != nil {
 		_ = c.consumer.Close()
 	}
 }
 
 // Start begins consuming messages from the specified topics and calls the handler for each message.
-// It blocks until an error occurs or the consumer is closed.
+// It blocks until an error occurs or the Consumer is closed.
 // Default timeout is 100ms per poll.
-func (c *consumer) Start(topics []string, handler Handler) error {
+func (c *Consumer) Start(topics []string, handler Handler) error {
 	return c.StartWithTimeout(topics, handler, 100)
 }
 
 // StartWithTimeout starts consuming messages with a custom timeout per message poll.
-// It blocks until an error occurs or the consumer is closed.
-func (c *consumer) StartWithTimeout(topics []string, handler Handler, timeoutMs int) error {
+// It blocks until an error occurs or the Consumer is closed.
+func (c *Consumer) StartWithTimeout(topics []string, handler Handler, timeoutMs int) error {
 	if handler == nil {
 		return fmt.Errorf("message handler cannot be nil")
 	}
@@ -95,7 +99,7 @@ func (c *consumer) StartWithTimeout(topics []string, handler Handler, timeoutMs 
 
 		case kafka.Error:
 			if e.IsFatal() {
-				return fmt.Errorf("fatal consumer error: %w", e)
+				return fmt.Errorf("fatal Consumer error: %w", e)
 			}
 			log.Printf("Consumer error: %v", e)
 

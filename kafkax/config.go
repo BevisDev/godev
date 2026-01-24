@@ -2,7 +2,7 @@ package kafkax
 
 // About configuration
 // https://github.com/confluentinc/librdkafka/blob/master/CONFIGURATION.md
-// * = both producer and consumer
+// * = both Producer and Consumer
 const (
 	clientId              = "client.id"
 	bootstrapServers      = "bootstrap.servers"
@@ -11,7 +11,7 @@ const (
 	connectionMaxIdleMs   = "connections.max.idle.ms"
 )
 
-// producer
+// Producer
 const (
 	retries = "retries"
 	acks    = "acks"
@@ -28,7 +28,7 @@ const (
 	deliveryTimeoutMs = "delivery.timeout.ms"
 )
 
-// consumer
+// Consumer
 const (
 	groupId          = "group.id"
 	autoOffsetReset  = "auto.offset.reset"

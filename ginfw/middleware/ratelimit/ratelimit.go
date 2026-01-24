@@ -19,12 +19,10 @@ type RateLimit struct {
 	limiter *rate.Limiter
 }
 
-func New(fs ...OptionFunc) *RateLimit {
+func New(fs ...Option) *RateLimit {
 	o := defaultOptions()
 	for _, opt := range fs {
-		if opt != nil {
-			opt(o)
-		}
+		opt(o)
 	}
 
 	return &RateLimit{

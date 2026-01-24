@@ -36,13 +36,13 @@ const (
 //
 // Returns an error if the configuration is nil, the connection fails,
 // or the channel cannot be created.
-func New(cf *Config, fs ...OptionFunc) (*RabbitMQ, error) {
+func New(cf *Config, opts ...Option) (*RabbitMQ, error) {
 	if cf == nil {
 		return nil, fmt.Errorf("[rabbitmq] config is nil")
 	}
 
 	opt := withDefaults()
-	for _, f := range fs {
+	for _, f := range opts {
 		f(opt)
 	}
 

@@ -21,7 +21,7 @@ import (
 	"github.com/BevisDev/godev/utils/validate"
 )
 
-type httpRequest[T any] struct {
+type HTTPRequest[T any] struct {
 	client *Client
 
 	// url is the target API endpoint (e.g., "/users/:id").
@@ -34,23 +34,23 @@ type httpRequest[T any] struct {
 	pathParams map[string]string
 
 	// bodyForm contains form data (application/x-www-form-urlencoded).
-	// Used only if Body is nil and the httpRequest requires form encoding.
+	// Used only if Body is nil and the HTTPRequest requires form encoding.
 	bodyForm map[string]string
 
 	// headers allows you to set custom headers (e.g., Authorization, Content-Type).
 	headers map[string]string
 
-	// body is the raw httpRequest body (typically a struct to be JSON-encoded).
+	// body is the raw HTTPRequest body (typically a struct to be JSON-encoded).
 	// This is ignored if BodyForm is set.
 	body any
 
-	// method execute httpRequest
+	// method execute HTTPRequest
 	method string
 
-	// rid: ID httpRequest
+	// rid: ID HTTPRequest
 	rid string
 
-	// startTime time begin httpRequest
+	// startTime time begin HTTPRequest
 	startTime time.Time
 }
 
@@ -64,82 +64,82 @@ type HTTPResponse[T any] struct {
 	HasBody    bool
 }
 
-func NewRequest[T any](client *Client) *httpRequest[T] {
-	if client == nil {
-		client = New()
+func NewRequest[T any](c *Client) *HTTPRequest[T] {
+	if c == nil {
+		c = New()
 	}
 
-	return &httpRequest[T]{
-		client: client,
+	return &HTTPRequest[T]{
+		client: c,
 	}
 }
 
-func (r *httpRequest[T]) URL(url string) *httpRequest[T] {
+func (r *HTTPRequest[T]) URL(url string) *HTTPRequest[T] {
 	r.url = url
 	return r
 }
 
-func (r *httpRequest[T]) QueryParams(query map[string]string) *httpRequest[T] {
+func (r *HTTPRequest[T]) QueryParams(query map[string]string) *HTTPRequest[T] {
 	r.queryParams = query
 	return r
 }
 
-func (r *httpRequest[T]) PathParams(params map[string]string) *httpRequest[T] {
+func (r *HTTPRequest[T]) PathParams(params map[string]string) *HTTPRequest[T] {
 	r.pathParams = params
 	return r
 }
 
-func (r *httpRequest[T]) Headers(headers map[string]string) *httpRequest[T] {
+func (r *HTTPRequest[T]) Headers(headers map[string]string) *HTTPRequest[T] {
 	r.headers = headers
 	return r
 }
 
-func (r *httpRequest[T]) Body(body any) *httpRequest[T] {
+func (r *HTTPRequest[T]) Body(body any) *HTTPRequest[T] {
 	r.body = body
 	return r
 }
 
-func (r *httpRequest[T]) BodyForm(bodyForm map[string]string) *httpRequest[T] {
+func (r *HTTPRequest[T]) BodyForm(bodyForm map[string]string) *HTTPRequest[T] {
 	r.bodyForm = bodyForm
 	return r
 }
 
-func (r *httpRequest[T]) GET(c context.Context) (HTTPResponse[T], error) {
+func (r *HTTPRequest[T]) GET(c context.Context) (HTTPResponse[T], error) {
 	r.method = http.MethodGet
 	return r.restTemplate(c)
 }
 
-func (r *httpRequest[T]) POST(c context.Context) (HTTPResponse[T], error) {
+func (r *HTTPRequest[T]) POST(c context.Context) (HTTPResponse[T], error) {
 	r.method = http.MethodPost
 	return r.restTemplate(c)
 }
 
-func (r *httpRequest[T]) PostForm(c context.Context) (HTTPResponse[T], error) {
+func (r *HTTPRequest[T]) PostForm(c context.Context) (HTTPResponse[T], error) {
 	r.method = http.MethodPost
 	return r.restTemplate(c)
 }
 
-func (r *httpRequest[T]) PUT(c context.Context) (HTTPResponse[T], error) {
+func (r *HTTPRequest[T]) PUT(c context.Context) (HTTPResponse[T], error) {
 	r.method = http.MethodPut
 	return r.restTemplate(c)
 }
 
-func (r *httpRequest[T]) PATCH(c context.Context) (HTTPResponse[T], error) {
+func (r *HTTPRequest[T]) PATCH(c context.Context) (HTTPResponse[T], error) {
 	r.method = http.MethodPatch
 	return r.restTemplate(c)
 }
 
-func (r *httpRequest[T]) DELETE(c context.Context) (HTTPResponse[T], error) {
+func (r *HTTPRequest[T]) DELETE(c context.Context) (HTTPResponse[T], error) {
 	r.method = http.MethodDelete
 	return r.restTemplate(c)
 }
 
-func (r *httpRequest[T]) restTemplate(c context.Context) (HTTPResponse[T], error) {
+func (r *HTTPRequest[T]) restTemplate(c context.Context) (HTTPResponse[T], error) {
 	// set metadata
 	r.rid = utils.GetRID(c)
 	r.startTime = time.Now()
 
-	// determine httpRequest shape and prepare URL/body/headers
+	// determine HTTPRequest shape and prepare URL/body/headers
 	isFormData := !validate.IsNilOrEmpty(r.bodyForm)
 	r.setContentType(isFormData)
 	r.buildURL()
@@ -150,13 +150,13 @@ func (r *httpRequest[T]) restTemplate(c context.Context) (HTTPResponse[T], error
 		return HTTPResponse[T]{}, err
 	}
 
-	// log httpRequest
+	// log HTTPRequest
 	r.logRequest(body)
 
 	ctx, cancel := utils.NewCtxTimeout(c, r.client.timeout)
 	defer cancel()
 
-	// create httpRequest
+	// create HTTPRequest
 	request, err := r.createHTTPRequest(ctx, isFormData, raw, body)
 	if err != nil {
 		return HTTPResponse[T]{}, err
@@ -165,7 +165,7 @@ func (r *httpRequest[T]) restTemplate(c context.Context) (HTTPResponse[T], error
 	// set headers
 	r.setHeaders(request)
 
-	// Execute the HTTP httpRequest
+	// Execute the HTTP HTTPRequest
 	return r.execute(request)
 }
 
@@ -173,7 +173,7 @@ func (r *httpRequest[T]) restTemplate(c context.Context) (HTTPResponse[T], error
 // If form-data, encodes BodyForm as URL-encoded string.
 // If Body is []byte, use it directly and log as "[binary body]".
 // Otherwise, marshal Body to JSON and convert to string for logging.
-func (r *httpRequest[T]) serializeBody(isFormData bool) ([]byte, string, error) {
+func (r *HTTPRequest[T]) serializeBody(isFormData bool) ([]byte, string, error) {
 	// CASE: form-data
 	if isFormData {
 		formValues := url.Values{}
@@ -202,7 +202,7 @@ func (r *httpRequest[T]) serializeBody(isFormData bool) ([]byte, string, error) 
 
 // createHTTPRequest constructs the underlying *http.Request based on
 // the previously prepared URL, headers and body serialisation.
-func (r *httpRequest[T]) createHTTPRequest(
+func (r *HTTPRequest[T]) createHTTPRequest(
 	ctx context.Context,
 	isFormData bool,
 	raw []byte,
@@ -218,24 +218,24 @@ func (r *httpRequest[T]) createHTTPRequest(
 	}
 }
 
-func (r *httpRequest[T]) logRequest(body string) {
+func (r *HTTPRequest[T]) logRequest(body string) {
 	if r.client.useLog {
-		log := &logx.RequestLogger{
+		reqLog := &logx.RequestLogger{
 			RID:    r.rid,
 			URL:    r.url,
 			Method: r.method,
 			Time:   r.startTime,
 		}
 		if !validate.IsNilOrEmpty(r.queryParams) {
-			log.Query = str.ToString(r.queryParams)
+			reqLog.Query = str.ToString(r.queryParams)
 		}
 		if !r.client.skipHeader {
-			log.Header = r.headers
+			reqLog.Header = r.headers
 		}
 		if r.logBody(r.headers[consts.ContentType]) {
-			log.Body = body
+			reqLog.Body = body
 		}
-		r.client.logger.LogExtRequest(log)
+		r.client.logger.LogExtRequest(reqLog)
 		return
 	}
 
@@ -259,7 +259,7 @@ func (r *httpRequest[T]) logRequest(body string) {
 	log.Println(sb.String())
 }
 
-func (r *httpRequest[T]) execute(request *http.Request) (HTTPResponse[T], error) {
+func (r *HTTPRequest[T]) execute(request *http.Request) (HTTPResponse[T], error) {
 	client := r.client.GetClient()
 	response, err := client.Do(request)
 	if err != nil {
@@ -309,7 +309,7 @@ func (r *httpRequest[T]) execute(request *http.Request) (HTTPResponse[T], error)
 
 // getData converts the raw HTTP response bytes into the generic
 // type T. It supports []byte, json.RawMessage, string and arbitrary structs.
-func (r *httpRequest[T]) getData(raw []byte) (T, error) {
+func (r *HTTPRequest[T]) getData(raw []byte) (T, error) {
 	var result T
 
 	switch any(result).(type) {
@@ -326,7 +326,7 @@ func (r *httpRequest[T]) getData(raw []byte) (T, error) {
 	}
 }
 
-func (r *httpRequest[T]) logResponse(response *http.Response, body string) {
+func (r *HTTPRequest[T]) logResponse(response *http.Response, body string) {
 	if r.client.useLog {
 		logger := &logx.ResponseLogger{
 			RID:      r.rid,
@@ -357,7 +357,7 @@ func (r *httpRequest[T]) logResponse(response *http.Response, body string) {
 	}
 }
 
-func (r *httpRequest[T]) logBody(contentType string) bool {
+func (r *HTTPRequest[T]) logBody(contentType string) bool {
 	// ---- skip by content-type ----
 	for c, _ := range r.client.skipBodyByContentTypes {
 		if strings.HasPrefix(contentType, c) {
@@ -400,7 +400,7 @@ func (r *httpRequest[T]) logBody(contentType string) bool {
 	return true
 }
 
-func (r *httpRequest[T]) buildURL() {
+func (r *HTTPRequest[T]) buildURL() {
 	for key, val := range r.pathParams {
 		if strings.HasPrefix(key, ":") {
 			r.url = strings.ReplaceAll(r.url, key, val)
@@ -423,7 +423,7 @@ func (r *httpRequest[T]) buildURL() {
 	}
 }
 
-func (r *httpRequest[T]) setContentType(isFormData bool) {
+func (r *HTTPRequest[T]) setContentType(isFormData bool) {
 	if r.headers == nil {
 		r.headers = make(map[string]string)
 	}
@@ -437,7 +437,7 @@ func (r *httpRequest[T]) setContentType(isFormData bool) {
 	}
 }
 
-func (r *httpRequest[T]) setHeaders(rq *http.Request) {
+func (r *HTTPRequest[T]) setHeaders(rq *http.Request) {
 	for key, value := range r.headers {
 		rq.Header.Set(key, value)
 	}

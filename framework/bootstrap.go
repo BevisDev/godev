@@ -56,7 +56,7 @@ type Bootstrap struct {
 }
 
 // New creates a new Bootstrap instance with the provided options.
-func New(opts ...OptionFunc) *Bootstrap {
+func New(opts ...Option) *Bootstrap {
 	ctx, cancel := context.WithCancel(context.Background())
 	b := &Bootstrap{
 		options: new(options),

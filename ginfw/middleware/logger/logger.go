@@ -30,10 +30,10 @@ func (w *responseWrapper) Write(b []byte) (int, error) {
 	return w.ResponseWriter.Write(b)
 }
 
-func New(fs ...OptionFunc) *HttpLogger {
+func New(opts ...Option) *HttpLogger {
 	o := withDefaults()
-	for _, f := range fs {
-		f(o)
+	for _, opt := range opts {
+		opt(o)
 	}
 
 	return &HttpLogger{

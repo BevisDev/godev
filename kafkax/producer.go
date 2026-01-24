@@ -8,13 +8,13 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 )
 
-type producer struct {
+type Producer struct {
 	*Config
 	producer *kafka.Producer
 	events   chan kafka.Event
 }
 
-func NewProducer(cf *Config) (Producer, error) {
+func NewProducer(cf *Config) (*Producer, error) {
 	cfg := cf.ProducerConfig
 	configMap := kafka.ConfigMap{
 		clientId:         cf.ClientId,
@@ -47,7 +47,7 @@ func NewProducer(cf *Config) (Producer, error) {
 		return nil, err
 	}
 
-	prod := &producer{
+	prod := &Producer{
 		Config:   cf,
 		producer: p,
 		events:   make(chan kafka.Event, 100),
@@ -57,7 +57,7 @@ func NewProducer(cf *Config) (Producer, error) {
 	return prod, nil
 }
 
-func (p *producer) Close() {
+func (p *Producer) Close() {
 	if p.producer != nil {
 		p.producer.Flush(5000)
 		close(p.events)
@@ -65,7 +65,7 @@ func (p *producer) Close() {
 	}
 }
 
-func (p *producer) deliveryHandler() {
+func (p *Producer) deliveryHandler() {
 	for e := range p.events {
 		switch ev := e.(type) {
 		case *kafka.Message:
@@ -75,7 +75,7 @@ func (p *producer) deliveryHandler() {
 		case kafka.Error:
 			log.Printf("Producer error: %v", ev)
 			if ev.IsFatal() || ev.Code() == kafka.ErrAllBrokersDown {
-				log.Println("All brokers down - closing producer")
+				log.Println("All brokers down - closing Producer")
 				p.Close()
 				return
 			}
@@ -84,7 +84,7 @@ func (p *producer) deliveryHandler() {
 }
 
 // Produce sends a message to Kafka with the given topic, key, and value.
-func (p *producer) Produce(
+func (p *Producer) Produce(
 	id, topic string,
 	key, value []byte,
 ) error {
@@ -106,7 +106,7 @@ func (p *producer) Produce(
 }
 
 // ProduceString sends a message with string key and value.
-func (p *producer) ProduceString(
+func (p *Producer) ProduceString(
 	id, topic string,
 	key, value string,
 ) error {
@@ -114,7 +114,7 @@ func (p *producer) ProduceString(
 }
 
 // ProduceJSON serializes the value to JSON and sends it to Kafka.
-func (p *producer) ProduceJSON(
+func (p *Producer) ProduceJSON(
 	id, topic string,
 	key string,
 	value interface{},
@@ -127,7 +127,7 @@ func (p *producer) ProduceJSON(
 }
 
 // ProduceWithHeaders sends a message with custom headers.
-func (p *producer) ProduceWithHeaders(
+func (p *Producer) ProduceWithHeaders(
 	id, topic string,
 	key, value []byte,
 	customHeaders map[string]string,
@@ -159,7 +159,7 @@ func (p *producer) ProduceWithHeaders(
 }
 
 // ProduceToPartition sends a message to a specific partition.
-func (p *producer) ProduceToPartition(
+func (p *Producer) ProduceToPartition(
 	id, topic string,
 	partition int32,
 	key, value []byte,
@@ -182,6 +182,6 @@ func (p *producer) ProduceToPartition(
 }
 
 // Flush waits for all pending messages to be delivered.
-func (p *producer) Flush(timeoutMs int) int {
+func (p *Producer) Flush(timeoutMs int) int {
 	return p.producer.Flush(timeoutMs)
 }

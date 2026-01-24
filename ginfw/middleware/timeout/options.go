@@ -7,14 +7,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type OptionFunc func(*options)
+type Option func(*options)
 
 type options struct {
 	duration time.Duration
 	response func(*gin.Context)
 }
 
-func WithTimeout(d time.Duration) OptionFunc {
+func WithTimeout(d time.Duration) Option {
 	return func(o *options) {
 		if d > 0 {
 			o.duration = d
@@ -22,7 +22,7 @@ func WithTimeout(d time.Duration) OptionFunc {
 	}
 }
 
-func WithResponse(fn func(*gin.Context)) OptionFunc {
+func WithResponse(fn func(*gin.Context)) Option {
 	return func(o *options) {
 		if fn != nil {
 			o.response = fn

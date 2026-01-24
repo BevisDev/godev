@@ -9,12 +9,10 @@ type Timeout struct {
 	*options
 }
 
-func New(fs ...OptionFunc) *Timeout {
+func New(opts ...Option) *Timeout {
 	o := withDefaults()
-	for _, f := range fs {
-		if f != nil {
-			f(o)
-		}
+	for _, opt := range opts {
+		opt(o)
 	}
 
 	return &Timeout{

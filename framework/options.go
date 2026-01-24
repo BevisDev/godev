@@ -12,8 +12,8 @@ import (
 	"github.com/BevisDev/godev/scheduler"
 )
 
-// OptionFunc configures Bootstrap behavior (captures config to initialize later in Init).
-type OptionFunc func(*options)
+// Option configures Bootstrap behavior (captures config to initialize later in Init).
+type Option func(*options)
 
 type options struct {
 	loggerConf    *logx.Config
@@ -24,58 +24,58 @@ type options struct {
 	keycloakConf  *keycloak.Config
 
 	restOn   bool
-	restOpts []rest.OptionFunc
+	restOpts []rest.Option
 
 	schedulerOn  bool
-	schedulerOpt []scheduler.OptionFunc
+	schedulerOpt []scheduler.Option
 
 	serverConf *server.Config
 }
 
 // WithLogger configures the logger.
-func WithLogger(cfg *logx.Config) OptionFunc {
+func WithLogger(cfg *logx.Config) Option {
 	return func(o *options) {
 		o.loggerConf = cfg
 	}
 }
 
 // WithDatabase configures the database connection.
-func WithDatabase(cfg *database.Config) OptionFunc {
+func WithDatabase(cfg *database.Config) Option {
 	return func(o *options) {
 		o.dbConf = cfg
 	}
 }
 
 // WithMigration configures the database migration.
-func WithMigration(cfg *migration.Config) OptionFunc {
+func WithMigration(cfg *migration.Config) Option {
 	return func(o *options) {
 		o.migrationConf = cfg
 	}
 }
 
 // WithRedis configures the Redis cache.
-func WithRedis(cfg *redis.Config) OptionFunc {
+func WithRedis(cfg *redis.Config) Option {
 	return func(o *options) {
 		o.redisConf = cfg
 	}
 }
 
 // WithRabbitMQ configures RabbitMQ connection.
-func WithRabbitMQ(cfg *rabbitmq.Config) OptionFunc {
+func WithRabbitMQ(cfg *rabbitmq.Config) Option {
 	return func(o *options) {
 		o.rabbitmqConf = cfg
 	}
 }
 
 // WithKeycloak configures Keycloak client.
-func WithKeycloak(cfg *keycloak.Config) OptionFunc {
+func WithKeycloak(cfg *keycloak.Config) Option {
 	return func(o *options) {
 		o.keycloakConf = cfg
 	}
 }
 
 // WithRestClient configures REST HTTP client.
-func WithRestClient(opts ...rest.OptionFunc) OptionFunc {
+func WithRestClient(opts ...rest.Option) Option {
 	return func(o *options) {
 		o.restOn = true
 		o.restOpts = opts
@@ -83,7 +83,7 @@ func WithRestClient(opts ...rest.OptionFunc) OptionFunc {
 }
 
 // WithScheduler configures the job scheduler.
-func WithScheduler(opts ...scheduler.OptionFunc) OptionFunc {
+func WithScheduler(opts ...scheduler.Option) Option {
 	return func(o *options) {
 		o.schedulerOn = true
 		o.schedulerOpt = opts
@@ -91,7 +91,7 @@ func WithScheduler(opts ...scheduler.OptionFunc) OptionFunc {
 }
 
 // WithServer configures the Gin HTTP server.
-func WithServer(cfg *server.Config) OptionFunc {
+func WithServer(cfg *server.Config) Option {
 	return func(o *options) {
 		o.serverConf = cfg
 	}

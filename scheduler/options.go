@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-type OptionFunc func(*options)
+type Option func(*options)
 
 type options struct {
 	Location    *time.Location
@@ -19,13 +19,13 @@ func defaultOptions() *options {
 	}
 }
 
-func WithSeconds() OptionFunc {
+func WithSeconds() Option {
 	return func(o *options) {
 		o.WithSeconds = true
 	}
 }
 
-func WithLocation(loc *time.Location) OptionFunc {
+func WithLocation(loc *time.Location) Option {
 	return func(o *options) {
 		if loc != nil {
 			o.Location = loc
@@ -33,7 +33,7 @@ func WithLocation(loc *time.Location) OptionFunc {
 	}
 }
 
-func WithTimezone(tz string) OptionFunc {
+func WithTimezone(tz string) Option {
 	return func(o *options) {
 		if tz == "" {
 			o.Location = time.UTC

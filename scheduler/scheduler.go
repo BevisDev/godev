@@ -17,16 +17,16 @@ type Scheduler struct {
 	mu      sync.Mutex
 }
 
-func New(fs ...OptionFunc) *Scheduler {
-	options := defaultOptions()
-	for _, f := range fs {
-		f(options)
+func New(opts ...Option) *Scheduler {
+	op := defaultOptions()
+	for _, opt := range opts {
+		opt(op)
 	}
 
 	cronOpts := []cron.Option{
-		cron.WithLocation(options.Location),
+		cron.WithLocation(op.Location),
 	}
-	if options.WithSeconds {
+	if op.WithSeconds {
 		cronOpts = append(cronOpts, cron.WithSeconds())
 	}
 

@@ -2,7 +2,7 @@ package logger
 
 import "github.com/BevisDev/godev/logx"
 
-type OptionFunc func(*options)
+type Option func(*options)
 
 type options struct {
 	// logger instance for logging
@@ -26,20 +26,20 @@ func withDefaults() *options {
 	}
 }
 
-func WithLogger(l logx.Logger) OptionFunc {
+func WithLogger(l logx.Logger) Option {
 	return func(o *options) {
 		o.logger = l
 		o.useLog = true
 	}
 }
 
-func WithSkipHeader() OptionFunc {
+func WithSkipHeader() Option {
 	return func(o *options) {
 		o.skipHeader = true
 	}
 }
 
-func WithSkipDefaultContentTypeCheck() OptionFunc {
+func WithSkipDefaultContentTypeCheck() Option {
 	return func(o *options) {
 		o.skipDefaultContentTypeCheck = true
 	}

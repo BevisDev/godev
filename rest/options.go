@@ -6,7 +6,7 @@ import (
 	"github.com/BevisDev/godev/logx"
 )
 
-type OptionFunc func(*options)
+type Option func(*options)
 
 type options struct {
 	// timeout for rest client operations.
@@ -21,7 +21,7 @@ type options struct {
 	// skipHeader Skip logging HTTP headers if true
 	skipHeader bool
 
-	// skipBodyByPaths defines API paths for which httpRequest/response bodies should not be logged.
+	// skipBodyByPaths defines API paths for which request/response bodies should not be logged.
 	skipBodyByPaths map[string]struct{}
 
 	// skipBodyContentTypes defines content types for which bodies should not be logged.
@@ -39,14 +39,14 @@ func withDefaults() *options {
 	}
 }
 
-func WithLogger(logger logx.Logger) OptionFunc {
+func WithLogger(logger logx.Logger) Option {
 	return func(o *options) {
 		o.logger = logger
 		o.useLog = true
 	}
 }
 
-func WithTimeout(timeout time.Duration) OptionFunc {
+func WithTimeout(timeout time.Duration) Option {
 	return func(o *options) {
 		if timeout > 0 {
 			o.timeout = timeout
@@ -54,13 +54,13 @@ func WithTimeout(timeout time.Duration) OptionFunc {
 	}
 }
 
-func WithSkipHeader() OptionFunc {
+func WithSkipHeader() Option {
 	return func(o *options) {
 		o.skipHeader = true
 	}
 }
 
-func WithSkipBodyByPaths(paths ...string) OptionFunc {
+func WithSkipBodyByPaths(paths ...string) Option {
 	return func(o *options) {
 		for _, p := range paths {
 			o.skipBodyByPaths[p] = struct{}{}
@@ -68,7 +68,7 @@ func WithSkipBodyByPaths(paths ...string) OptionFunc {
 	}
 }
 
-func WithSkipBodyByContentTypes(contentTypes ...string) OptionFunc {
+func WithSkipBodyByContentTypes(contentTypes ...string) Option {
 	return func(o *options) {
 		for _, c := range contentTypes {
 			o.skipBodyByContentTypes[c] = struct{}{}
@@ -76,7 +76,7 @@ func WithSkipBodyByContentTypes(contentTypes ...string) OptionFunc {
 	}
 }
 
-func WithSkipDefaultContentTypeCheck() OptionFunc {
+func WithSkipDefaultContentTypeCheck() Option {
 	return func(o *options) {
 		o.skipDefaultContentTypeCheck = true
 	}
