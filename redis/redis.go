@@ -24,14 +24,14 @@ type Cache struct {
 // and returns a Cache instance. If `timeout` is zero or negative,
 // it falls back to the default timeout.
 // Returns an error if the connection cannot be established.
-func New(cf *Config) (*Cache, error) {
-	if cf == nil {
+func New(cfg *Config) (*Cache, error) {
+	if cfg == nil {
 		return nil, errors.New("[redis] config is nil")
 	}
-	clone := cf.clone()
+	cf := cfg.clone()
 
 	var c = &Cache{
-		cf: clone,
+		cf: cf,
 	}
 
 	rdb, err := c.connect()

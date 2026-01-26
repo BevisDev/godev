@@ -54,38 +54,23 @@ type Config struct {
 
 // clone applies default values to config fields if they are zero or invalid.
 func (c *Config) clone() *Config {
-	clone := &Config{
-		DBType:       c.DBType,
-		DBName:       c.DBName,
-		Timeout:      c.Timeout,
-		Host:         c.Host,
-		Port:         c.Port,
-		Username:     c.Username,
-		Password:     c.Password,
-		MaxOpenConns: c.MaxOpenConns,
-		MaxIdleConns: c.MaxIdleConns,
-		MaxIdleTime:  c.MaxIdleTime,
-		MaxLifeTime:  c.MaxLifeTime,
-		ShowQuery:    c.ShowQuery,
-		Params:       c.Params,
+	cc := *c
+	if cc.Timeout <= 0 {
+		cc.Timeout = 1 * time.Minute
 	}
-
-	if clone.Timeout <= 0 {
-		clone.Timeout = 1 * time.Minute
+	if cc.MaxOpenConns <= 0 {
+		cc.MaxOpenConns = 50
 	}
-	if clone.MaxOpenConns <= 0 {
-		clone.MaxOpenConns = 50
+	if cc.MaxIdleConns <= 0 {
+		cc.MaxIdleConns = 50
 	}
-	if clone.MaxIdleConns <= 0 {
-		clone.MaxIdleConns = 50
+	if cc.MaxIdleTime <= 0 {
+		cc.MaxIdleTime = 5 * time.Second
 	}
-	if clone.MaxIdleTime <= 0 {
-		clone.MaxIdleTime = 5 * time.Second
+	if cc.MaxLifeTime <= 0 {
+		cc.MaxLifeTime = 3600 * time.Second
 	}
-	if clone.MaxLifeTime <= 0 {
-		clone.MaxLifeTime = 3600 * time.Second
-	}
-	return clone
+	return &cc
 }
 
 func (c *Config) getDSN() string {

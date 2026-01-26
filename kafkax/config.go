@@ -1,72 +1,22 @@
 package kafkax
 
-// About configuration
-// https://github.com/confluentinc/librdkafka/blob/master/CONFIGURATION.md
-// * = both Producer and Consumer
-const (
-	clientId              = "client.id"
-	bootstrapServers      = "bootstrap.servers"
-	reconnectBackoffMs    = "reconnect.backoff.ms"
-	reconnectBackoffMaxMs = "reconnect.backoff.max.ms"
-	connectionMaxIdleMs   = "connections.max.idle.ms"
-)
-
-// Producer
-const (
-	retries = "retries"
-	acks    = "acks"
-
-	// if enableIdempotence = true
-	// the configuration are adjusted automatically (if not modified by the user)
-	// max.in.flight.requests.per.connection=5 (must <=5)
-	// retries=INT32_MAX (must >0)
-	// acks=all
-	// queuing.strategy=fifo
-	enableIdempotence = "enable.idempotence"
-	messageMaxBytes   = "message.max.bytes"
-	requestTimeoutMs  = "request.timeout.ms"
-	deliveryTimeoutMs = "delivery.timeout.ms"
-)
-
-// Consumer
-const (
-	groupId          = "group.id"
-	autoOffsetReset  = "auto.offset.reset"
-	enableAutoCommit = "enable.auto.commit"
-	sessionTimeoutMs = "session.timeout.ms"
-)
-
-type AutoOffsetReset string
-
-const (
-	Earliest  AutoOffsetReset = "earliest"
-	Beginning AutoOffsetReset = "beginning"
-	Latest    AutoOffsetReset = "latest"
-	Error     AutoOffsetReset = "error"
-)
-
-func (a AutoOffsetReset) String() string {
-	return string(a)
-}
+import "time"
 
 type Config struct {
-	ClientId         string
-	BootstrapServers string
-	ProducerConfig   *ProducerConfig
-	ConsumerConfig   *ConsumerConfig
+	Brokers []string
+	GroupID string
+
+	// options
+	MinBytes         int
+	MaxBytes         int
+	MaxWait          time.Duration
+	CommitInterval   time.Duration
+	StartOffset      int64 // kafka.FirstOffset hoặc kafka.LastOffset
+	SessionTimeout   time.Duration
+	RebalanceTimeout time.Duration
 }
 
-type ProducerConfig struct {
-	Retries           int
-	Acks              int
-	EnableIdempotence bool
-	MessageMaxBytes   int
-	RequestTimeoutMs  int
-	DeliveryTimeoutMs int
-}
-
-type ConsumerConfig struct {
-	GroupID          string
-	AutoOffsetReset  AutoOffsetReset
-	EnableAutoCommit bool
+func (c *Config) clone() *Config {
+	clone := *c
+	return &clone
 }

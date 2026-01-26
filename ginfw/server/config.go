@@ -67,36 +67,24 @@ type Config struct {
 }
 
 func (c *Config) clone() *Config {
-	clone := &Config{
-		IsProduction:      c.IsProduction,
-		Port:              c.Port,
-		Proxies:           c.Proxies,
-		ShutdownTimeout:   c.ShutdownTimeout,
-		ReadHeaderTimeout: c.ReadTimeout,
-		ReadTimeout:       c.ReadTimeout,
-		WriteTimeout:      c.WriteTimeout,
-		IdleTimeout:       c.IdleTimeout,
-		Setup:             c.Setup,
-		Shutdown:          c.Shutdown,
-		Recovery:          c.Recovery,
+	cc := *c
+	if cc.Port == "" {
+		cc.Port = "8080"
 	}
-	if clone.Port == "" {
-		clone.Port = "8080"
+	if cc.ShutdownTimeout <= 0 {
+		cc.ShutdownTimeout = 15 * time.Second
 	}
-	if clone.ShutdownTimeout <= 0 {
-		clone.ShutdownTimeout = 15 * time.Second
+	if cc.ReadHeaderTimeout <= 0 {
+		cc.ReadHeaderTimeout = 5 * time.Second
 	}
-	if clone.ReadHeaderTimeout <= 0 {
-		clone.ReadHeaderTimeout = 5 * time.Second
+	if cc.ReadTimeout <= 0 {
+		cc.ReadTimeout = 10 * time.Second
 	}
-	if clone.ReadTimeout <= 0 {
-		clone.ReadTimeout = 10 * time.Second
+	if cc.WriteTimeout <= 0 {
+		cc.WriteTimeout = 15 * time.Second
 	}
-	if clone.WriteTimeout <= 0 {
-		clone.WriteTimeout = 15 * time.Second
+	if cc.IdleTimeout <= 0 {
+		cc.IdleTimeout = 60 * time.Second
 	}
-	if clone.IdleTimeout <= 0 {
-		clone.IdleTimeout = 60 * time.Second
-	}
-	return clone
+	return &cc
 }

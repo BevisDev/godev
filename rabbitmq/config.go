@@ -10,6 +10,11 @@ type Config struct {
 	VHost    string // VHost Virtual host
 }
 
+func (c *Config) clone() *Config {
+	cc := *c
+	return &cc
+}
+
 func (c *Config) URL() string {
 	return fmt.Sprintf("amqp://%s:%s@%s:%d/%s",
 		c.Username, c.Password, c.Host, c.Port, c.VHost)

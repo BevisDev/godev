@@ -52,22 +52,7 @@ type SkipGroup struct {
 }
 
 func (c *Config) clone() *Config {
-	clone := &Config{
-		IsProduction: c.IsProduction,
-		IsLocal:      c.IsLocal,
-		MaxSize:      c.MaxSize,
-		MaxBackups:   c.MaxBackups,
-		MaxAge:       c.MaxAge,
-		Compress:     c.Compress,
-		IsRotate:     c.IsRotate,
-		Cron:         c.Cron,
-		DirName:      c.DirName,
-		Filename:     c.Filename,
-		CallerConfig: CallerConfig{
-			Request:  c.CallerConfig.Request,
-			Response: c.CallerConfig.Response,
-		},
-	}
+	clone := *c
 	if clone.MaxSize <= 0 {
 		clone.MaxSize = 100
 	}
@@ -101,5 +86,5 @@ func (c *Config) clone() *Config {
 	if clone.CallerConfig.Response.External <= 0 {
 		clone.CallerConfig.Response.External = 6
 	}
-	return clone
+	return &clone
 }

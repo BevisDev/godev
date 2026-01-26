@@ -21,14 +21,9 @@ type Config struct {
 }
 
 func (c *Config) clone() *Config {
-	clone := &Config{
-		Dir:     c.Dir,
-		DBType:  c.DBType,
-		DB:      c.DB,
-		Timeout: c.Timeout,
+	cc := *c
+	if cc.Timeout <= 0 {
+		cc.Timeout = 1 * time.Minute
 	}
-	if c.Timeout <= 0 {
-		c.Timeout = 1 * time.Minute
-	}
-	return clone
+	return &cc
 }

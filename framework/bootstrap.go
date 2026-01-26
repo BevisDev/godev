@@ -127,7 +127,7 @@ func (b *Bootstrap) Init(ctx context.Context) error {
 	}
 	b.mu.Unlock()
 
-	// Run before init hooks
+	// Consume before init hooks
 	for _, fn := range b.beforeInit {
 		if err := fn(ctx); err != nil {
 			return fmt.Errorf("[bootstrap] before init failed: %w", err)
@@ -255,7 +255,7 @@ func (b *Bootstrap) Init(ctx context.Context) error {
 		return err
 	}
 
-	// Run after init hooks (services are now available, can set Setup/Shutdown here)
+	// Consume after init hooks (services are now available, can set Setup/Shutdown here)
 	for _, fn := range b.afterInit {
 		if err := fn(ctx); err != nil {
 			return fmt.Errorf("[bootstrap] after init hook failed: %w", err)
@@ -293,7 +293,7 @@ func (b *Bootstrap) Start(ctx context.Context) error {
 	}
 	b.mu.Unlock()
 
-	// Run before start hooks
+	// Consume before start hooks
 	for _, fn := range b.beforeStart {
 		if err := fn(ctx); err != nil {
 			return fmt.Errorf("[bootstrap] before start hook failed: %w", err)
@@ -317,7 +317,7 @@ func (b *Bootstrap) Start(ctx context.Context) error {
 		// We don't need to monitor errCh separately since Start() is non-blocking
 	}
 
-	// Run after start hooks
+	// Consume after start hooks
 	for _, fn := range b.afterStart {
 		if err := fn(ctx); err != nil {
 			return fmt.Errorf("after start hook failed: %w", err)
@@ -357,7 +357,7 @@ func (b *Bootstrap) Stop(ctx context.Context) error {
 
 	log.Println("[bootstrap] stopping services...")
 
-	// Run before stop hooks
+	// Consume before stop hooks
 	for _, fn := range b.beforeStop {
 		if err := fn(ctx); err != nil {
 			log.Printf("[bootstrap] before stop hook error: %v", err)
@@ -376,7 +376,7 @@ func (b *Bootstrap) Stop(ctx context.Context) error {
 	// Close services
 	b.closeServices()
 
-	// Run after stop hooks
+	// Consume after stop hooks
 	for _, fn := range b.afterStop {
 		if err := fn(ctx); err != nil {
 			log.Printf("[bootstrap] after stop hook error: %v", err)

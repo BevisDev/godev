@@ -20,23 +20,14 @@ type Config struct {
 
 // clone applies default values to the configuration if they are not set.
 func (c *Config) clone() *Config {
-	clone := &Config{
-		Host:     c.Host,
-		Port:     c.Port,
-		Password: c.Password,
-		DB:       c.DB,
-		PoolSize: c.PoolSize,
-		Timeout:  c.Timeout,
+	cc := *c
+	if cc.Timeout <= 0 {
+		cc.Timeout = 5 * time.Second
 	}
-
-	if clone.Timeout <= 0 {
-		clone.Timeout = 5 * time.Second
+	if cc.PoolSize <= 0 {
+		cc.PoolSize = 10
 	}
-	if clone.PoolSize <= 0 {
-		clone.PoolSize = 10
-	}
-
-	return clone
+	return &cc
 }
 
 // Addr returns the Redis server address in the format "host:port".

@@ -3,11 +3,15 @@ package kafkax
 import (
 	"context"
 	"errors"
+	"github.com/BevisDev/godev/consts"
+	"github.com/BevisDev/godev/utils"
 	"github.com/segmentio/kafka-go"
+	"log"
 )
 
 type Consumer struct {
 	reader *kafka.Reader
+	cf     *Config
 }
 
 func NewConsumer(
@@ -16,7 +20,6 @@ func NewConsumer(
 	topic string,
 // opts ...ConsumerOption,
 ) *Consumer {
-
 	cfg := kafka.ReaderConfig{
 		Brokers: brokers,
 		GroupID: groupID,
@@ -35,11 +38,21 @@ func NewConsumer(
 	}
 }
 
-func (c *Consumer) Close() error {
-	return c.reader.Close()
+func (c *Consumer) Close() {
+	if c.reader != nil {
+		_ = c.reader.Close()
+	}
 }
 
-func (c *Consumer) Run(ctx context.Context, handler Handler) error {
+func (c *Consumer) Consume(
+	ctx context.Context,
+	topics []string,
+	handler Handler,
+) error {
+	if len(topics) == 0 {
+		return errors.New("[kafkax] consume non topic")
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -50,19 +63,23 @@ func (c *Consumer) Run(ctx context.Context, handler Handler) error {
 				if errors.Is(err, context.Canceled) {
 					return nil
 				}
-				return err
+
+				log.Printf("[kafkax] consume message error: %v\n", err)
+				continue
 			}
 
-			headers := map[string][]byte{}
+			var rid string
 			for _, h := range msg.Headers {
-				headers[h.Key] = h.Value
+				if consts.XRequestID == h.Key {
+					rid = string(h.Value)
+				}
 			}
 
-			err = handler(ctx, Message{
+			ctxNew := utils.SetValueCtx(nil, consts.RID, rid)
+			err = handler(ctxNew, &Message{
 				Topic:     msg.Topic,
 				Key:       msg.Key,
 				Value:     msg.Value,
-				Headers:   headers,
 				Partition: msg.Partition,
 				Offset:    msg.Offset,
 			})
