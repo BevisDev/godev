@@ -28,12 +28,12 @@ func SetValueCtx(ctx context.Context, key string, value interface{}) context.Con
 
 func GetRID(ctx context.Context) string {
 	if ctx == nil {
-		return ""
+		return random.NewUUID()
 	}
 
 	rid, ok := ctx.Value(consts.RID).(string)
 	if !ok {
-		rid = ""
+		rid = random.NewUUID()
 	}
 
 	return rid

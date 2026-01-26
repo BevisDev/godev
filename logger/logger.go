@@ -52,11 +52,12 @@ type Logger struct {
 // New creates and returns a new logger instance using Zap.
 // Configures encoder format (JSON/console), output destination (file/stdout),
 // and log rotation via Lumberjack. Includes caller information and uses InfoLevel by default.
-func New(cf *Config) (*Logger, error) {
-	if cf == nil {
+func New(cfg *Config) (*Logger, error) {
+	if cfg == nil {
 		return nil, errors.New("config is nil")
 	}
 
+	cf := cfg.clone()
 	l := &Logger{
 		cf: cf,
 	}
@@ -135,7 +136,7 @@ func (l *Logger) writeSync() zapcore.WriteSyncer {
 
 	// job runner to rotate log every day
 	if l.cf.IsRotate {
-		l.cron.AddFunc("0 0 * * *", func() {
+		l.cron.AddFunc(l.cf.Cron, func() {
 			lumber.Filename = getFilename(l.cf.DirName, l.cf.Filename, l.cf.IsRotate)
 			if err := lumber.Rotate(); err != nil {
 				log.Printf("[logger] failed to rotate log file: %v", err)
