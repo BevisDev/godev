@@ -66,7 +66,7 @@ Main struct for loading configuration:
 | Field        | Description                                                                    |
 |--------------|--------------------------------------------------------------------------------|
 | `Path`       | Directory where the config file is located. Example: `"./configs"`.            |
-| `Extension`  | File type: `"yaml"`, `"json"`, `"toml"`, etc.                                  |
+| `Ext`        | File type: `"yaml"`, `"json"`, `"toml"`, etc.                                  |
 | `Target`     | Generic struct type to receive parsed values.                                  |
 | `AutoEnv`    | Enable automatic environment variable binding via Viper.                       |
 | `ReplaceEnv` | Replace `$VAR` placeholders in config values with environment variable values. |
@@ -100,10 +100,10 @@ type AppConfig struct {
 func main() {
 	profile := os.Getenv("GO_PROFILE") // e.g., "dev" or "prod"
 
-	result := config.MustLoad[*AppConfig](&config.Config{
-		Path:      "./configs",
-		Extension: "yaml",
-		Profile:   profile,
+	result, err := config.Load[AppConfig](&config.Config{
+		Path:    "./configs",
+		Ext:     "yaml",
+		Profile: profile,
 	})
 
 	log.Printf("Loaded config: %+v", result.Data)

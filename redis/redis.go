@@ -28,11 +28,12 @@ func New(cf *Config) (*Cache, error) {
 	if cf == nil {
 		return nil, errors.New("[redis] config is nil")
 	}
-	cf.withDefaults()
+	clone := cf.clone()
 
 	var c = &Cache{
-		cf: cf,
+		cf: clone,
 	}
+
 	rdb, err := c.connect()
 	if err != nil {
 		return nil, err

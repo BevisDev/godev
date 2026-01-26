@@ -76,39 +76,39 @@ func equalSlice[T comparable](a, b []T) bool {
 // =============================================================================
 
 func TestMustLoad_MissingFile(t *testing.T) {
-	assert.Panics(t, func() {
-		_ = MustLoad[*TestConfigStruct](&Config{
-			Path:      "./testdata1",
-			Extension: "yaml",
-			Profile:   "test",
-		})
+	_, err := Load[*TestConfigStruct](&Config{
+		Path:    "./testdata1",
+		Ext:     "yaml",
+		Profile: "test",
 	})
+	require.Error(t, err)
 }
 
 func TestMustLoad_NilConfig(t *testing.T) {
-	assert.Panics(t, func() {
-		_ = MustLoad[TestConfigStruct](nil)
-	})
+	_, err := Load[TestConfigStruct](nil)
+	require.Error(t, err)
 }
 
 func TestMustLoad_InvalidTarget(t *testing.T) {
-	assert.Panics(t, func() {
-		_ = MustLoad[string](&Config{
-			Path:      "./testdata",
-			Extension: "yaml",
-			Profile:   "test",
-		})
+	_, err := Load[string](&Config{
+		Path:    "./testdata",
+		Ext:     "yaml",
+		Profile: "test",
 	})
+	require.Error(t, err)
 }
 
 func TestMustLoad_Success(t *testing.T) {
-	resp := MustLoad[TestConfigStruct](&Config{
-		Path:      "./testdata",
-		Extension: "yaml",
-		Profile:   "test",
+	resp, err := Load[TestConfigStruct](&Config{
+		Path:    "./testdata",
+		Ext:     "yaml",
+		Profile: "test",
 	})
 
+	require.NoError(t, err)
+	require.NotNil(t, resp)
 	require.NotNil(t, resp.Data)
+
 	assert.Equal(t, "demo-app", resp.Data.AppName)
 	assert.NotEmpty(t, resp.Settings)
 }
@@ -127,15 +127,17 @@ func TestMustLoad_AutoEnv(t *testing.T) {
 	})
 	defer cleanup()
 
-	out := MustLoad[TestConfigStruct](&Config{
-		Path:      "./testdata",
-		Extension: "yaml",
-		Profile:   "test_env",
-		AutoEnv:   true,
+	out, err := Load[TestConfigStruct](&Config{
+		Path:    "./testdata",
+		Ext:     "yaml",
+		Profile: "test_env",
+		AutoEnv: true,
 	})
+	require.NoError(t, err)
 
 	cfg := out.Data
 	require.NotNil(t, cfg)
+
 	assert.Equal(t, "env-app", cfg.AppName)
 	assert.Equal(t, 9090, cfg.Port)
 	assert.Equal(t, "envName", cfg.SomeKey.ClientName)
@@ -153,15 +155,17 @@ func TestMustLoad_ReplaceEnv(t *testing.T) {
 	})
 	defer cleanup()
 
-	out := MustLoad[TestConfigStruct](&Config{
+	out, err := Load[TestConfigStruct](&Config{
 		Path:       "./testdata",
-		Extension:  "yaml",
+		Ext:        "yaml",
 		Profile:    "test_replace_env",
 		ReplaceEnv: true,
 	})
+	require.NoError(t, err)
 
 	cfg := out.Data
 	require.NotNil(t, cfg)
+
 	assert.Equal(t, "expanded-app", cfg.AppName)
 	assert.Equal(t, 8080, cfg.Port)
 }
@@ -173,9 +177,8 @@ func TestMustLoad_ReplaceEnv(t *testing.T) {
 func TestMustMapStruct_Panic(t *testing.T) {
 	cfMap := map[string]string{"name": "abc"}
 
-	assert.Panics(t, func() {
-		_ = MustMapStruct[*TestConfig](cfMap)
-	})
+	_, err := MapStruct[*TestConfig](cfMap)
+	require.Error(t, err)
 }
 
 func TestMapStruct_AllTypes(t *testing.T) {
@@ -193,7 +196,8 @@ func TestMapStruct_AllTypes(t *testing.T) {
 		"client_name":    "ClientApp",
 	}
 
-	cfg := MustMapStruct[TestConfig](cfMap)
+	cfg, err := MapStruct[TestConfig](cfMap)
+	require.NoError(t, err)
 	require.NotNil(t, cfg)
 
 	assert.Equal(t, "Alice", cfg.Name)
@@ -211,8 +215,10 @@ func TestMapStruct_AllTypes(t *testing.T) {
 }
 
 func TestMapStruct_EmptyMap(t *testing.T) {
-	cfg := MustMapStruct[TestConfig](map[string]string{})
+	cfg, err := MapStruct[TestConfig](map[string]string{})
+	require.NoError(t, err)
 	require.NotNil(t, cfg)
+
 	assert.Empty(t, cfg.Name)
 	assert.Zero(t, cfg.Age)
 	assert.False(t, cfg.Active)
@@ -221,29 +227,29 @@ func TestMapStruct_EmptyMap(t *testing.T) {
 }
 
 func TestMapStruct_UnknownKeysIgnored(t *testing.T) {
-	cfMap := map[string]string{
+	cfg, err := MapStruct[TestConfig](map[string]string{
 		"name":        "Alice",
 		"unknown_key": "ignored",
-	}
+	})
+	require.NoError(t, err)
 
-	cfg := MustMapStruct[TestConfig](cfMap)
-	require.NotNil(t, cfg)
 	assert.Equal(t, "Alice", cfg.Name)
 }
 
 func TestMapStruct_BoolVariants(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    string
-		expected bool
+		name      string
+		input     string
+		expectErr bool
+		expected  bool
 	}{
-		{"true", "true", true},
-		{"1", "1", true},
-		{"yes", "yes", true},
-		{"y", "y", true},
-		{"false", "false", false},
-		{"0", "0", false},
-		{"other", "other", false},
+		{"true", "true", false, true},
+		{"1", "1", false, true},
+		{"yes", "yes", false, true},
+		{"y", "y", false, true},
+		{"false", "false", false, false},
+		{"0", "0", false, false},
+		{"other", "other", false, false},
 	}
 
 	for _, tt := range tests {
@@ -251,8 +257,12 @@ func TestMapStruct_BoolVariants(t *testing.T) {
 			type C struct {
 				Active bool `config:"active"`
 			}
-			cfg := MustMapStruct[C](map[string]string{"active": tt.input})
-			require.NotNil(t, cfg)
+			cfg, err := MapStruct[C](map[string]string{"active": tt.input})
+			if tt.expectErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
 			assert.Equal(t, tt.expected, cfg.Active)
 		})
 	}

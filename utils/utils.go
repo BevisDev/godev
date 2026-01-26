@@ -28,15 +28,15 @@ func SetValueCtx(ctx context.Context, key string, value interface{}) context.Con
 
 func GetRID(ctx context.Context) string {
 	if ctx == nil {
-		return random.NewUUID()
+		return ""
 	}
 
-	state, ok := ctx.Value(consts.RID).(string)
+	rid, ok := ctx.Value(consts.RID).(string)
 	if !ok {
-		state = random.NewUUID()
+		rid = ""
 	}
 
-	return state
+	return rid
 }
 
 func NewCtxTimeout(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {

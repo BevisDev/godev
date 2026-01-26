@@ -66,23 +66,37 @@ type Config struct {
 	Recovery func(c *gin.Context, err any)
 }
 
-func (c *Config) withDefaults() {
-	if c.Port == "" {
-		c.Port = "8080"
+func (c *Config) clone() *Config {
+	clone := &Config{
+		IsProduction:      c.IsProduction,
+		Port:              c.Port,
+		Proxies:           c.Proxies,
+		ShutdownTimeout:   c.ShutdownTimeout,
+		ReadHeaderTimeout: c.ReadTimeout,
+		ReadTimeout:       c.ReadTimeout,
+		WriteTimeout:      c.WriteTimeout,
+		IdleTimeout:       c.IdleTimeout,
+		Setup:             c.Setup,
+		Shutdown:          c.Shutdown,
+		Recovery:          c.Recovery,
 	}
-	if c.ShutdownTimeout <= 0 {
-		c.ShutdownTimeout = 15 * time.Second
+	if clone.Port == "" {
+		clone.Port = "8080"
 	}
-	if c.ReadHeaderTimeout <= 0 {
-		c.ReadHeaderTimeout = 5 * time.Second
+	if clone.ShutdownTimeout <= 0 {
+		clone.ShutdownTimeout = 15 * time.Second
 	}
-	if c.ReadTimeout <= 0 {
-		c.ReadTimeout = 10 * time.Second
+	if clone.ReadHeaderTimeout <= 0 {
+		clone.ReadHeaderTimeout = 5 * time.Second
 	}
-	if c.WriteTimeout <= 0 {
-		c.WriteTimeout = 15 * time.Second
+	if clone.ReadTimeout <= 0 {
+		clone.ReadTimeout = 10 * time.Second
 	}
-	if c.IdleTimeout <= 0 {
-		c.IdleTimeout = 60 * time.Second
+	if clone.WriteTimeout <= 0 {
+		clone.WriteTimeout = 15 * time.Second
 	}
+	if clone.IdleTimeout <= 0 {
+		clone.IdleTimeout = 60 * time.Second
+	}
+	return clone
 }

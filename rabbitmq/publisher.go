@@ -55,10 +55,10 @@ func (p *Publisher) publish(ctx context.Context,
 			ContentType: contentType,
 			Body:        body,
 			Headers: amqp.Table{
-				XRid: utils.GetRID(ctx),
+				consts.XRequestID: utils.GetRID(ctx),
 			},
 		}
-		if p.mq.opt.persistentMsg {
+		if p.mq.persistentMsg {
 			publishing.DeliveryMode = amqp.Persistent
 		}
 

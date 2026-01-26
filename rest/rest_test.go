@@ -125,9 +125,9 @@ func TestRestClient_Server500Error(t *testing.T) {
 		URL(server.URL).
 		GET(context.Background())
 	require.Error(t, err)
-	httpErr, ok := AsHttpError(err)
+	httpErr, ok := AsHTTPError(err)
 	require.True(t, ok)
-	assert.Equal(t, 500, httpErr.StatusCode)
+	assert.Equal(t, 500, httpErr.Status)
 }
 
 func TestRestClient_Post(t *testing.T) {
@@ -241,9 +241,9 @@ func TestExecute_GatewayTimeout504(t *testing.T) {
 		GET(context.Background())
 	require.Error(t, err)
 
-	httpErr, ok := AsHttpError(err)
-	require.True(t, ok, "expected HttpError, got %T", err)
-	assert.Equal(t, 504, httpErr.StatusCode)
+	httpErr, ok := AsHTTPError(err)
+	require.True(t, ok, "expected HTTPError, got %T", err)
+	assert.Equal(t, 504, httpErr.Status)
 	assert.Contains(t, httpErr.Body, "504 Gateway Time-out")
 }
 
@@ -276,7 +276,7 @@ func TestExecute_ConnectionResetByPeer(t *testing.T) {
 
 func TestAsHttpError_NonHttpError(t *testing.T) {
 	plainErr := errors.New("plain error")
-	httpErr, ok := AsHttpError(plainErr)
+	httpErr, ok := AsHTTPError(plainErr)
 	assert.False(t, ok)
 	assert.Nil(t, httpErr)
 }

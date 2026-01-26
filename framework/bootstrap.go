@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/BevisDev/godev/kafkax"
 	"log"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/BevisDev/godev/kafkax"
 
 	"github.com/BevisDev/godev/database"
 	"github.com/BevisDev/godev/ginfw/server"
@@ -27,7 +28,7 @@ import (
 
 // Bootstrap manages application lifecycle and dependencies.
 type Bootstrap struct {
-	opts *options
+	*options
 
 	// Core services
 	Logger        *logger.Logger
@@ -63,13 +64,13 @@ type Bootstrap struct {
 func New(opts ...Option) *Bootstrap {
 	ctx, cancel := context.WithCancel(context.Background())
 	b := &Bootstrap{
-		opts:   new(options),
-		ctx:    ctx,
-		cancel: cancel,
+		options: new(options),
+		ctx:     ctx,
+		cancel:  cancel,
 	}
 
 	for _, opt := range opts {
-		opt(b.opts)
+		opt(b.options)
 	}
 
 	return b
@@ -136,17 +137,17 @@ func (b *Bootstrap) Init(ctx context.Context) error {
 	log.Println("[bootstrap] initializing services...")
 
 	// Logger: must be initialized first (synchronously) for other services
-	if b.opts.loggerConf != nil && b.Logger == nil {
-		b.Logger, _ = logger.New(b.opts.loggerConf)
+	if b.loggerConf != nil && b.Logger == nil {
+		b.Logger, _ = logger.New(b.loggerConf)
 	}
 
 	// Init services in parallel (except logger which must be first)
 	g, ctx := errgroup.WithContext(ctx)
 
 	// Database
-	if b.opts.dbConf != nil && b.Database == nil {
+	if b.dbConf != nil && b.Database == nil {
 		g.Go(func() error {
-			db, err := database.New(b.opts.dbConf)
+			db, err := database.New(b.dbConf)
 			if err != nil {
 				return fmt.Errorf("[database] %w", err)
 			}
@@ -156,9 +157,9 @@ func (b *Bootstrap) Init(ctx context.Context) error {
 	}
 
 	// Redis
-	if b.opts.redisConf != nil && b.Redis == nil {
+	if b.redisConf != nil && b.Redis == nil {
 		g.Go(func() error {
-			cache, err := redis.New(b.opts.redisConf)
+			cache, err := redis.New(b.redisConf)
 			if err != nil {
 				return fmt.Errorf("[redis] %w", err)
 			}
@@ -168,9 +169,9 @@ func (b *Bootstrap) Init(ctx context.Context) error {
 	}
 
 	// RabbitMQ
-	if b.opts.rabbitmqConf != nil && b.RabbitMQ == nil {
+	if b.rabbitmqConf != nil && b.RabbitMQ == nil {
 		g.Go(func() error {
-			mq, err := rabbitmq.New(b.opts.rabbitmqConf)
+			mq, err := rabbitmq.New(b.rabbitmqConf)
 			if err != nil {
 				return fmt.Errorf("[rabbitmq] %w", err)
 			}
@@ -180,27 +181,27 @@ func (b *Bootstrap) Init(ctx context.Context) error {
 	}
 
 	// Kafka
-	if b.opts.kafkaConf != nil && b.Kafka == nil {
+	if b.kafkaConf != nil && b.Kafka == nil {
 		g.Go(func() error {
-			kafka, err := kafkax.New(b.opts.kafkaConf)
+			kafka, err := kafkax.New(b.kafkaConf)
 			if err != nil {
 				return fmt.Errorf("[kafka] %w", err)
 			}
 			b.Kafka = kafka
 			return nil
 		})
-	} else if b.opts.kafkaProducerConf != nil && b.KafkaProducer == nil {
+	} else if b.kafkaProducerConf != nil && b.KafkaProducer == nil {
 		g.Go(func() error {
-			p, err := kafkax.NewProducer(b.opts.kafkaProducerConf)
+			p, err := kafkax.NewProducer(b.kafkaProducerConf)
 			if err != nil {
 				return fmt.Errorf("[kafka-producer] %w", err)
 			}
 			b.KafkaProducer = p
 			return nil
 		})
-	} else if b.opts.kafkaConsumerConf != nil && b.KafkaConsumer == nil {
+	} else if b.kafkaConsumerConf != nil && b.KafkaConsumer == nil {
 		g.Go(func() error {
-			c, err := kafkax.NewConsumer(b.opts.kafkaConsumerConf)
+			c, err := kafkax.NewConsumer(b.kafkaConsumerConf)
 			if err != nil {
 				return fmt.Errorf("[kafka-consumer] %w", err)
 			}
@@ -210,17 +211,17 @@ func (b *Bootstrap) Init(ctx context.Context) error {
 	}
 
 	// Keycloak
-	if b.opts.keycloakConf != nil && b.Keycloak == nil {
+	if b.keycloakConf != nil && b.Keycloak == nil {
 		g.Go(func() error {
-			b.Keycloak = keycloak.New(b.opts.keycloakConf)
+			b.Keycloak = keycloak.New(b.keycloakConf)
 			return nil
 		})
 	}
 
 	// Scheduler
-	if b.opts.schedulerOn && b.Scheduler == nil {
+	if b.schedulerOn && b.Scheduler == nil {
 		g.Go(func() error {
-			b.Scheduler = scheduler.New(b.opts.schedulerOpt...)
+			b.Scheduler = scheduler.New(b.schedulerOpt...)
 			return nil
 		})
 	}
@@ -231,8 +232,8 @@ func (b *Bootstrap) Init(ctx context.Context) error {
 
 	// REST client: init after logger is ready (may need logger)
 	// If logger is not in options, inject it automatically
-	if b.opts.restOn && b.Rest == nil {
-		opts := b.opts.restOpts
+	if b.restOn && b.Rest == nil {
+		opts := b.restOpts
 		// Check if WithLogger is already in options by checking if logger was passed
 		// Since we can't easily check, we'll always inject logger if available
 		// (rest.New will handle duplicates gracefully or user can avoid passing nil)
@@ -251,8 +252,8 @@ func (b *Bootstrap) Init(ctx context.Context) error {
 	}
 
 	// Ensure server config exists (for setting Setup/Shutdown later)
-	if b.opts.serverConf == nil {
-		b.opts.serverConf = &server.Config{
+	if b.serverConf == nil {
+		b.serverConf = &server.Config{
 			Shutdown: func(ctx context.Context) error {
 				b.closeServices()
 				return nil
@@ -296,8 +297,8 @@ func (b *Bootstrap) Start(ctx context.Context) error {
 	}
 
 	// Start HTTP server if configured
-	if b.opts.serverConf != nil {
-		b.HTTPApp = server.New(b.opts.serverConf)
+	if b.serverConf != nil {
+		b.HTTPApp = server.New(b.serverConf)
 		if err := b.HTTPApp.Start(); err != nil {
 			return fmt.Errorf("[bootstrap] failed to start HTTP server: %w", err)
 		}
@@ -432,7 +433,7 @@ func (b *Bootstrap) Health(ctx context.Context) map[string]interface{} {
 		}
 	}
 
-	for _, entry := range b.opts.healthCheckers {
+	for _, entry := range b.healthCheckers {
 		if err := entry.fn(ctx); err != nil {
 			health[entry.name] = err
 		} else {
@@ -497,18 +498,18 @@ func (b *Bootstrap) closeServices() {
 // This allows Setup to access initialized services (Logger, Database, Redis, etc.).
 // Should be called in AfterInit hook or after Init() completes.
 func (b *Bootstrap) SetServerSetup(setup func(r *gin.Engine)) {
-	if b.opts.serverConf == nil {
-		b.opts.serverConf = &server.Config{}
+	if b.serverConf == nil {
+		b.serverConf = &server.Config{}
 	}
-	b.opts.serverConf.Setup = setup
+	b.serverConf.Setup = setup
 }
 
 // SetServerShutdown sets the server Shutdown function after services are initialized.
 // This allows Shutdown to access initialized services for cleanup.
 // Should be called in AfterInit hook or after Init() completes.
 func (b *Bootstrap) SetServerShutdown(shutdown func(ctx context.Context) error) {
-	if b.opts.serverConf == nil {
-		b.opts.serverConf = &server.Config{}
+	if b.serverConf == nil {
+		b.serverConf = &server.Config{}
 	}
-	b.opts.serverConf.Shutdown = shutdown
+	b.serverConf.Shutdown = shutdown
 }

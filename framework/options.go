@@ -130,7 +130,7 @@ func WithKafkaProducer(cfg *kafkax.Config) Option {
 	}
 }
 
-// WithKafkaConsumer configures the Kafka Consumer connection.
+// WithKafkaConsumer configures the Kafka Handler connection.
 func WithKafkaConsumer(cfg *kafkax.Config) Option {
 	return func(o *options) {
 		o.kafkaConsumerConf = cfg

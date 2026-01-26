@@ -16,7 +16,7 @@ type User struct {
 	Age  int
 }
 
-func TestNewCtx_ShouldReturnContextWithState(t *testing.T) {
+func TestNewCtx_ShouldReturnContextWithRID(t *testing.T) {
 	ctx := NewCtx()
 	state := ctx.Value(consts.RID)
 
@@ -25,27 +25,27 @@ func TestNewCtx_ShouldReturnContextWithState(t *testing.T) {
 	}
 }
 
-func TestGetState_WhenCtxNil(t *testing.T) {
+func TestGetRID_WhenCtxNil(t *testing.T) {
 	state := GetRID(nil)
-	if state == "" {
+	if state != "" {
 		t.Error("Expected non-empty state")
 	}
 }
 
-func TestGetState_WhenCtxHasNoState(t *testing.T) {
+func TestGetRID_WhenCtxHasNoRID(t *testing.T) {
 	ctx := context.Background()
-	state := GetRID(ctx)
-	if state == "" {
-		t.Error("Expected generated state")
+	rid := GetRID(ctx)
+	if rid != "" {
+		t.Error("Expected generated rid")
 	}
 }
 
-func TestGetState_WhenCtxHasState(t *testing.T) {
-	expected := "fixed-state"
+func TestGetRID_WhenCtxHasRID(t *testing.T) {
+	expected := "fixed-rid"
 	ctx := context.WithValue(context.Background(), consts.RID, expected)
-	state := GetRID(ctx)
-	if state != expected {
-		t.Errorf("GetRID() = %q; want %q", state, expected)
+	rid := GetRID(ctx)
+	if rid != expected {
+		t.Errorf("GetRID() = %q; want %q", rid, expected)
 	}
 }
 

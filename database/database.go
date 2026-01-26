@@ -42,7 +42,7 @@ func New(cfg *Config) (*Database, error) {
 	}
 
 	// Apply defaults
-	cfg.withDefaults()
+	cfg.clone()
 
 	db := &Database{Config: cfg}
 

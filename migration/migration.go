@@ -28,9 +28,9 @@ func New(cf *Config) (*Migration, error) {
 	if cf == nil {
 		return nil, errors.New("[migration] config is nil")
 	}
-	cf.withDefaults()
+	clone := cf.clone()
 
-	m := Migration{cf: cf}
+	m := Migration{cf: clone}
 
 	if err := m.Init(); err != nil {
 		return nil, err

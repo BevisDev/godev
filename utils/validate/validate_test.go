@@ -372,7 +372,7 @@ func TestIsValidFileName(t *testing.T) {
 			want:       true,
 		},
 		{
-			name:       "Extension with number",
+			name:       "Ext with number",
 			filename:   "archive.v2",
 			allowedExt: []string{"v2"},
 			want:       true,

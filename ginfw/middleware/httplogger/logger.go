@@ -46,8 +46,13 @@ func (h *HttpLogger) Handler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		startTime := time.Now()
 
-		// Generate RID per request and attach to context
-		rid := random.NewUUID()
+		// Get or generate Request ID
+		rid := c.Request.Header.Get(consts.XRequestID)
+		if rid == "" {
+			rid = random.NewUUID()
+		}
+
+		// Attach RID to context.Context
 		ctx := utils.SetValueCtx(c.Request.Context(), consts.RID, rid)
 		c.Request = c.Request.WithContext(ctx)
 

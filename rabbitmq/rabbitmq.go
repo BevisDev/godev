@@ -15,19 +15,13 @@ type ConsumerHandler func(ctx context.Context, msg Message) error
 type ChannelHandler func(ch *amqp.Channel) error
 
 type RabbitMQ struct {
+	*options
 	cf         *Config
-	opt        *options
 	Queue      *Queue
 	Publisher  *Publisher
 	connection *amqp.Connection
 	mu         sync.RWMutex
 }
-
-const (
-	// XRid is the header key used to store the RequestID (or trace ID)
-	// when publishing, and consumers to retrieve it for logging or tracing.
-	XRid = "x-rid"
-)
 
 // New creates a new RabbitMQ client using the provided configuration.
 //
@@ -47,8 +41,8 @@ func New(cf *Config, opts ...Option) (*RabbitMQ, error) {
 	}
 
 	r := &RabbitMQ{
-		cf:  cf,
-		opt: opt,
+		cf:      cf,
+		options: opt,
 	}
 	conn, err := r.connect()
 	if err != nil {

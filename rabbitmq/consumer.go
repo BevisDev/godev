@@ -12,8 +12,8 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-// Consumer defines the interface for message consumers.
-type Consumer interface {
+// Handler defines the interface for message consumers.
+type Handler interface {
 	// Queue returns the queue name to consume from.
 	Queue() string
 
@@ -21,28 +21,28 @@ type Consumer interface {
 	Handle(ctx context.Context, msg Message) error
 }
 
-// ConsumerManager manages multiple consumers with auto-reconnect and error handling.
-type ConsumerManager struct {
+// Consumer manages multiple consumers with auto-reconnect and error handling.
+type Consumer struct {
 	*RabbitMQ
-	consumers []Consumer
+	consumers []Handler
 	wg        sync.WaitGroup
 }
 
-// Register creates a new ConsumerManager for the given RabbitMQ instance.
-func Register(r *RabbitMQ) *ConsumerManager {
-	return &ConsumerManager{
+// Register creates a new Consumer for the given RabbitMQ instance.
+func Register(r *RabbitMQ) *Consumer {
+	return &Consumer{
 		RabbitMQ:  r,
-		consumers: make([]Consumer, 0),
+		consumers: make([]Handler, 0),
 	}
 }
 
 // Register adds one or more consumers to the manager.
-func (m *ConsumerManager) Register(consumers ...Consumer) {
+func (m *Consumer) Register(consumers ...Handler) {
 	m.consumers = append(m.consumers, consumers...)
 }
 
 // Start starts all registered consumers in separate goroutines until context is canceled.
-func (m *ConsumerManager) Start(ctx context.Context) {
+func (m *Consumer) Start(ctx context.Context) {
 	if len(m.consumers) == 0 {
 		log.Println("[rabbitmq] no consumers registered")
 		return
@@ -63,7 +63,7 @@ func (m *ConsumerManager) Start(ctx context.Context) {
 }
 
 // run runs a single consumer with auto error handling and reconnection.
-func (m *ConsumerManager) run(ctx context.Context, consumer Consumer) {
+func (m *Consumer) run(ctx context.Context, consumer Handler) {
 	defer m.wg.Done()
 
 	queueName := consumer.Queue()
@@ -107,7 +107,7 @@ func (m *ConsumerManager) run(ctx context.Context, consumer Consumer) {
 }
 
 // consume sets up the consumer and processes messages from the queue.
-func (m *ConsumerManager) consume(ctx context.Context, consumer Consumer) error {
+func (m *Consumer) consume(ctx context.Context, consumer Handler) error {
 	queueName := consumer.Queue()
 
 	ch, err := m.GetChannel()
@@ -163,10 +163,10 @@ func (m *ConsumerManager) consume(ctx context.Context, consumer Consumer) error 
 }
 
 // createMessageContext creates a new context with x-rid from message headers.
-func (m *ConsumerManager) createMessageContext(msg Message) context.Context {
+func (m *Consumer) createMessageContext(msg Message) context.Context {
 	newCtx := utils.NewCtx()
-	if xRid := msg.Header(XRid); xRid != nil {
-		if s, ok := xRid.(string); ok && s != "" {
+	if xRID := msg.Header(consts.XRequestID); xRID != nil {
+		if s, ok := xRID.(string); ok && s != "" {
 			newCtx = utils.SetValueCtx(newCtx, consts.RID, s)
 		}
 	}

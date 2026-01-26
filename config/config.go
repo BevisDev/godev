@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"reflect"
 	"strings"
@@ -15,7 +16,7 @@ import (
 // It is typically used with Viper or similar tools to load a config file into a target struct.
 type Config struct {
 	Path       string // Path is the directory path where the config file is located (e.g., "./configs").
-	Extension  string // Extension is the type of the config file (e.g., "yaml", "json", "toml").
+	Ext        string // Ext is the type of the config file (e.g., "yaml", "json", "toml").
 	AutoEnv    bool   // AutoEnv is used for env overrides (APP_PORT overrides app.port)
 	ReplaceEnv bool   // ReplaceEnv is used for replacing placeholders like "$DB_DSN"
 	Profile    string // Profile is config file name (without extension), e.g., "dev", "prod".
@@ -26,18 +27,18 @@ type Response[T any] struct {
 	Data     *T
 }
 
-// MustLoad loads configuration and panics on failure.
+// Load loads configuration and panics on failure.
 // It reads the config file, applies env overrides, expands $VARS,
 // and unmarshal the result into the target struct.
-func MustLoad[T any](cf *Config) Response[T] {
+func Load[T any](cf *Config) (Response[T], error) {
 	if cf == nil {
-		panic("config is nil")
+		return Response[T]{}, fmt.Errorf("config is nil")
 	}
 
 	v := viper.New()
 	v.AddConfigPath(cf.Path)
 	v.SetConfigName(cf.Profile)
-	v.SetConfigType(cf.Extension)
+	v.SetConfigType(cf.Ext)
 
 	// BINDING ENV
 	if cf.AutoEnv {
@@ -47,75 +48,84 @@ func MustLoad[T any](cf *Config) Response[T] {
 
 	// READ CONFIG
 	if err := v.ReadInConfig(); err != nil {
-		panic(err)
+		return Response[T]{}, fmt.Errorf("[config] failed to read: %v", err)
 	}
+
+	// ALL SETTINGS
+	settings := v.AllSettings()
 
 	// REPLACE ENV
 	if cf.ReplaceEnv {
-		settings := v.AllSettings()
-		replaceVars(settings)
+		replaceSettings(settings)
 		err := v.MergeConfigMap(settings)
 		if err != nil {
-			panic(err)
+			return Response[T]{}, fmt.Errorf("[config] failed to merge: %v", err)
 		}
+	}
+
+	// RETURN
+	var out Response[T]
+	if settings == nil || len(settings) <= 0 {
+		return Response[T]{}, fmt.Errorf("[config] settings is empty")
 	}
 
 	var t T
 	err := v.Unmarshal(&t)
 	if err != nil {
-		panic(err)
+		return Response[T]{}, fmt.Errorf("[config] failed to unmarshal: %v", err)
 	}
 
-	// RETURN
-	var out Response[T]
 	out.Data = &t
 	out.Settings = v.AllSettings()
-	return out
+	return out, nil
 }
 
-func replaceVars(data interface{}) {
-	switch v := data.(type) {
-	case map[string]interface{}:
-		for key, value := range v {
-			v[key] = replace(value)
-		}
-	case []interface{}:
-		for i, value := range v {
-			v[i] = replace(value)
-		}
+func replaceSettings(data map[string]interface{}) {
+	for k, v := range data {
+		data[k] = replace(v)
 	}
 }
 
 func replace(value interface{}) interface{} {
-	switch v := value.(type) {
+	switch val := value.(type) {
 	case string:
-		return os.ExpandEnv(v)
+		return os.ExpandEnv(val)
+
 	case map[string]interface{}:
-		replaceVars(v)
+		for k, v := range val {
+			val[k] = replace(v)
+		}
+		return val
+
 	case []interface{}:
-		replaceVars(v)
+		for i, v := range val {
+			val[i] = replace(v)
+		}
+		return val
+
+	default:
+		return value
 	}
-	return value
 }
 
-func MustMapStruct[T any](m map[string]string) *T {
+func MapStruct[T any](m map[string]string) (*T, error) {
 	var dest T
 	err := mapStruct(&dest, m)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	return &dest
+	return &dest, nil
 }
 
 func mapStruct(target interface{}, cfMap map[string]string) error {
 	rv := reflect.ValueOf(target)
 	if rv.Kind() != reflect.Ptr || rv.IsNil() {
-		return errors.New("target must be a non-nil pointer to a struct")
+		return errors.New("[config] target must be a non-nil pointer to a struct")
 	}
 
 	v := rv.Elem()
 	if v.Kind() != reflect.Struct {
-		return errors.New("target must point to a struct")
+		return errors.New("[config] target must point to a struct")
 	}
 
 	t := v.Type()

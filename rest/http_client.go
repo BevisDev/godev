@@ -153,7 +153,7 @@ func (r *HTTPRequest[T]) restTemplate(c context.Context) (HTTPResponse[T], error
 	// log HTTPRequest
 	r.logRequest(body)
 
-	ctx, cancel := utils.NewCtxTimeout(c, r.client.opt.timeout)
+	ctx, cancel := utils.NewCtxTimeout(c, r.client.timeout)
 	defer cancel()
 
 	// create HTTPRequest
@@ -219,7 +219,7 @@ func (r *HTTPRequest[T]) createHTTPRequest(
 }
 
 func (r *HTTPRequest[T]) logRequest(body string) {
-	if r.client.opt.useLog {
+	if r.client.useLog {
 		reqLog := &logger.RequestLogger{
 			RID:    r.rid,
 			URL:    r.url,
@@ -229,13 +229,13 @@ func (r *HTTPRequest[T]) logRequest(body string) {
 		if !validate.IsNilOrEmpty(r.queryParams) {
 			reqLog.Query = str.ToString(r.queryParams)
 		}
-		if !r.client.opt.skipHeader {
+		if !r.client.skipHeader {
 			reqLog.Header = r.headers
 		}
 		if r.logBody(r.headers[consts.ContentType]) {
 			reqLog.Body = body
 		}
-		r.client.opt.logger.LogExtRequest(reqLog)
+		r.client.logger.LogExtRequest(reqLog)
 		return
 	}
 
@@ -249,7 +249,7 @@ func (r *HTTPRequest[T]) logRequest(body string) {
 	if !validate.IsNilOrEmpty(r.queryParams) {
 		fmt.Fprintf(&sb, "%s: %v\n", consts.Query, r.queryParams)
 	}
-	if !r.client.opt.skipHeader {
+	if !r.client.skipHeader {
 		fmt.Fprintf(&sb, "%s: %s\n", consts.Header, r.headers)
 	}
 	if r.logBody(r.headers[consts.ContentType]) {
@@ -288,9 +288,9 @@ func (r *HTTPRequest[T]) execute(request *http.Request) (HTTPResponse[T], error)
 
 	// check error
 	if resp.StatusCode >= 400 {
-		return resp, &HttpError{
-			StatusCode: resp.StatusCode,
-			Body:       resp.Body,
+		return resp, &HTTPError{
+			Status: resp.StatusCode,
+			Body:   resp.Body,
 		}
 	}
 
@@ -327,26 +327,26 @@ func (r *HTTPRequest[T]) getData(raw []byte) (T, error) {
 }
 
 func (r *HTTPRequest[T]) logResponse(response *http.Response, body string) {
-	if r.client.opt.useLog {
+	if r.client.useLog {
 		respLogger := &logger.ResponseLogger{
 			RID:      r.rid,
 			Status:   response.StatusCode,
 			Duration: time.Since(r.startTime),
 		}
-		if !r.client.opt.skipHeader {
+		if !r.client.skipHeader {
 			respLogger.Header = response.Header
 		}
 		if r.logBody(response.Header.Get(consts.ContentType)) {
 			respLogger.Body = body
 		}
-		r.client.opt.logger.LogExtResponse(respLogger)
+		r.client.logger.LogExtResponse(respLogger)
 	} else {
 		var sb strings.Builder
 		sb.WriteString("\n========== RESPONSE INFO ==========\n")
 		fmt.Fprintf(&sb, "%s: %s\n", consts.RID, r.rid)
 		fmt.Fprintf(&sb, "%s: %d\n", consts.Status, response.StatusCode)
 		fmt.Fprintf(&sb, "%s: %s\n", consts.Duration, time.Since(r.startTime))
-		if !r.client.opt.skipHeader {
+		if !r.client.skipHeader {
 			fmt.Fprintf(&sb, "%s: %s\n", consts.Header, response.Header)
 		}
 		if r.logBody(response.Header.Get(consts.ContentType)) {
@@ -359,26 +359,26 @@ func (r *HTTPRequest[T]) logResponse(response *http.Response, body string) {
 
 func (r *HTTPRequest[T]) logBody(contentType string) bool {
 	// ---- skip by content-type ----
-	for c, _ := range r.client.opt.skipBodyByContentTypes {
+	for c := range r.client.skipBodyByContentTypes {
 		if strings.HasPrefix(contentType, c) {
 			return false
 		}
 	}
 
 	// ---- check default content-type ----
-	if !r.client.opt.skipDefaultContentTypeCheck && utils.SkipContentType(contentType) {
+	if !r.client.skipDefaultContentTypeCheck && utils.SkipContentType(contentType) {
 		return false
 	}
 
 	// ---- skip by path ----
-	if len(r.client.opt.skipBodyByPaths) > 0 {
+	if len(r.client.skipBodyByPaths) > 0 {
 		parsed, err := url.Parse(r.url)
 		if err != nil {
 			return true
 		}
 		path := parsed.Path
 
-		for p, _ := range r.client.opt.skipBodyByPaths {
+		for p := range r.client.skipBodyByPaths {
 			if p == path {
 				return false
 			}

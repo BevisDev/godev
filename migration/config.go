@@ -20,8 +20,15 @@ type Config struct {
 	Timeout time.Duration
 }
 
-func (c *Config) withDefaults() {
+func (c *Config) clone() *Config {
+	clone := &Config{
+		Dir:     c.Dir,
+		DBType:  c.DBType,
+		DB:      c.DB,
+		Timeout: c.Timeout,
+	}
 	if c.Timeout <= 0 {
 		c.Timeout = 1 * time.Minute
 	}
+	return clone
 }
