@@ -28,20 +28,3 @@ func New(cf *Config) (*Kafka, error) {
 
 	return c, nil
 }
-
-func (k *Kafka) Close() {
-	if k.producer != nil {
-		k.producer.Close()
-	}
-	if k.consumer != nil {
-		k.consumer.Close()
-	}
-}
-
-func (k *Kafka) GetProducer() *Producer {
-	return k.producer
-}
-
-func (k *Kafka) GetConsumer() *Consumer {
-	return k.consumer
-}
