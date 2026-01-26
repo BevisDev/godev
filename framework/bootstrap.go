@@ -137,8 +137,17 @@ func (b *Bootstrap) Init(ctx context.Context) error {
 	log.Println("[bootstrap] initializing services...")
 
 	// Logger: must be initialized first (synchronously) for other services
-	if b.loggerConf != nil && b.Logger == nil {
-		b.Logger, _ = logger.New(b.loggerConf)
+	if b.Logger == nil {
+		if b.loggerConf == nil {
+			b.loggerConf = &logger.Config{
+				IsLocal: true,
+			}
+		}
+		l, err := logger.New(b.loggerConf)
+		if err != nil {
+			return err
+		}
+		b.Logger = l
 	}
 
 	// Init services in parallel (except logger which must be first)
@@ -226,22 +235,24 @@ func (b *Bootstrap) Init(ctx context.Context) error {
 		})
 	}
 
-	if err := g.Wait(); err != nil {
-		return err
-	}
-
 	// REST client: init after logger is ready (may need logger)
 	// If logger is not in options, inject it automatically
 	if b.restOn && b.Rest == nil {
-		opts := b.restOpts
-		// Check if WithLogger is already in options by checking if logger was passed
-		// Since we can't easily check, we'll always inject logger if available
-		// (rest.New will handle duplicates gracefully or user can avoid passing nil)
-		if b.Logger != nil {
-			// Inject logger - if user passed nil, this will override it
-			opts = append(opts, rest.WithLogger(b.Logger))
-		}
-		b.Rest = rest.New(opts...)
+		g.Go(func() error {
+			opts := b.restOpts
+			// Check if WithLogger is already in options by checking if logger was passed
+			// (rest.New will handle duplicates gracefully or user can avoid passing nil)
+			if b.Logger != nil {
+				// Inject logger - if user passed nil, this will override it
+				opts = append(opts, rest.WithLogger(b.Logger))
+			}
+			b.Rest = rest.New(opts...)
+			return nil
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		return err
 	}
 
 	// Run after init hooks (services are now available, can set Setup/Shutdown here)

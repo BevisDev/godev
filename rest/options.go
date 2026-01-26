@@ -41,7 +41,7 @@ func withDefaults() *options {
 
 func WithLogger(logger *logger.Logger) Option {
 	return func(o *options) {
-		if logger != nil {
+		if o.logger == nil && o.logger != nil {
 			o.logger = logger
 			o.useLog = true
 		}
