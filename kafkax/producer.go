@@ -2,10 +2,11 @@ package kafkax
 
 import (
 	"context"
+	"time"
+
 	"github.com/BevisDev/godev/consts"
 	"github.com/BevisDev/godev/utils"
 	"github.com/segmentio/kafka-go"
-	"time"
 )
 
 type Producer struct {
@@ -41,8 +42,8 @@ func (p *Producer) Produce(
 	key, value []byte,
 ) error {
 	rid := utils.GetRID(ctx)
-	var hs []kafka.Header
-	hs = append(hs, kafka.Header{
+	var headers []kafka.Header
+	headers = append(headers, kafka.Header{
 		Key:   consts.XRequestID,
 		Value: []byte(rid),
 	})
@@ -51,7 +52,7 @@ func (p *Producer) Produce(
 		Topic:   topic,
 		Key:     key,
 		Value:   value,
-		Headers: hs,
+		Headers: headers,
 		Time:    time.Now(),
 	})
 }
@@ -64,27 +65,25 @@ func (p *Producer) ProduceBatch(
 		return nil
 	}
 
-	kafkaMsgs := make([]kafka.Message, 0, len(messages))
+	rid := utils.GetRID(ctx)
+	var headers []kafka.Header
+	headers = append(headers, kafka.Header{
+		Key:   consts.XRequestID,
+		Value: []byte(rid),
+	})
+
+	msgs := make([]kafka.Message, 0, len(messages))
 	for _, msg := range messages {
 		kafkaMsg := kafka.Message{
-			Topic: msg.Topic,
-			Key:   msg.Key,
-			Value: msg.Value,
-			Time:  time.Now(),
+			Topic:   msg.Topic,
+			Key:     msg.Key,
+			Value:   msg.Value,
+			Headers: headers,
+			Time:    time.Now(),
 		}
 
-		if msg.Headers != nil {
-			kafkaMsg.Headers = make([]kafka.Header, 0, len(msg.Headers))
-			for k, v := range msg.Headers {
-				kafkaMsg.Headers = append(kafkaMsg.Headers, kafka.Header{
-					Key:   k,
-					Value: []byte(v),
-				})
-			}
-		}
-
-		kafkaMsgs = append(kafkaMsgs, kafkaMsg)
+		msgs = append(msgs, kafkaMsg)
 	}
 
-	return p.writer.WriteMessages(ctx, kafkaMsgs...)
+	return p.writer.WriteMessages(ctx, msgs...)
 }
