@@ -3,10 +3,11 @@ package kafkax
 import (
 	"context"
 	"errors"
+	"log"
+
 	"github.com/BevisDev/godev/consts"
 	"github.com/BevisDev/godev/utils"
 	"github.com/segmentio/kafka-go"
-	"log"
 )
 
 type Consumer struct {
