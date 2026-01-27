@@ -190,34 +190,34 @@ func (b *Bootstrap) Init(ctx context.Context) error {
 	}
 
 	// Kafka
-	if b.kafkaConf != nil && b.Kafka == nil {
-		g.Go(func() error {
-			kafka, err := kafkax.New(b.kafkaConf)
-			if err != nil {
-				return fmt.Errorf("[kafka] %w", err)
-			}
-			b.Kafka = kafka
-			return nil
-		})
-	} else if b.kafkaProducerConf != nil && b.KafkaProducer == nil {
-		g.Go(func() error {
-			p, err := kafkax.NewProducer(b.kafkaProducerConf)
-			if err != nil {
-				return fmt.Errorf("[kafka-producer] %w", err)
-			}
-			b.KafkaProducer = p
-			return nil
-		})
-	} else if b.kafkaConsumerConf != nil && b.KafkaConsumer == nil {
-		g.Go(func() error {
-			c, err := kafkax.NewConsumer(b.kafkaConsumerConf)
-			if err != nil {
-				return fmt.Errorf("[kafka-consumer] %w", err)
-			}
-			b.KafkaConsumer = c
-			return nil
-		})
-	}
+	//if b.kafkaConf != nil && b.Kafka == nil {
+	//	g.Go(func() error {
+	//		kafka, err := kafkax.New(b.kafkaConf)
+	//		if err != nil {
+	//			return fmt.Errorf("[kafka] %w", err)
+	//		}
+	//		b.Kafka = kafka
+	//		return nil
+	//	})
+	//} else if b.kafkaProducerConf != nil && b.KafkaProducer == nil {
+	//	g.Go(func() error {
+	//		p, err := kafkax.NewProducer(b.kafkaProducerConf)
+	//		if err != nil {
+	//			return fmt.Errorf("[kafka-producer] %w", err)
+	//		}
+	//		b.KafkaProducer = p
+	//		return nil
+	//	})
+	//} else if b.kafkaConsumerConf != nil && b.KafkaConsumer == nil {
+	//	g.Go(func() error {
+	//		c, err := kafkax.NewConsumer(b.kafkaConsumerConf)
+	//		if err != nil {
+	//			return fmt.Errorf("[kafka-consumer] %w", err)
+	//		}
+	//		b.KafkaConsumer = c
+	//		return nil
+	//	})
+	//}
 
 	// Keycloak
 	if b.keycloakConf != nil && b.Keycloak == nil {
@@ -491,18 +491,18 @@ func (b *Bootstrap) closeServices() {
 	}
 
 	// Close Kafka
-	if b.Kafka == nil {
-		b.Kafka.Close()
-		b.Kafka = nil
-		b.KafkaProducer = nil
-		b.KafkaConsumer = nil
-	} else if b.KafkaProducer != nil {
-		b.KafkaProducer.Close()
-		b.KafkaProducer = nil
-	} else if b.KafkaConsumer != nil {
-		b.KafkaConsumer.Close()
-		b.KafkaConsumer = nil
-	}
+	//if b.Kafka == nil {
+	//	b.Kafka.Close()
+	//	b.Kafka = nil
+	//	b.KafkaProducer = nil
+	//	b.KafkaConsumer = nil
+	//} else if b.KafkaProducer != nil {
+	//	b.KafkaProducer.Close()
+	//	b.KafkaProducer = nil
+	//} else if b.KafkaConsumer != nil {
+	//	b.KafkaConsumer.Close()
+	//	b.KafkaConsumer = nil
+	//}
 }
 
 // SetServerSetup sets the server Setup function after services are initialized.

@@ -33,11 +33,7 @@ type options struct {
 	redisConf     *redis.Config
 	rabbitmqConf  *rabbitmq.Config
 	keycloakConf  *keycloak.Config
-
-	// kafka
-	kafkaConf         *kafkax.Config
-	kafkaProducerConf *kafkax.Config
-	kafkaConsumerConf *kafkax.Config
+	kafkaConf     *kafkax.Config
 
 	restOn   bool
 	restOpts []rest.Option
@@ -124,18 +120,18 @@ func WithKafka(cfg *kafkax.Config) Option {
 }
 
 // WithKafkaProducer configures the Kafka Producer connection.
-func WithKafkaProducer(cfg *kafkax.Config) Option {
-	return func(o *options) {
-		o.kafkaProducerConf = cfg
-	}
-}
-
-// WithKafkaConsumer configures the Kafka Handler connection.
-func WithKafkaConsumer(cfg *kafkax.Config) Option {
-	return func(o *options) {
-		o.kafkaConsumerConf = cfg
-	}
-}
+//func WithKafkaProducer(cfg *kafkax.Config) Option {
+//	return func(o *options) {
+//		o.kafkaProducerConf = cfg
+//	}
+//}
+//
+//// WithKafkaConsumer configures the Kafka Handler connection.
+//func WithKafkaConsumer(cfg *kafkax.Config) Option {
+//	return func(o *options) {
+//		o.kafkaConsumerConf = cfg
+//	}
+//}
 
 // WithHealthChecker registers a custom health checker. Name is used as the key in Health() result.
 // Use this to plug in health checks from other projects (e.g. external APIs, custom services).
