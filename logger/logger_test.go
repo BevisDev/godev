@@ -5,8 +5,11 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"path/filepath"
 	"reflect"
+	"runtime"
 	"testing"
 	"time"
 
@@ -16,6 +19,7 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 type User struct {
@@ -35,28 +39,31 @@ func TestFormatMessage(t *testing.T) {
 		msg      string
 		args     []interface{}
 		expected string
+		errCount int
 	}{
-		{"hello", nil, "hello"},
-		{"value is {}", []interface{}{123}, "value is 123"},
-		{"value is {}", []interface{}{ptrTo("abc")}, "value is abc"},
-		{"value is {}", []interface{}{(*string)(nil)}, "value is <nil>"},
-		{"value is {}", []interface{}{User{ID: 1, Name: "Alice"}}, "value is {\"ID\":1,\"Name\":\"Alice\"}"},
-		{"value is {}", []interface{}{&User{ID: 2, Name: "Bob"}}, "value is {\"ID\":2,\"Name\":\"Bob\"}"},
-		{"multiple placeholders: {}, {}", []interface{}{123, "abc"}, "multiple placeholders: 123, abc"},
-		{"decimal: {}", []interface{}{decimal.NewFromFloat(12.34)}, "decimal: 12.34"},
-		{"nullstring: {}", []interface{}{sql.NullString{String: "ok", Valid: true}}, "nullstring: ok"},
-		{"nullstring: {}", []interface{}{sql.NullString{Valid: false}}, "nullstring: <null>"},
-		{"time: {}", []interface{}{now}, "time: 2025-06-09T10:00:00Z"},
-		{"bytes: {}", []interface{}{[]byte("hello")}, `bytes: "hello"`},
-		{"bytes: {}", []interface{}{[]byte{0xff, 0xfe}}, "bytes: []byte(len=2)"},
-		{"raw json: {}", []interface{}{json.RawMessage(`{"foo":"bar"}`)}, `raw json: {"foo":"bar"}`},
-		{"err: {}", []interface{}{fmt.Errorf("something went wrong")}, "err: something went wrong"},
-		{"ctx: {}", []interface{}{context.Background()}, "ctx: <context>"},
+		{"hello", nil, "hello", 0},
+		{"value is {}", []interface{}{123}, "value is 123", 0},
+		{"value is {}", []interface{}{ptrTo("abc")}, "value is abc", 0},
+		{"value is {}", []interface{}{(*string)(nil)}, "value is <nil>", 0},
+		{"value is {}", []interface{}{User{ID: 1, Name: "Alice"}}, `value is {"ID":1,"Name":"Alice"}`, 0},
+		{"value is {}", []interface{}{&User{ID: 2, Name: "Bob"}}, `value is {"ID":2,"Name":"Bob"}`, 0},
+		{"multiple placeholders: {}, {}", []interface{}{123, "abc"}, "multiple placeholders: 123, abc", 0},
+		{"decimal: {}", []interface{}{decimal.NewFromFloat(12.34)}, "decimal: 12.34", 0},
+		{"nullstring: {}", []interface{}{sql.NullString{String: "ok", Valid: true}}, "nullstring: ok", 0},
+		{"nullstring: {}", []interface{}{sql.NullString{Valid: false}}, "nullstring: <null>", 0},
+		{"time: {}", []interface{}{now}, "time: 2025-06-09T10:00:00Z", 0},
+		{"bytes: {}", []interface{}{[]byte("hello")}, `bytes: "hello"`, 0},
+		{"bytes: {}", []interface{}{[]byte{0xff, 0xfe}}, "bytes: []byte(len=2)", 0},
+		{"raw json: {}", []interface{}{json.RawMessage(`{"foo":"bar"}`)}, `raw json: {"foo":"bar"}`, 0},
+		{"err: {}", []interface{}{fmt.Errorf("something went wrong")}, "err: ", 1},
+		{"ctx: {}", []interface{}{context.Background()}, "ctx: <context>", 0},
 	}
 
 	for _, tt := range tests {
-		result := logger.formatMessage(tt.msg, tt.args...)
+		result, errs := logger.formatMessage(tt.msg, tt.args...)
+
 		assert.Equal(t, tt.expected, result, "msg: %q", tt.msg)
+		assert.Len(t, errs, tt.errCount, "msg: %q", tt.msg)
 	}
 }
 
@@ -146,6 +153,98 @@ func TestErrorLog(t *testing.T) {
 	logOutput := buf.String()
 	assert.Contains(t, logOutput, "Something went wrong: disk full")
 	assert.Contains(t, logOutput, "ERR_STATE")
+}
+
+func TestErrorLog_WithErrorAndValue(t *testing.T) {
+	buf := &bytes.Buffer{}
+
+	core := zapcore.NewCore(
+		zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig()),
+		zapcore.AddSync(buf),
+		zapcore.ErrorLevel,
+	)
+
+	zapLogger := zap.New(core)
+	logger := &Logger{zap: zapLogger}
+
+	err := errors.New("disk full")
+
+	logger.Error(
+		"ERR_STATE",
+		"Something went wrong: {} (retry={})",
+		err,
+		3,
+	)
+
+	logOutput := buf.String()
+
+	// message
+	assert.Contains(t, logOutput, "Something went wrong:  (retry=3)")
+
+	// error field (zap.Error)
+	assert.Contains(t, logOutput, "disk full")
+
+	// error code / tag
+	assert.Contains(t, logOutput, "ERR_STATE")
+}
+
+func TestLogger_StackTrace(t *testing.T) {
+	// Arrange
+	core, recorded := observer.New(zapcore.ErrorLevel)
+	zapLogger := zap.New(core, zap.AddCaller())
+
+	logx := &Logger{
+		zap: zapLogger,
+	}
+
+	rid := "rid-123"
+	msg := "unexpected error occurred"
+	stack := []byte("fake stacktrace")
+
+	// Act
+	logx.StackTrace(rid, msg, stack)
+
+	// Assert
+	logs := recorded.All()
+	if len(logs) != 1 {
+		t.Fatalf("expected 1 log entry, got %d", len(logs))
+	}
+
+	entry := logs[0]
+
+	if entry.Level != zapcore.ErrorLevel {
+		t.Errorf("expected level ERROR, got %v", entry.Level)
+	}
+
+	if entry.Message != msg {
+		t.Errorf("expected message %q, got %q", msg, entry.Message)
+	}
+
+	fields := entry.ContextMap()
+
+	if fields["rid"] != rid {
+		t.Errorf("expected rid %q, got %v", rid, fields["rid"])
+	}
+
+	if fields["stack"] != string(stack) {
+		t.Errorf("stack mismatch")
+	}
+
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("cannot get runtime caller")
+	}
+
+	expectedFile := filepath.Base(file)
+	actualFile := filepath.Base(entry.Caller.File)
+
+	if expectedFile != actualFile {
+		t.Errorf(
+			"expected caller file %s, got %s",
+			expectedFile,
+			actualFile,
+		)
+	}
 }
 
 func TestWarnLog(t *testing.T) {

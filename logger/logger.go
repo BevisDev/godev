@@ -148,47 +148,63 @@ func (l *Logger) writeSync() zapcore.WriteSyncer {
 	return zapcore.AddSync(lumber)
 }
 
-func getFilename(dir, fileName string, isSplit bool) string {
-	if isSplit {
+func getFilename(dir, fileName string, isRotate bool) string {
+	if isRotate {
 		now := datetime.ToString(time.Now(), datetime.DateLayoutISO)
 		return filepath.Join(dir, now, fileName)
 	}
 	return filepath.Join(dir, fileName)
 }
 
-func (l *Logger) log(level zapcore.Level,
+func (l *Logger) log(
+	level zapcore.Level,
+	callerSkips int,
 	rid, msg string,
+	fields []zap.Field,
 	args ...interface{},
 ) {
 	// format message
-	var message = l.formatMessage(msg, args...)
+	message, errs := l.formatMessage(msg, args...)
 
 	// skip caller before
 	logging := l.zap.WithOptions(
-		zap.AddCallerSkip(2),
+		zap.AddCallerSkip(callerSkips),
 	)
 
 	// declare field
-	fields := []zap.Field{zap.String(consts.RID, rid)}
+	fs := []zap.Field{
+		zap.String(consts.RID, rid),
+	}
+
+	if len(errs) > 0 {
+		if err := l.formatErrors(errs); err != nil {
+			fs = append(fs,
+				zap.Error(err),
+			)
+		}
+	}
+
+	fs = append(fs, fields...)
 
 	switch level {
 	case zapcore.InfoLevel:
-		logging.Info(message, fields...)
+		logging.Info(message, fs...)
 	case zapcore.WarnLevel:
-		logging.Warn(message, fields...)
+		logging.Warn(message, fs...)
 	case zapcore.ErrorLevel:
-		logging.Error(message, fields...)
+		logging.Error(message, fs...)
 	default:
-		logging.Info(message, fields...)
+		logging.Info(message, fs...)
 	}
 }
 
-func (l *Logger) formatMessage(msg string, args ...interface{}) string {
+func (l *Logger) formatMessage(msg string, args ...interface{}) (string, []error) {
 	if len(args) == 0 {
-		return msg
+		return msg, nil
 	}
 
-	numArgs := len(args)
+	formatted, errors := l.formatArgs(args...)
+	numArgs := len(formatted)
 
 	// Handle {} placeholder pattern
 	if strings.Contains(msg, "{}") {
@@ -196,39 +212,46 @@ func (l *Logger) formatMessage(msg string, args ...interface{}) string {
 		if count < numArgs {
 			msg += strings.Repeat(" :{}", numArgs-count)
 		}
-		message := strings.ReplaceAll(msg, "{}", "%+v")
-		return fmt.Sprintf(message, l.deferArgs(args...)...)
-	}
 
-	// Handle printf-style formatting (append formatted values)
-	if strings.Contains(msg, "%") {
-		for _, arg := range args {
-			msg += " :" + l.formatAny(arg)
+		// replace {} with actual values
+		result := msg
+		for _, arg := range formatted {
+			result = strings.Replace(result, "{}", arg, 1)
 		}
-		return msg
+		return result, errors
 	}
 
 	// Default: append all args
-	msg += strings.Repeat(":%+v", numArgs)
-	return fmt.Sprintf(msg, l.deferArgs(args...)...)
-}
-
-func (l *Logger) deferArgs(args ...interface{}) []interface{} {
-	out := make([]interface{}, len(args))
-	for i, arg := range args {
-		out[i] = l.formatAny(arg)
+	for _, arg := range formatted {
+		msg += " :" + arg
 	}
-	return out
+
+	return msg, errors
 }
 
-func (l *Logger) formatAny(v interface{}) string {
+func (l *Logger) formatArgs(args ...interface{}) ([]string, []error) {
+	out := make([]string, len(args))
+	var errors []error
+
+	for i, arg := range args {
+		v, err := l.formatAny(arg)
+		if err != nil {
+			errors = append(errors, err)
+			continue
+		}
+		out[i] = v
+	}
+	return out, errors
+}
+
+func (l *Logger) formatAny(v interface{}) (string, error) {
 	if v == nil {
-		return "<nil>"
+		return "<nil>", nil
 	}
 
 	// Handle error type
 	if err, ok := v.(error); ok {
-		return err.Error()
+		return "", err
 	}
 
 	rv := reflect.ValueOf(v)
@@ -236,25 +259,25 @@ func (l *Logger) formatAny(v interface{}) string {
 	// Dereference pointers
 	rv, v = l.dereferencePointer(rv)
 	if !rv.IsValid() {
-		return "<nil>"
+		return "<nil>", nil
 	}
 
 	// Handle special types
 	if formatted := l.formatSpecialType(v); formatted != "" {
-		return formatted
+		return formatted, nil
 	}
 
 	// Handle complex types (struct, map, slice, array) via JSON
 	if rv.Kind() == reflect.Struct || rv.Kind() == reflect.Map ||
 		rv.Kind() == reflect.Slice || rv.Kind() == reflect.Array {
-		return jsonx.ToJSON(v)
+		return jsonx.ToJSON(v), nil
 	}
 
 	// Default formatting
 	if rv.CanInterface() {
-		return fmt.Sprintf("%+v", rv.Interface())
+		return fmt.Sprintf("%+v", rv.Interface()), nil
 	}
-	return fmt.Sprintf("<unreadable: %T>", v)
+	return fmt.Sprintf("<unreadable: %T>", v), nil
 }
 
 func (l *Logger) dereferencePointer(rv reflect.Value) (reflect.Value, interface{}) {
@@ -270,6 +293,28 @@ func (l *Logger) dereferencePointer(rv reflect.Value) (reflect.Value, interface{
 		v = rv.Interface()
 	}
 	return rv, v
+}
+
+func (l *Logger) formatErrors(errs []error) error {
+	if len(errs) == 0 {
+		return nil
+	}
+	if len(errs) == 1 {
+		return errs[0]
+	}
+
+	msgs := make([]string, 0, len(errs))
+	for _, err := range errs {
+		if err != nil {
+			msgs = append(msgs, err.Error())
+		}
+	}
+
+	if len(msgs) == 0 {
+		return nil
+	}
+
+	return errors.New(strings.Join(msgs, " | "))
 }
 
 func (l *Logger) formatSpecialType(v interface{}) string {
@@ -339,17 +384,46 @@ func (l *Logger) Sync() {
 
 // Info Logs an informational message
 func (l *Logger) Info(rid, msg string, args ...interface{}) {
-	l.log(zapcore.InfoLevel, rid, msg, args...)
+	l.log(zapcore.InfoLevel,
+		2,
+		rid, msg,
+		nil,
+		args...,
+	)
 }
 
 // Error Logs a recoverable error that occurred during execution.
 func (l *Logger) Error(rid, msg string, args ...interface{}) {
-	l.log(zapcore.ErrorLevel, rid, msg, args...)
+	l.log(zapcore.ErrorLevel,
+		2,
+		rid, msg,
+		nil,
+		args...,
+	)
+}
+
+// StackTrace logs a recoverable error with stacktrace attached.
+// This should be used for unexpected errors where stack information is needed
+// but the application can continue running.
+func (l *Logger) StackTrace(rid, msg string, stack []byte, args ...interface{}) {
+	l.log(zapcore.ErrorLevel,
+		2,
+		rid, msg,
+		[]zap.Field{
+			zap.ByteString("stack", stack),
+		},
+		args...,
+	)
 }
 
 // Warn Logs a potentially harmful situation or an unexpected event that isn't an error.
 func (l *Logger) Warn(rid, msg string, args ...interface{}) {
-	l.log(zapcore.WarnLevel, rid, msg, args...)
+	l.log(zapcore.WarnLevel,
+		2,
+		rid, msg,
+		nil,
+		args...,
+	)
 }
 
 // LogRequest Logs an incoming request to the application (e.g., an HTTP server receiving a client request).

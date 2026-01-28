@@ -18,12 +18,12 @@ import (
 // Option configures Bootstrap behavior (captures config to initialize later in Init).
 type Option func(*options)
 
-// HealthChecker is a function that checks health of a service. Return nil if OK, otherwise an error.
-type HealthChecker func(ctx context.Context) error
+// HealthCheckFunc is a function that checks health of a service. Return nil if OK, otherwise an error.
+type HealthCheckFunc func(ctx context.Context) error
 
-type healthCheckerEntry struct {
+type healthChecker struct {
 	name string
-	fn   HealthChecker
+	fn   HealthCheckFunc
 }
 
 type options struct {
@@ -44,7 +44,7 @@ type options struct {
 	serverConf *server.Config
 
 	// custom health checkers (e.g. from other projects)
-	healthCheckers []healthCheckerEntry
+	healthCheckers []healthChecker
 }
 
 // WithLogger configures the logger.
@@ -125,7 +125,7 @@ func WithKafka(cfg *kafkax.Config) Option {
 //		o.kafkaProducerConf = cfg
 //	}
 //}
-//
+
 //// WithKafkaConsumer configures the Kafka Handler connection.
 //func WithKafkaConsumer(cfg *kafkax.Config) Option {
 //	return func(o *options) {
@@ -135,10 +135,10 @@ func WithKafka(cfg *kafkax.Config) Option {
 
 // WithHealthChecker registers a custom health checker. Name is used as the key in Health() result.
 // Use this to plug in health checks from other projects (e.g. external APIs, custom services).
-func WithHealthChecker(name string, fn HealthChecker) Option {
+func WithHealthChecker(name string, fn HealthCheckFunc) Option {
 	return func(o *options) {
 		if name != "" && fn != nil {
-			o.healthCheckers = append(o.healthCheckers, healthCheckerEntry{name: name, fn: fn})
+			o.healthCheckers = append(o.healthCheckers, healthChecker{name: name, fn: fn})
 		}
 	}
 }

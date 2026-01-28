@@ -17,7 +17,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type HttpLogger struct {
+type HTTPLogger struct {
 	*options
 }
 
@@ -31,18 +31,18 @@ func (w *responseWrapper) Write(b []byte) (int, error) {
 	return w.ResponseWriter.Write(b)
 }
 
-func New(opts ...Option) *HttpLogger {
+func New(opts ...Option) *HTTPLogger {
 	o := withDefaults()
 	for _, opt := range opts {
 		opt(o)
 	}
 
-	return &HttpLogger{
+	return &HTTPLogger{
 		options: o,
 	}
 }
 
-func (h *HttpLogger) Handler() gin.HandlerFunc {
+func (h *HTTPLogger) Handler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		startTime := time.Now()
 
@@ -73,7 +73,7 @@ func (h *HttpLogger) Handler() gin.HandlerFunc {
 	}
 }
 
-func (h *HttpLogger) readRequestBody(c *gin.Context) string {
+func (h *HTTPLogger) readRequestBody(c *gin.Context) string {
 	contentType := c.Request.Header.Get(consts.ContentType)
 	if h.skipDefaultContentTypeCheck || !utils.SkipContentType(contentType) {
 		raw, err := io.ReadAll(c.Request.Body)
@@ -87,7 +87,7 @@ func (h *HttpLogger) readRequestBody(c *gin.Context) string {
 	return ""
 }
 
-func (h *HttpLogger) wrapResponseWriter(c *gin.Context) *bytes.Buffer {
+func (h *HTTPLogger) wrapResponseWriter(c *gin.Context) *bytes.Buffer {
 	buf := &bytes.Buffer{}
 	c.Writer = &responseWrapper{
 		ResponseWriter: c.Writer,
@@ -96,14 +96,14 @@ func (h *HttpLogger) wrapResponseWriter(c *gin.Context) *bytes.Buffer {
 	return buf
 }
 
-func (h *HttpLogger) readResponseBody(buf *bytes.Buffer, contentType string) string {
+func (h *HTTPLogger) readResponseBody(buf *bytes.Buffer, contentType string) string {
 	if h.skipDefaultContentTypeCheck || !utils.SkipContentType(contentType) {
 		return buf.String()
 	}
 	return ""
 }
 
-func (h *HttpLogger) logRequest(c *gin.Context, rid string, startTime time.Time, reqBody string) {
+func (h *HTTPLogger) logRequest(c *gin.Context, rid string, startTime time.Time, reqBody string) {
 	if h.useLog {
 		h.logRequestWithLogger(c, rid, startTime, reqBody)
 	} else {
@@ -111,7 +111,7 @@ func (h *HttpLogger) logRequest(c *gin.Context, rid string, startTime time.Time,
 	}
 }
 
-func (h *HttpLogger) logRequestWithLogger(c *gin.Context, rid string, startTime time.Time, reqBody string) {
+func (h *HTTPLogger) logRequestWithLogger(c *gin.Context, rid string, startTime time.Time, reqBody string) {
 	reqLog := &logger.RequestLogger{
 		RID:    rid,
 		URL:    c.Request.URL.String(),
@@ -126,7 +126,7 @@ func (h *HttpLogger) logRequestWithLogger(c *gin.Context, rid string, startTime 
 	h.logger.LogRequest(reqLog)
 }
 
-func (h *HttpLogger) logRequestConsole(c *gin.Context, rid string, startTime time.Time, reqBody string) {
+func (h *HTTPLogger) logRequestConsole(c *gin.Context, rid string, startTime time.Time, reqBody string) {
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "\n========== REQUEST INFO ==========\n")
 	fmt.Fprintf(&sb, "%s: %s\n", consts.RID, rid)
@@ -143,7 +143,7 @@ func (h *HttpLogger) logRequestConsole(c *gin.Context, rid string, startTime tim
 	log.Println(sb.String())
 }
 
-func (h *HttpLogger) logResponse(c *gin.Context, rid string, duration time.Duration, resBody string) {
+func (h *HTTPLogger) logResponse(c *gin.Context, rid string, duration time.Duration, resBody string) {
 	if h.useLog {
 		h.logResponseWithLogger(c, rid, duration, resBody)
 	} else {
@@ -151,7 +151,7 @@ func (h *HttpLogger) logResponse(c *gin.Context, rid string, duration time.Durat
 	}
 }
 
-func (h *HttpLogger) logResponseWithLogger(c *gin.Context, rid string, duration time.Duration, resBody string) {
+func (h *HTTPLogger) logResponseWithLogger(c *gin.Context, rid string, duration time.Duration, resBody string) {
 	resLog := &logger.ResponseLogger{
 		RID:      rid,
 		Status:   c.Writer.Status(),
@@ -164,7 +164,7 @@ func (h *HttpLogger) logResponseWithLogger(c *gin.Context, rid string, duration 
 	h.logger.LogResponse(resLog)
 }
 
-func (h *HttpLogger) logResponseConsole(c *gin.Context, rid string, duration time.Duration, resBody string) {
+func (h *HTTPLogger) logResponseConsole(c *gin.Context, rid string, duration time.Duration, resBody string) {
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "\n========== RESPONSE INFO ==========\n")
 	fmt.Fprintf(&sb, "%s: %s\n", consts.RID, rid)

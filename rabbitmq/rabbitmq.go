@@ -2,11 +2,13 @@ package rabbitmq
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"sync"
 	"time"
 
+	"github.com/BevisDev/godev/utils"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -14,13 +16,28 @@ type ConsumerHandler func(ctx context.Context, msg Message) error
 
 type ChannelHandler func(ch *amqp.Channel) error
 
+// RabbitMQ represents a production-ready RabbitMQ client with automatic reconnection
 type RabbitMQ struct {
 	*options
-	cf         *Config
-	Queue      *Queue
-	Publisher  *Publisher
+	config *Config
+
 	connection *amqp.Connection
-	mu         sync.RWMutex
+	connMu     sync.RWMutex
+
+	queue     *Queue
+	publisher *Publisher
+	consumer  *Consumer
+
+	// Connection lifecycle management
+	closeNotify chan *amqp.Error
+	reconnectCh chan struct{}
+
+	closed   bool
+	closedMu sync.RWMutex
+
+	ctx    context.Context
+	cancel context.CancelFunc
+	wg     sync.WaitGroup
 }
 
 // New creates a new RabbitMQ client using the provided configuration.
@@ -30,67 +47,237 @@ type RabbitMQ struct {
 //
 // Returns an error if the configuration is nil, the connection fails,
 // or the channel cannot be created.
-func New(cfg *Config, opts ...Option) (*RabbitMQ, error) {
+func New(c context.Context, cfg *Config, opts ...Option) (*RabbitMQ, error) {
 	if cfg == nil {
-		return nil, fmt.Errorf("[rabbitmq] config is nil")
+		return nil, ErrNilConfig
 	}
-	cf := cfg.clone()
 
 	opt := withDefaults()
 	for _, f := range opts {
 		f(opt)
 	}
 
+	ctx, cancel := utils.NewCtxCancel(c)
+
 	r := &RabbitMQ{
-		cf:      cf,
-		options: opt,
+		config:      cfg.clone(),
+		options:     opt,
+		reconnectCh: make(chan struct{}, 1),
+		ctx:         ctx,
+		cancel:      cancel,
 	}
-	conn, err := r.connect()
-	if err != nil {
+
+	// Initial connection
+	if err := r.connect(); err != nil {
+		cancel()
 		return nil, err
 	}
 
-	r.connection = conn
-	r.Queue = newQueue(r)
-	r.Publisher = newPublisher(r)
+	// Initialize components
+	r.queue = newQueue(r)
+	r.publisher = newPublisher(r)
+
+	// Start connection monitor
+	r.wg.Add(1)
+	go r.monitorConnection()
+
 	log.Println("[rabbitmq] connected successfully")
 	return r, nil
 }
 
-func (r *RabbitMQ) connect() (*amqp.Connection, error) {
-	conn, err := amqp.Dial(r.cf.URL())
+// monitorConnection monitors connection health and triggers reconnection
+func (r *RabbitMQ) monitorConnection() {
+	defer r.wg.Done()
+
+	for {
+		select {
+		case <-r.ctx.Done():
+			log.Printf("[rabbitmq] context is cannceled")
+			return
+
+		case err := <-r.closeNotify:
+			if r.isClosed() {
+				return
+			}
+
+			log.Printf("[rabbitmq] connection closed: %v", err)
+
+			// Trigger reconnection
+			select {
+			case r.reconnectCh <- struct{}{}:
+			default:
+			}
+
+			if err := r.reconnect(); err != nil {
+				fmt.Printf("[rabbitmq] reconnect failed: %v", err)
+			}
+
+		case <-r.reconnectCh:
+			if err := r.reconnect(); err != nil {
+				fmt.Printf("[rabbitmq] manual reconnection failed: %v", err)
+			}
+		}
+	}
+}
+
+func (r *RabbitMQ) connect() error {
+	r.connMu.Lock()
+	defer r.connMu.Unlock()
+
+	// Close existing connection if any
+	if r.connection != nil && !r.connection.IsClosed() {
+		_ = r.connection.Close()
+	}
+
+	conn, err := amqp.Dial(r.config.URL())
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("[rabbitmq] failed to dial: %w", err)
 	}
 
 	if conn == nil {
-		return nil, fmt.Errorf("[rabbitmq] connection is nil")
+		return errors.New("[rabbitmq] connection is nil after dial")
 	}
 
-	return conn, nil
+	r.connection = conn
+	r.closeNotify = make(chan *amqp.Error, 1)
+	r.connection.NotifyClose(r.closeNotify)
+
+	return nil
 }
 
-// Close closes the current channel and connection safely.
-func (r *RabbitMQ) Close() {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+// isClosed checks if the client is closed
+func (r *RabbitMQ) isClosed() bool {
+	r.closedMu.RLock()
+	defer r.closedMu.RUnlock()
+	return r.closed
+}
 
+// Close gracefully shuts down the RabbitMQ client
+func (r *RabbitMQ) Close() {
+	r.closedMu.Lock()
+	if r.closed {
+		r.closedMu.Unlock()
+		return
+	}
+
+	r.closed = true
+	r.closedMu.Unlock()
+
+	log.Println("[rabbitmq] is shutting down")
+
+	// Cancel context to stop background goroutines
+	r.cancel()
+
+	// Wait for background goroutines
+	done := make(chan struct{})
+	go func() {
+		r.wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		log.Println("[rabbitmq] shutdown timeout, forcing close")
+	}
+
+	// Close components
+	//if r.consumer != nil {
+	//	r.consumer.Close()
+	//}
+
+	//if r.publisher != nil {
+	//	r.publisher.
+	//}
+
+	// Close connection
+	r.connMu.Lock()
 	if r.connection != nil {
 		_ = r.connection.Close()
 	}
+	r.connMu.Unlock()
+
+	log.Println("[rabbitmq] shutdown complete")
+}
+
+// reconnect attempts to reconnect with exponential backoff
+func (r *RabbitMQ) reconnect() error {
+	if r.isClosed() {
+		return ErrClientClosed
+	}
+
+	maxRetries := 10
+	baseDelay := time.Second
+
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		select {
+		case <-r.ctx.Done():
+			return r.ctx.Err()
+		default:
+		}
+
+		log.Printf("[rabbitmq] attempting %d to reconnect...", attempt)
+
+		if err := r.connect(); err != nil {
+			delay := baseDelay * time.Duration(1<<uint(attempt-1))
+			if delay > 30*time.Second {
+				delay = 30 * time.Second
+			}
+
+			log.Printf("[rabbitmq] attempting to reconnect failed: %d, err=%v, retry after", delay, err)
+
+			time.Sleep(delay)
+			continue
+		}
+
+		log.Printf("[rabbitmq] reconnected successfully")
+		return nil
+	}
+
+	return ErrMaxRetriesReached
+}
+
+// Health checks the health status of the connection
+func (r *RabbitMQ) Health() error {
+	if r.isClosed() {
+		return ErrClientClosed
+	}
+
+	return r.WithChannel(func(ch *amqp.Channel) error {
+		// Try to declare a temporary queue to verify channel works
+		_, err := ch.QueueDeclare(
+			"",    // name (auto-generated)
+			false, // durable
+			true,  // delete when unused
+			true,  // exclusive
+			false, // no-wait
+			nil,   // arguments
+		)
+		return err
+	})
 }
 
 // GetConnection returns a live connection, reconnecting if needed.
 // It retries indefinitely until a connection is established.
 func (r *RabbitMQ) GetConnection() (*amqp.Connection, error) {
-	r.mu.RLock()
-
-	// return connection if not closed
-	if r.connection != nil && !r.connection.IsClosed() {
-		defer r.mu.RUnlock()
-		return r.connection, nil
+	if r.isClosed() {
+		return nil, ErrClientClosed
 	}
 
+	r.connMu.RLock()
+	conn := r.connection
+	r.connMu.RUnlock()
+
+	// return connection if not closed
+	if conn != nil && !conn.IsClosed() {
+		return conn, nil
+	}
+
+	// Trigger reconnection
+	select {
+	case r.reconnectCh <- struct{}{}:
+	default:
+	}
 	r.mu.RUnlock()
 
 	// reconnect only one go routine
@@ -130,6 +317,34 @@ func (r *RabbitMQ) GetChannel() (*amqp.Channel, error) {
 	return conn.Channel()
 }
 
+// GetConsumerChannel returns a channel WITH QoS configured for consuming
+// Use this specifically for consumers
+func (r *RabbitMQ) GetConsumerChannel() (*amqp.Channel, error) {
+	conn, err := r.GetConnection()
+	if err != nil {
+		return nil, fmt.Errorf("get connection: %w", err)
+	}
+
+	ch, err := conn.Channel()
+	if err != nil {
+		return nil, fmt.Errorf("create channel: %w", err)
+	}
+
+	// Set QoS for consumer
+	if r.options.prefetchCount > 0 {
+		if err := ch.Qos(
+			r.options.prefetchCount, // prefetch count
+			0,                       // prefetch size (0 = no limit)
+			false,                   // global (false = per consumer)
+		); err != nil {
+			ch.Close()
+			return nil, fmt.Errorf("set qos: %w", err)
+		}
+	}
+
+	return ch, nil
+}
+
 func (r *RabbitMQ) WithChannel(fn ChannelHandler) error {
 	ch, err := r.GetChannel()
 	if err != nil {
@@ -138,4 +353,19 @@ func (r *RabbitMQ) WithChannel(fn ChannelHandler) error {
 	defer ch.Close()
 
 	return fn(ch)
+}
+
+// GetPublisher returns the publisher instance
+func (r *RabbitMQ) GetPublisher() *Publisher {
+	return r.publisher
+}
+
+// GetConsumer returns the consumer instance
+func (r *RabbitMQ) GetConsumer() *Consumer {
+	return r.consumer
+}
+
+// GetQueue returns the queue instance
+func (r *RabbitMQ) GetQueue() *Queue {
+	return r.queue
 }

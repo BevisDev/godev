@@ -11,6 +11,7 @@ import (
 )
 
 type Scheduler struct {
+	*options
 	cron    *cron.Cron
 	jobs    map[string]*Job
 	started bool
@@ -18,21 +19,22 @@ type Scheduler struct {
 }
 
 func New(opts ...Option) *Scheduler {
-	op := defaultOptions()
+	options := defaultOptions()
 	for _, opt := range opts {
-		opt(op)
+		opt(options)
 	}
 
 	cronOpts := []cron.Option{
-		cron.WithLocation(op.Location),
+		cron.WithLocation(options.location),
 	}
-	if op.WithSeconds {
+	if options.useSeconds {
 		cronOpts = append(cronOpts, cron.WithSeconds())
 	}
 
 	return &Scheduler{
-		cron: cron.New(cronOpts...),
-		jobs: make(map[string]*Job),
+		options: options,
+		cron:    cron.New(cronOpts...),
+		jobs:    make(map[string]*Job),
 	}
 }
 

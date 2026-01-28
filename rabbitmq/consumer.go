@@ -23,7 +23,7 @@ type Handler interface {
 
 // Consumer manages multiple consumers with auto-reconnect and error handling.
 type Consumer struct {
-	*RabbitMQ
+	mq        *RabbitMQ
 	consumers []Handler
 	wg        sync.WaitGroup
 }
@@ -31,7 +31,7 @@ type Consumer struct {
 // Register creates a new Consumer for the given RabbitMQ instance.
 func Register(r *RabbitMQ) *Consumer {
 	return &Consumer{
-		RabbitMQ:  r,
+		mq:        r,
 		consumers: make([]Handler, 0),
 	}
 }
@@ -110,13 +110,13 @@ func (m *Consumer) run(ctx context.Context, consumer Handler) {
 func (m *Consumer) consume(ctx context.Context, consumer Handler) error {
 	queueName := consumer.Queue()
 
-	ch, err := m.GetChannel()
+	ch, err := m.mq.GetChannel()
 	if err != nil {
 		return err
 	}
 	defer ch.Close()
 
-	if err := m.Queue.DeclareSimple(queueName); err != nil {
+	if err := m.mq.Queue.DeclareSimple(queueName); err != nil {
 		return err
 	}
 
