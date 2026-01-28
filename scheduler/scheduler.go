@@ -2,11 +2,11 @@ package scheduler
 
 import (
 	"context"
-	"log"
 	"runtime/debug"
 	"sync"
 
 	"github.com/BevisDev/godev/utils"
+	"github.com/BevisDev/godev/utils/console"
 	"github.com/robfig/cron/v3"
 )
 
@@ -16,6 +16,7 @@ type Scheduler struct {
 	jobs    map[string]*Job
 	started bool
 	mu      sync.Mutex
+	log     *console.Logger
 }
 
 func New(opts ...Option) *Scheduler {
@@ -35,6 +36,7 @@ func New(opts ...Option) *Scheduler {
 		options: options,
 		cron:    cron.New(cronOpts...),
 		jobs:    make(map[string]*Job),
+		log:     console.New("scheduler"),
 	}
 }
 
@@ -48,7 +50,7 @@ func (s *Scheduler) Register(jobs ...*Job) {
 		}
 
 		if _, ok := s.jobs[job.Name]; ok {
-			log.Printf("[scheduler] job %s already registered, override", job.Name)
+			s.log.Info("job %s already registered, override", job.Name)
 		}
 
 		s.jobs[job.Name] = job
@@ -87,7 +89,7 @@ func (s *Scheduler) register() {
 		job := v
 
 		if !job.IsOn {
-			log.Printf("[scheduler] job %s is disabled", name)
+			s.log.Info("job %s is disabled", name)
 			continue
 		}
 
@@ -96,8 +98,7 @@ func (s *Scheduler) register() {
 
 			defer func() {
 				if r := recover(); r != nil {
-					log.Printf(
-						"[RECOVER] job %s: %v\n%s",
+					s.log.Error("[RECOVER] job %s: %v \npanic: %s",
 						name, r, debug.Stack(),
 					)
 				}
@@ -106,7 +107,7 @@ func (s *Scheduler) register() {
 			job.Handler.Handle(ctx)
 		})
 		if err != nil {
-			log.Printf("[scheduler] error register job %s: %v", name, err)
+			s.log.Error("error register job %s: %v", name, err)
 		}
 	}
 }
@@ -126,19 +127,18 @@ func (s *Scheduler) Start(ctx context.Context) {
 	s.register()
 
 	if len(s.cron.Entries()) == 0 {
-		log.Println("[scheduler] no jobs registered")
+		s.log.Info("no jobs registered")
 		return
 	}
 
 	s.cron.Start()
-	log.Printf(
-		"[scheduler] started successfully, timezone=%s",
+	s.log.Info("started successfully, timezone=%s",
 		s.Timezone(),
 	)
 
 	go func() {
 		<-ctx.Done()
-		log.Println("[scheduler] stopping...")
+		s.log.Info("stopping...")
 		s.cron.Stop()
 	}()
 }

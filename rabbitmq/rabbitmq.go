@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/BevisDev/godev/utils"
+	"github.com/BevisDev/godev/utils/console"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -26,7 +27,7 @@ type RabbitMQ struct {
 
 	queue     *Queue
 	publisher *Publisher
-	consumer  *Consumer
+	consumer  *ConsumerManager
 
 	// Connection lifecycle management
 	closeNotify chan *amqp.Error
@@ -38,6 +39,9 @@ type RabbitMQ struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
+
+	// logger
+	log *console.Logger
 }
 
 // New creates a new RabbitMQ client using the provided configuration.
@@ -65,6 +69,7 @@ func New(c context.Context, cfg *Config, opts ...Option) (*RabbitMQ, error) {
 		reconnectCh: make(chan struct{}, 1),
 		ctx:         ctx,
 		cancel:      cancel,
+		log:         console.New("rabbitmq"),
 	}
 
 	// Initial connection
@@ -76,6 +81,7 @@ func New(c context.Context, cfg *Config, opts ...Option) (*RabbitMQ, error) {
 	// Initialize components
 	r.queue = newQueue(r)
 	r.publisher = newPublisher(r)
+	r.consumer = newConsumer(r)
 
 	// Start connection monitor
 	r.wg.Add(1)
@@ -361,7 +367,7 @@ func (r *RabbitMQ) GetPublisher() *Publisher {
 }
 
 // GetConsumer returns the consumer instance
-func (r *RabbitMQ) GetConsumer() *Consumer {
+func (r *RabbitMQ) GetConsumer() *ConsumerManager {
 	return r.consumer
 }
 
