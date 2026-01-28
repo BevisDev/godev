@@ -99,7 +99,7 @@ func main() {
 	defer appLogger.Sync()
 
 	appLogger.Info("app", "Application started")
-	appLogger.Error("app", "An error occurred", "error", "something went wrong")
+	appLogger.Error("app", "An error occurred")
 }
 
 ```

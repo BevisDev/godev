@@ -41,12 +41,8 @@ import (
 
 type HelloJob struct{}
 
-func NewHelloJob() scheduler.Job {
+func NewHelloJob() scheduler.Handler {
     return &HelloJob{}
-}
-
-func (j *HelloJob) Name() string {
-    return "hello-job"
 }
 
 func (j *HelloJob) Handle(ctx context.Context) {
@@ -57,31 +53,31 @@ func main() {
     // Create root context
     ctx, cancel := context.WithCancel(context.Background())
     defer cancel()
-
+    
     // Handle OS signals for graceful shutdown
     sig := make(chan os.Signal, 1)
     signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
-
+    
     // Initialize scheduler
     s := scheduler.New(
         scheduler.WithSeconds(),
         scheduler.WithTimezone("Asia/Ho_Chi_Minh"),
     )
-
+    
     // Register jobs
-    s.Register(
-        NewHelloJob(),
-        scheduler.JobConfig{
-            Cron: "*/5 * * * * *", // every 5 seconds
-            IsOn: true,
+    s.Register(&scheduler.Job{
+        Name:    "hello-job",
+        Cron:    "*/5 * * * * *",
+        IsOn:    true,
+        Handler: NewHelloJob(),
         },
     )
-
+    
     // Start scheduler
     s.Start(ctx)
-
+    
     log.Println("[main] scheduler started")
-
+    
     // Wait for shutdown signal
     <-sig
     log.Println("[main] shutting down...")

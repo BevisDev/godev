@@ -3,70 +3,101 @@ package rabbitmq
 import (
 	"context"
 	"errors"
-	"log"
 	"sync"
 	"time"
 
 	"github.com/BevisDev/godev/consts"
 	"github.com/BevisDev/godev/utils"
+	"github.com/BevisDev/godev/utils/console"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 // Handler defines the interface for message consumers.
 type Handler interface {
-	// Queue returns the queue name to consume from.
-	Queue() string
-
 	// Handle processes a single message. Returns nil to ack, error to requeue.
 	Handle(ctx context.Context, msg Message) error
 }
 
-// Consumer manages multiple consumers with auto-reconnect and error handling.
 type Consumer struct {
-	*RabbitMQ
-	consumers []Handler
-	wg        sync.WaitGroup
+	IsOn    bool   // enable / disable consumer
+	Queue   string // queue name
+	Handler Handler
 }
 
-// Register creates a new Consumer for the given RabbitMQ instance.
-func Register(r *RabbitMQ) *Consumer {
-	return &Consumer{
-		RabbitMQ:  r,
-		consumers: make([]Handler, 0),
+// ConsumerManager manages multiple consumers with auto-reconnect and error handling.
+type ConsumerManager struct {
+	mq        *RabbitMQ
+	consumers map[string]*Consumer
+	mu        sync.Mutex
+	wg        sync.WaitGroup
+	log       *console.Logger
+}
+
+// newConsumer creates a new ConsumerManager for the given RabbitMQ instance.
+func newConsumer(r *RabbitMQ) *ConsumerManager {
+	return &ConsumerManager{
+		mq:        r,
+		consumers: make(map[string]*Consumer),
+		log:       console.New("rabbitmq-consumer"),
 	}
 }
 
 // Register adds one or more consumers to the manager.
-func (m *Consumer) Register(consumers ...Handler) {
-	m.consumers = append(m.consumers, consumers...)
+func (m *ConsumerManager) Register(consumers ...*Consumer) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for _, c := range consumers {
+		if c.Queue == "" || c.Handler == nil {
+			continue
+		}
+
+		if _, ok := m.consumers[c.Queue]; ok {
+			m.log.Info("queue %s already registered, override", c.Queue)
+		}
+
+		m.consumers[c.Queue] = c
+	}
+}
+
+func (m *ConsumerManager) All() map[string]*Consumer {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	cp := make(map[string]*Consumer, len(m.consumers))
+	for k, v := range m.consumers {
+		cp[k] = v
+	}
+
+	return cp
 }
 
 // Start starts all registered consumers in separate goroutines until context is canceled.
-func (m *Consumer) Start(ctx context.Context) {
+func (m *ConsumerManager) Start(ctx context.Context) {
 	if len(m.consumers) == 0 {
-		log.Println("[rabbitmq] no consumers registered")
+		m.log.Info("no consumer registered")
 		return
 	}
 
-	log.Printf("[rabbitmq] consumer(s) %d are starting", len(m.consumers))
+	m.log.Info("consumer(s) %d are starting", len(m.consumers))
 	for _, consumer := range m.consumers {
 		m.wg.Add(1)
 		go m.run(ctx, consumer)
 	}
 
-	log.Println("[rabbitmq] all consumers started successfully")
+	m.log.Info("all consumers started successfully")
 	<-ctx.Done()
 
-	log.Println("[rabbitmq] shutting down all consumers...")
+	m.log.Info("shutting down all consumers...")
 	m.wg.Wait()
-	log.Println("[rabbitmq] all consumers stopped")
+	m.log.Info("all consumers stopped")
 }
 
 // run runs a single consumer with auto error handling and reconnection.
-func (m *Consumer) run(ctx context.Context, consumer Handler) {
+func (m *ConsumerManager) run(ctx context.Context, consumer *Consumer) {
 	defer m.wg.Done()
 
-	queueName := consumer.Queue()
+	queueName := consumer.Queue
 	consecutiveErrors := 0
 	const maxConsecutiveErrors = 10
 	const retryDelay = 5 * time.Second
@@ -74,18 +105,17 @@ func (m *Consumer) run(ctx context.Context, consumer Handler) {
 	for {
 		select {
 		case <-ctx.Done():
-			log.Printf("[rabbitmq] consumer [%s] stopped by context cancellation", queueName)
 			return
 		default:
 			err := m.consume(ctx, consumer)
 
 			if err != nil {
 				consecutiveErrors++
-				log.Printf("[rabbitmq] consumer [%s] error: %v (consecutive errors: %d)",
+				m.log.Info("[%s] error: %v (consecutive errors: %d)",
 					queueName, err, consecutiveErrors)
 
 				if consecutiveErrors >= maxConsecutiveErrors {
-					log.Printf("[rabbitmq] consumer [%s] exceeded max consecutive errors (%d), stopping",
+					m.log.Info("[%s] exceeded max consecutive errors (%d), stopping",
 						queueName, maxConsecutiveErrors)
 					return
 				}
@@ -93,7 +123,7 @@ func (m *Consumer) run(ctx context.Context, consumer Handler) {
 				var amqpErr *amqp.Error
 				if errors.As(err, &amqpErr) {
 					if amqpErr.Code == 504 || amqpErr.Code == 320 || amqpErr.Code == 501 {
-						log.Printf("[WARNING][rabbitmq] consumer [%s] connection error, reconnecting...", queueName)
+						m.log.Warn("[%s] connection error, reconnecting...", queueName)
 						time.Sleep(retryDelay)
 						continue
 					}
@@ -107,16 +137,16 @@ func (m *Consumer) run(ctx context.Context, consumer Handler) {
 }
 
 // consume sets up the consumer and processes messages from the queue.
-func (m *Consumer) consume(ctx context.Context, consumer Handler) error {
-	queueName := consumer.Queue()
+func (m *ConsumerManager) consume(ctx context.Context, consumer *Consumer) error {
+	queueName := consumer.Queue
 
-	ch, err := m.GetChannel()
+	ch, err := m.mq.GetChannel()
 	if err != nil {
 		return err
 	}
 	defer ch.Close()
 
-	if err := m.Queue.DeclareSimple(queueName); err != nil {
+	if err := m.mq.queue.DeclareSimple(queueName); err != nil {
 		return err
 	}
 
@@ -138,7 +168,7 @@ func (m *Consumer) consume(ctx context.Context, consumer Handler) error {
 		return err
 	}
 
-	log.Printf("[rabbitmq] consumer [%s] started consuming messages", queueName)
+	m.log.Info("[%s] started consuming messages", queueName)
 
 	for {
 		select {
@@ -152,8 +182,8 @@ func (m *Consumer) consume(ctx context.Context, consumer Handler) error {
 			msg := Message{Delivery: delivery}
 			msgCtx := m.createMessageContext(msg)
 
-			if err := consumer.Handle(msgCtx, msg); err != nil {
-				log.Printf("[rabbitmq] consumer [%s] handle error: %v", queueName, err)
+			if err := consumer.Handler.Handle(msgCtx, msg); err != nil {
+				m.log.Info("[rabbitmq] consumer [%s] handle error: %v", queueName, err)
 				msg.Requeue()
 			} else {
 				msg.Commit()
@@ -163,7 +193,7 @@ func (m *Consumer) consume(ctx context.Context, consumer Handler) error {
 }
 
 // createMessageContext creates a new context with x-rid from message headers.
-func (m *Consumer) createMessageContext(msg Message) context.Context {
+func (m *ConsumerManager) createMessageContext(msg Message) context.Context {
 	newCtx := utils.NewCtx()
 	if xRID := msg.Header(consts.XRequestID); xRID != nil {
 		if s, ok := xRID.(string); ok && s != "" {

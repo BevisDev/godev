@@ -40,17 +40,17 @@ type HTTPRequest[T any] struct {
 	// headers allows you to set custom headers (e.g., Authorization, Content-Type).
 	headers map[string]string
 
-	// body is the raw HTTPRequest body (typically a struct to be JSON-encoded).
+	// body is the raw request body (typically a struct to be JSON-encoded).
 	// This is ignored if BodyForm is set.
 	body any
 
-	// method execute HTTPRequest
+	// method execute request
 	method string
 
-	// rid: ID HTTPRequest
+	// rid: ID Request
 	rid string
 
-	// startTime time begin HTTPRequest
+	// startTime time begin request
 	startTime time.Time
 }
 

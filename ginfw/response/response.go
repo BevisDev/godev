@@ -24,17 +24,17 @@ var Code = map[string]string{
 }
 
 // Response represents a standardized API response structure.
-type Response[T any] struct {
+type Response struct {
 	RID        string `json:"rid,omitempty"`
 	Success    bool   `json:"success"`
-	Data       T      `json:"data,omitempty"`
+	Data       any    `json:"data,omitempty"`
 	ResponseAt string `json:"response_at,omitempty"`
 	Error      *Error `json:"error,omitempty"`
 }
 
 // NewSuccess creates a successful response with the provided data.
-func NewSuccess[T any](ctx context.Context, data T) *Response[T] {
-	return &Response[T]{
+func NewSuccess(ctx context.Context, data any) *Response {
+	return &Response{
 		RID:        utils.GetRID(ctx),
 		Success:    true,
 		Data:       data,
@@ -43,8 +43,8 @@ func NewSuccess[T any](ctx context.Context, data T) *Response[T] {
 }
 
 // NewFailure creates a failure response with error code and message.
-func NewFailure(ctx context.Context, code, message string) *Response[any] {
-	return &Response[any]{
+func NewFailure(ctx context.Context, code, message string) *Response {
+	return &Response{
 		RID:        utils.GetRID(ctx),
 		Success:    false,
 		ResponseAt: datetime.ToString(time.Now(), datetime.DateTimeLayout),
@@ -73,25 +73,25 @@ func GetCode(code, message string, defCode string) (string, string) {
 
 // Success sends a 200 OK response with the provided data.
 func Success[T any](c *gin.Context, data T) {
-	res := NewSuccess[T](c.Request.Context(), data)
+	res := NewSuccess(c.Request.Context(), data)
 	c.JSON(http.StatusOK, res)
 }
 
 // Created sends a 201 Created response with the provided data.
-func Created[T any](c *gin.Context, data T) {
-	res := NewSuccess[T](c.Request.Context(), data)
+func Created(c *gin.Context, data any) {
+	res := NewSuccess(c.Request.Context(), data)
 	c.JSON(http.StatusCreated, res)
 }
 
 // Accepted sends a 202 Accepted response.
 func Accepted(c *gin.Context) {
-	res := NewSuccess[any](c.Request.Context(), nil)
+	res := NewSuccess(c.Request.Context(), nil)
 	c.JSON(http.StatusAccepted, res)
 }
 
 // NotModified sends a 304 Not Modified response.
 func NotModified(c *gin.Context) {
-	res := NewSuccess[any](c.Request.Context(), nil)
+	res := NewSuccess(c.Request.Context(), nil)
 	c.JSON(http.StatusNotModified, res)
 }
 

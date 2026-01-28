@@ -7,6 +7,7 @@ import (
 
 	"github.com/BevisDev/godev/consts"
 	"github.com/BevisDev/godev/utils"
+	"github.com/BevisDev/godev/utils/console"
 	"github.com/BevisDev/godev/utils/jsonx"
 	"github.com/BevisDev/godev/utils/str"
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -15,12 +16,14 @@ import (
 const maxMessageSize = 50000 // maxMessageSize max size message
 
 type Publisher struct {
-	mq *RabbitMQ
+	mq  *RabbitMQ
+	log *console.Logger
 }
 
 func newPublisher(mq *RabbitMQ) *Publisher {
 	return &Publisher{
-		mq: mq,
+		mq:  mq,
+		log: console.New("rabbitmq-publisher"),
 	}
 }
 

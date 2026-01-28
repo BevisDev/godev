@@ -8,27 +8,27 @@ import (
 type Option func(*options)
 
 type options struct {
-	Location    *time.Location
-	WithSeconds bool
+	location   *time.Location
+	useSeconds bool
 }
 
 func defaultOptions() *options {
 	return &options{
-		Location:    time.UTC,
-		WithSeconds: false,
+		location:   time.UTC,
+		useSeconds: false,
 	}
 }
 
 func WithSeconds() Option {
 	return func(o *options) {
-		o.WithSeconds = true
+		o.useSeconds = true
 	}
 }
 
 func WithLocation(loc *time.Location) Option {
 	return func(o *options) {
 		if loc != nil {
-			o.Location = loc
+			o.location = loc
 		}
 	}
 }
@@ -36,16 +36,16 @@ func WithLocation(loc *time.Location) Option {
 func WithTimezone(tz string) Option {
 	return func(o *options) {
 		if tz == "" {
-			o.Location = time.UTC
+			o.location = time.UTC
 			return
 		}
 
 		loc, err := time.LoadLocation(tz)
 		if err != nil {
 			log.Printf("[scheduler] invalid timezone %s, fallback to UTC", tz)
-			o.Location = time.UTC
+			o.location = time.UTC
 			return
 		}
-		o.Location = loc
+		o.location = loc
 	}
 }
