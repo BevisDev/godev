@@ -51,7 +51,7 @@ type RabbitMQ struct {
 //
 // Returns an error if the configuration is nil, the connection fails,
 // or the channel cannot be created.
-func New(c context.Context, cfg *Config, opts ...Option) (*RabbitMQ, error) {
+func New(cfg *Config, opts ...Option) (*RabbitMQ, error) {
 	if cfg == nil {
 		return nil, ErrNilConfig
 	}
@@ -61,7 +61,7 @@ func New(c context.Context, cfg *Config, opts ...Option) (*RabbitMQ, error) {
 		f(opt)
 	}
 
-	ctx, cancel := utils.NewCtxCancel(c)
+	ctx, cancel := utils.NewCtxCancel(context.Background())
 
 	r := &RabbitMQ{
 		config:      cfg.clone(),
@@ -279,38 +279,19 @@ func (r *RabbitMQ) GetConnection() (*amqp.Connection, error) {
 		return conn, nil
 	}
 
-	// Trigger reconnection
-	select {
-	case r.reconnectCh <- struct{}{}:
-	default:
-	}
-	r.mu.RUnlock()
-
-	// reconnect only one go routine
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	var (
-		conn *amqp.Connection
-		err  error
-	)
-	for i := 0; i < 5; i++ {
-		conn, err = r.connect()
-		if err == nil {
-			log.Println("[rabbitmq] reconnected successfully")
-			break
-		}
-
-		sleep := time.Second * time.Duration(1<<i)
-		log.Printf("[rabbitmq] is attempting to reconnect in %s..., (err: %v)", sleep, err)
-		time.Sleep(sleep)
-	}
-	if conn == nil {
+	// attempt to reconnect using the existing reconnect logic
+	if err := r.reconnect(); err != nil {
 		return nil, err
 	}
 
-	r.connection = conn
-	return conn, nil
+	r.connMu.RLock()
+	defer r.connMu.RUnlock()
+
+	if r.connection == nil || r.connection.IsClosed() {
+		return nil, errors.New("[rabbitmq] connection is nil or closed after reconnect")
+	}
+
+	return r.connection, nil
 }
 
 // GetChannel returns a new channel from the current connection.

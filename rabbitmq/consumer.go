@@ -137,8 +137,8 @@ func (m *ConsumerManager) run(ctx context.Context, consumer *Consumer) {
 }
 
 // consume sets up the consumer and processes messages from the queue.
-func (m *ConsumerManager) consume(ctx context.Context, consumer Handler) error {
-	queueName := consumer.Queue()
+func (m *ConsumerManager) consume(ctx context.Context, consumer *Consumer) error {
+	queueName := consumer.Queue
 
 	ch, err := m.mq.GetChannel()
 	if err != nil {
@@ -146,7 +146,7 @@ func (m *ConsumerManager) consume(ctx context.Context, consumer Handler) error {
 	}
 	defer ch.Close()
 
-	if err := m.mq.Queue.DeclareSimple(queueName); err != nil {
+	if err := m.mq.queue.DeclareSimple(queueName); err != nil {
 		return err
 	}
 
@@ -182,7 +182,7 @@ func (m *ConsumerManager) consume(ctx context.Context, consumer Handler) error {
 			msg := Message{Delivery: delivery}
 			msgCtx := m.createMessageContext(msg)
 
-			if err := consumer.Handle(msgCtx, msg); err != nil {
+			if err := consumer.Handler.Handle(msgCtx, msg); err != nil {
 				m.log.Info("[rabbitmq] consumer [%s] handle error: %v", queueName, err)
 				msg.Requeue()
 			} else {

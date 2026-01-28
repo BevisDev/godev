@@ -20,11 +20,6 @@ type Config struct {
 	Consumer ConsumerConfig
 }
 
-func (c *Config) clone() *Config {
-	clone := *c
-	return &clone
-}
-
 type ProducerConfig struct {
 	// Performance tuning
 	BatchSize    int
@@ -128,4 +123,35 @@ func (c *Config) validateConsumerConfig() error {
 	}
 
 	return nil
+}
+
+// DefaultConfig returns a configuration with sensible defaults for producer and consumer.
+// Caller should still customize Consumer.GroupID and Consumer.Topics when using consumer.
+func DefaultConfig(brokers []string) *Config {
+	return &Config{
+		Brokers: brokers,
+		Producer: ProducerConfig{
+			BatchSize:    100,
+			BatchTimeout: 100 * time.Millisecond,
+			MaxAttempts:  3,
+			Compression:  compress.Snappy,
+			Async:        false,
+			RequiredAcks: int(kafka.RequireAll),
+			Balancer:     &kafka.LeastBytes{},
+			Idempotent:   false,
+		},
+		Consumer: ConsumerConfig{
+			StartOffset:            kafka.LastOffset,
+			CommitInterval:         1 * time.Second,
+			MaxWait:                500 * time.Millisecond,
+			MinBytes:               1,
+			MaxBytes:               10 * 1024 * 1024,
+			AutoCommit:             false,
+			PartitionWatchInterval: 5 * time.Second,
+			SessionTimeout:         10 * time.Second,
+			RebalanceTimeout:       30 * time.Second,
+			HeartbeatInterval:      3 * time.Second,
+			IsolationLevel:         kafka.ReadCommitted,
+		},
+	}
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"sync"
+	"time"
 
 	"github.com/BevisDev/godev/consts"
 	"github.com/BevisDev/godev/utils"
@@ -82,20 +83,18 @@ func (c *Consumer) Consume(ctx context.Context, handler Handler) error {
 			for _, h := range msg.Headers {
 				if consts.XRequestID == h.Key {
 					rid = string(h.Value)
+					break
 				}
 			}
 
-			ctxNew := utils.SetValueCtx(nil, consts.RID, rid)
-			err = handler(ctxNew, &Message{
-				Topic:     msg.Topic,
-				Key:       msg.Key,
-				Value:     msg.Value,
-				Partition: msg.Partition,
-				Offset:    msg.Offset,
-			})
+			ctxNew := utils.SetValueCtx(ctx, consts.RID, rid)
+			consumed := c.convertMessage(msg)
+			err = handler(ctxNew, consumed)
 
-			// Manual commit after successful processing
-			if !c.config.AutoCommit {
+			// Manual commit only after successful processing
+			if err != nil {
+				log.Printf("[kafkax-consumer] handler error: %v", err)
+			} else if !c.config.AutoCommit {
 				if err := c.reader.CommitMessages(ctx, msg); err != nil {
 					log.Printf("[kafkax-consumer] error committing message: %v", err)
 				}
@@ -130,11 +129,9 @@ func (c *Consumer) SetOffset(topic string, partition int, offset int64) error {
 		return ErrConsumerClosed
 	}
 
-	return c.reader.SetOffset(kafka.Partition{
-		Topic:     topic,
-		Partition: partition,
-		Offset:    offset,
-	})
+	// Reader.SetOffset sets the offset for the current partition; topic/partition
+	// parameters are kept for API compatibility but not used here.
+	return c.reader.SetOffset(offset)
 }
 
 // Close closes the consumer
@@ -159,6 +156,60 @@ func (c *Consumer) IsClosed() bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.closed
+}
+
+// ReadMessage reads a single message and returns a ConsumedMessage.
+func (c *Consumer) ReadMessage(ctx context.Context) (*ConsumedMessage, error) {
+	c.mu.RLock()
+	if c.closed {
+		c.mu.RUnlock()
+		return nil, ErrConsumerClosed
+	}
+	c.mu.RUnlock()
+
+	msg, err := c.reader.FetchMessage(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return c.convertMessage(msg), nil
+}
+
+// CommitMessage commits the offset for the provided ConsumedMessage.
+func (c *Consumer) CommitMessage(ctx context.Context, msg *ConsumedMessage) error {
+	if msg == nil {
+		return nil
+	}
+	return msg.Commit(ctx)
+}
+
+// ConsumeWithRetry wraps Consume with retry logic on handler error.
+func (c *Consumer) ConsumeWithRetry(
+	ctx context.Context,
+	handler Handler,
+	maxRetries int,
+	retryDelay time.Duration,
+) error {
+	wrapped := func(ctx context.Context, msg *ConsumedMessage) error {
+		var err error
+		for attempt := 0; attempt <= maxRetries; attempt++ {
+			err = handler(ctx, msg)
+			if err == nil {
+				return nil
+			}
+
+			if attempt < maxRetries {
+				log.Printf("[kafkax-consumer] handler error: %v, retrying (%d/%d)", err, attempt+1, maxRetries)
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-time.After(retryDelay):
+				}
+			}
+		}
+		return err
+	}
+
+	return c.Consume(ctx, wrapped)
 }
 
 // convertMessage converts kafka.Message to ConsumedMessage
