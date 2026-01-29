@@ -10,7 +10,7 @@ import (
 )
 
 type Chain[T any] struct {
-	*Database
+	*DB
 	table string
 
 	columns []string
@@ -29,9 +29,9 @@ type Chain[T any] struct {
 }
 
 // Builder creates a new query builder chain for type T.
-func Builder[T any](db *Database) ChainExec[T] {
+func Builder[T any](db *DB) ChainExec[T] {
 	return &Chain[T]{
-		Database: db,
+		DB: db,
 	}
 }
 

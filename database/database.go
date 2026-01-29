@@ -21,22 +21,22 @@ const (
 	maxParams = 2000
 )
 
-// Database represents a database connection along with configuration
+// DB represents a database connection along with configuration
 // settings and options for query logging.
 //
 // It embeds *Config to provide access to database configuration,
 // and maintains an internal sqlx.DB connection for executing queries.
-type Database struct {
+type DB struct {
 	*Config
 	db *sqlx.DB // db is the initialized sqlx.DB connection.
 }
 
-// New creates a new Database instance from the given Config.
+// New creates a new DB instance from the given Config.
 //
 // It applies default values, initializes connection settings (pool, timeout),
 // connects to the appropriate database based on DBType (e.g., SQL Server, Postgres),
 // and performs a ping to verify connectivity.
-func New(cfg *Config) (*Database, error) {
+func New(cfg *Config) (*DB, error) {
 	if cfg == nil {
 		return nil, errors.New("[database] config is nil")
 	}
@@ -44,7 +44,7 @@ func New(cfg *Config) (*Database, error) {
 	// Apply defaults
 	cfg.clone()
 
-	db := &Database{Config: cfg}
+	db := &DB{Config: cfg}
 
 	// Initialize connection
 	dbx, err := db.connect()
@@ -57,7 +57,7 @@ func New(cfg *Config) (*Database, error) {
 }
 
 // connect establishes a database connection using the configured settings.
-func (d *Database) connect() (*sqlx.DB, error) {
+func (d *DB) connect() (*sqlx.DB, error) {
 	cfg := d.Config
 
 	// Get connection string
@@ -89,7 +89,7 @@ func (d *Database) connect() (*sqlx.DB, error) {
 }
 
 // Ping verifies the database connection is still alive.
-func (d *Database) Ping() error {
+func (d *DB) Ping() error {
 	if d.db == nil {
 		return errors.New("[database] ping error")
 	}
@@ -97,7 +97,7 @@ func (d *Database) Ping() error {
 }
 
 // Close closes the database connection and releases resources.
-func (d *Database) Close() {
+func (d *DB) Close() {
 	if d.db != nil {
 		_ = d.db.Close()
 		d.db = nil
@@ -105,24 +105,24 @@ func (d *Database) Close() {
 }
 
 // GetDB returns the underlying sqlx.DB connection.
-func (d *Database) GetDB() *sqlx.DB {
+func (d *DB) GetDB() *sqlx.DB {
 	return d.db
 }
 
 // ViewQuery logs the SQL query if ShowQuery is enabled.
-func (d *Database) ViewQuery(query string) {
+func (d *DB) ViewQuery(query string) {
 	if d.ShowQuery {
 		log.Printf("[database] query: %s", query)
 	}
 }
 
 // IsNoResult returns true if the error indicates no rows were found.
-func (d *Database) IsNoResult(err error) bool {
+func (d *DB) IsNoResult(err error) bool {
 	return errors.Is(err, sql.ErrNoRows)
 }
 
 // MustBePtr validates that dest is a non-nil pointer.
-func (d *Database) MustBePtr(dest interface{}) error {
+func (d *DB) MustBePtr(dest interface{}) error {
 	if !validate.IsNonNilPointer(dest) {
 		return errors.New("[database] destination must be a non-nil pointer")
 	}
@@ -130,7 +130,7 @@ func (d *Database) MustBePtr(dest interface{}) error {
 }
 
 // GetTemplate returns the SQL template for the given template type and database type.
-func (d *Database) GetTemplate(template TemplateJSON) string {
+func (d *DB) GetTemplate(template TemplateJSON) string {
 	if tempDB, ok := TemplateDBMap[d.DBType]; ok {
 		if tpl, ok := tempDB[template]; ok {
 			return tpl
@@ -141,7 +141,7 @@ func (d *Database) GetTemplate(template TemplateJSON) string {
 
 // FormatRow formats a parameter placeholder for the current database type.
 // For MySQL, returns "?"; for others, returns formatted placeholder with index (e.g., "$1", "@p1").
-func (d *Database) FormatRow(idx int) string {
+func (d *DB) FormatRow(idx int) string {
 	placeholder := d.DBType.GetPlaceHolder()
 	if d.DBType == MySQL {
 		return placeholder
@@ -151,7 +151,7 @@ func (d *Database) FormatRow(idx int) string {
 
 // rebind processes the query string and arguments for database-specific placeholder binding.
 // It handles IN clauses and rebinds placeholders according to the database type.
-func (d *Database) rebind(query string, args ...interface{}) (string, []interface{}, error) {
+func (d *DB) rebind(query string, args ...interface{}) (string, []interface{}, error) {
 	// Handle IN clauses (expand slice arguments)
 	if strings.Contains(strings.ToUpper(query), "IN") {
 		var err error
@@ -173,7 +173,7 @@ func (d *Database) rebind(query string, args ...interface{}) (string, []interfac
 //
 // It handles transaction lifecycle (begin, commit, rollback) and recovers from panics.
 // If the function returns an error or panics, the transaction is rolled back.
-func (d *Database) RunTx(ctx context.Context, level sql.IsolationLevel,
+func (d *DB) RunTx(ctx context.Context, level sql.IsolationLevel,
 	fn func(ctx context.Context, tx *sqlx.Tx) error,
 ) error {
 	txCtx, cancel := utils.NewCtxTimeout(ctx, d.Timeout)
@@ -209,7 +209,7 @@ func (d *Database) RunTx(ctx context.Context, level sql.IsolationLevel,
 //
 // dest must be a pointer to a slice of structs or values.
 // If no rows are returned, dest will remain an empty slice (no error is thrown).
-func (d *Database) GetList(c context.Context, dest interface{}, query string, args ...interface{}) error {
+func (d *DB) GetList(c context.Context, dest interface{}, query string, args ...interface{}) error {
 	if err := d.MustBePtr(dest); err != nil {
 		return err
 	}
@@ -234,7 +234,7 @@ func (d *Database) GetList(c context.Context, dest interface{}, query string, ar
 // dest must be a pointer to a value or struct.
 // If the query returns no rows, it returns an error (sql.ErrNoRows),
 // which you can check with IsNoResult(err).
-func (d *Database) GetAny(c context.Context, dest interface{}, query string, args ...interface{}) error {
+func (d *DB) GetAny(c context.Context, dest interface{}, query string, args ...interface{}) error {
 	if err := d.MustBePtr(dest); err != nil {
 		return err
 	}
@@ -257,7 +257,7 @@ func (d *Database) GetAny(c context.Context, dest interface{}, query string, arg
 // Execute runs the given SQL query with optional arguments.
 // If a transaction is provided, the query runs within it.
 // Otherwise, it executes directly on the database connection.
-func (d *Database) Execute(ctx context.Context, query string, tx *sqlx.Tx, args ...interface{}) error {
+func (d *DB) Execute(ctx context.Context, query string, tx *sqlx.Tx, args ...interface{}) error {
 	d.ViewQuery(query)
 
 	if tx != nil {
@@ -272,7 +272,7 @@ func (d *Database) Execute(ctx context.Context, query string, tx *sqlx.Tx, args 
 
 // ExecuteTx runs the query in a new transaction with default isolation level.
 // Rolls back if an error occurs.
-func (d *Database) ExecuteTx(ctx context.Context, query string, args ...interface{}) (err error) {
+func (d *DB) ExecuteTx(ctx context.Context, query string, args ...interface{}) (err error) {
 	return d.RunTx(ctx, sql.LevelDefault, func(ctx context.Context, tx *sqlx.Tx) error {
 		return d.Execute(ctx, query, tx, args...)
 	})
@@ -280,7 +280,7 @@ func (d *Database) ExecuteTx(ctx context.Context, query string, args ...interfac
 
 // ExecuteSafe runs the query in a new transaction with serializable isolation.
 // Ensures maximum data safety.
-func (d *Database) ExecuteSafe(ctx context.Context, query string, args ...interface{}) (err error) {
+func (d *DB) ExecuteSafe(ctx context.Context, query string, args ...interface{}) (err error) {
 	return d.RunTx(ctx, sql.LevelSerializable, func(ctx context.Context, tx *sqlx.Tx) error {
 		return d.Execute(ctx, query, tx, args...)
 	})
@@ -289,7 +289,7 @@ func (d *Database) ExecuteSafe(ctx context.Context, query string, args ...interf
 // ExecReturningId executes a query that returns a single auto-generated ID.
 //
 // Returns the generated ID and any error encountered.
-func (d *Database) ExecReturningId(ctx context.Context, query string, args ...interface{}) (int, error) {
+func (d *DB) ExecReturningId(ctx context.Context, query string, args ...interface{}) (int, error) {
 	d.ViewQuery(query)
 
 	db := d.GetDB()
@@ -302,7 +302,7 @@ func (d *Database) ExecReturningId(ctx context.Context, query string, args ...in
 }
 
 // Prepare creates a prepared statement for later execution.
-func (d *Database) Prepare(ctx context.Context, query string) (*sqlx.Stmt, error) {
+func (d *DB) Prepare(ctx context.Context, query string) (*sqlx.Stmt, error) {
 	db := d.GetDB()
 	stmt, err := db.PreparexContext(ctx, query)
 	if err != nil {
@@ -318,7 +318,7 @@ func (d *Database) Prepare(ctx context.Context, query string) (*sqlx.Stmt, error
 // otherwise, it is executed within the provided transaction.
 //
 // Returns any error encountered during execution.
-func (d *Database) Save(ctx context.Context, tx *sqlx.Tx, query string, args interface{}) (err error) {
+func (d *DB) Save(ctx context.Context, tx *sqlx.Tx, query string, args interface{}) (err error) {
 	d.ViewQuery(query)
 
 	if tx == nil {
@@ -343,7 +343,7 @@ func (d *Database) Save(ctx context.Context, tx *sqlx.Tx, query string, args int
 //
 // Returns:
 //   - error: An error if the database operation fails, otherwise nil.
-func (d *Database) InsertOrUpdate(ctx context.Context, query string, args interface{}) error {
+func (d *DB) InsertOrUpdate(ctx context.Context, query string, args interface{}) error {
 	return d.Save(ctx, nil, query, args)
 }
 
@@ -372,7 +372,7 @@ func (d *Database) InsertOrUpdate(ctx context.Context, query string, args interf
 //	    Email string `db:"email"`
 //	}
 //	SaveTx(ctx, db, query, Person{...})
-func (d *Database) SaveTx(ctx context.Context, query string, args interface{}) (err error) {
+func (d *DB) SaveTx(ctx context.Context, query string, args interface{}) (err error) {
 	return d.RunTx(ctx, sql.LevelDefault, func(ctx context.Context, tx *sqlx.Tx) error {
 		return d.Save(ctx, tx, query, args)
 	})
@@ -380,7 +380,7 @@ func (d *Database) SaveTx(ctx context.Context, query string, args interface{}) (
 
 // SaveSafe executes a query with named parameters within a transaction
 // using serializable isolation level for maximum safety.
-func (d *Database) SaveSafe(ctx context.Context, query string, args interface{}) error {
+func (d *DB) SaveSafe(ctx context.Context, query string, args interface{}) error {
 	return d.RunTx(ctx, sql.LevelSerializable, func(ctx context.Context, tx *sqlx.Tx) error {
 		return d.Save(ctx, tx, query, args)
 	})
@@ -393,7 +393,7 @@ func (d *Database) SaveSafe(ctx context.Context, query string, args interface{})
 //   - If dest is a struct pointer: the query must return all the columns
 //     (e.g., using `OUTPUT INSERTED.*` or `RETURNING *`).
 //
-// Database-specific notes:
+// DB-specific notes:
 //   - SQL Server:
 //   - Use "OUTPUT INSERTED.id" for ID only.
 //   - Use "OUTPUT INSERTED.*" for the full inserted row.
@@ -407,7 +407,7 @@ func (d *Database) SaveSafe(ctx context.Context, query string, args interface{})
 //
 // The function automatically determines whether to use `Scan` (for int)
 // or `StructScan` (for structs) based on the type of dest.
-func (d *Database) InsertReturning(c context.Context, query string, dest interface{}, args ...interface{}) error {
+func (d *DB) InsertReturning(c context.Context, query string, dest interface{}, args ...interface{}) error {
 	if err := d.MustBePtr(dest); err != nil {
 		return err
 	}
@@ -443,7 +443,7 @@ func (d *Database) InsertReturning(c context.Context, query string, dest interfa
 //	colNames := []string{"name", "email"}
 //	args := []interface{}{"Alice", "alice@example.com", "Bob", "bob@example.com"}
 //	err := db.InsertBulk(ctx, "users", 2, colNames, args...)
-func (d *Database) InsertBulk(ctx context.Context, table string, row int, colNames []string, args ...interface{}) error {
+func (d *DB) InsertBulk(ctx context.Context, table string, row int, colNames []string, args ...interface{}) error {
 	col := len(colNames)
 	if col <= 0 {
 		return errors.New("[database] column count must be greater than 0")
@@ -478,7 +478,7 @@ func (d *Database) InsertBulk(ctx context.Context, table string, row int, colNam
 
 // InsertBatch executes a single batch INSERT statement with the provided arguments.
 // This is a helper method used by InsertBulk for batching large inserts.
-func (d *Database) InsertBatch(ctx context.Context, tx *sqlx.Tx,
+func (d *DB) InsertBatch(ctx context.Context, tx *sqlx.Tx,
 	table string, colNames []string,
 	col int, row int, args []interface{},
 ) error {
@@ -521,7 +521,7 @@ func (d *Database) InsertBatch(ctx context.Context, tx *sqlx.Tx,
 //	err := db.InsertMany(ctx, query, entities)
 //
 // Note: The fields in each entity must match the named parameters in the query.
-func (d *Database) InsertMany(ctx context.Context, query string, entities []interface{}) error {
+func (d *DB) InsertMany(ctx context.Context, query string, entities []interface{}) error {
 	const batchSize = 1000
 	d.ViewQuery(query)
 
@@ -547,7 +547,7 @@ func (d *Database) InsertMany(ctx context.Context, query string, entities []inte
 // Delete runs a delete query within a transaction using default isolation level.
 //
 // The query should use named parameters matching the fields in args.
-func (d *Database) Delete(ctx context.Context, query string, args interface{}) (err error) {
+func (d *DB) Delete(ctx context.Context, query string, args interface{}) (err error) {
 	return d.RunTx(ctx, sql.LevelDefault, func(ctx context.Context, tx *sqlx.Tx) error {
 		return d.Save(ctx, tx, query, args)
 	})
@@ -557,7 +557,7 @@ func (d *Database) Delete(ctx context.Context, query string, args interface{}) (
 // each with its own named parameters, inside a single transaction.
 //
 // Uses default isolation level.
-func (d *Database) UpdateMany(ctx context.Context, query string, entities []interface{}) (err error) {
+func (d *DB) UpdateMany(ctx context.Context, query string, entities []interface{}) (err error) {
 	return d.RunTx(ctx, sql.LevelDefault, func(ctx context.Context, tx *sqlx.Tx) error {
 		d.ViewQuery(query)
 		for _, e := range entities {
@@ -572,7 +572,7 @@ func (d *Database) UpdateMany(ctx context.Context, query string, entities []inte
 
 // UpdateManySafe is like UpdateMany but runs with serializable isolation level,
 // ensuring maximum safety in concurrent environments.
-func (d *Database) UpdateManySafe(ctx context.Context, query string, entities []interface{}) (err error) {
+func (d *DB) UpdateManySafe(ctx context.Context, query string, entities []interface{}) (err error) {
 	return d.RunTx(ctx, sql.LevelSerializable, func(ctx context.Context, tx *sqlx.Tx) error {
 		d.ViewQuery(query)
 		for _, e := range entities {

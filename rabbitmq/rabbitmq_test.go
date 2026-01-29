@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func NewMQTest() (*RabbitMQ, error) {
+func NewMQTest() (*MQ, error) {
 	mq, err := New(&Config{
 		Host:     "localhost",
 		Port:     5672,

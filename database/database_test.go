@@ -23,7 +23,7 @@ type User struct {
 }
 
 // setupTestDB creates a test database instance with mock.
-func setupTestDB(t *testing.T) (*Database, sqlmock.Sqlmock) {
+func setupTestDB(t *testing.T) (*DB, sqlmock.Sqlmock) {
 	t.Helper()
 
 	db, mock, err := sqlmock.New()
@@ -31,7 +31,7 @@ func setupTestDB(t *testing.T) (*Database, sqlmock.Sqlmock) {
 
 	sqlxDB := sqlx.NewDb(db, "sqlmock")
 
-	database := &Database{
+	database := &DB{
 		Config: &Config{
 			DBType:  SqlServer,
 			Timeout: 5 * time.Second,
@@ -66,7 +66,7 @@ func TestDatabase_Ping(t *testing.T) {
 	})
 
 	t.Run("nil connection", func(t *testing.T) {
-		db := &Database{db: nil}
+		db := &DB{db: nil}
 
 		err := db.Ping()
 		assert.Error(t, err)
@@ -98,7 +98,7 @@ func TestDatabase_GetDB(t *testing.T) {
 
 func TestDatabase_ViewQuery(t *testing.T) {
 	t.Run("enabled", func(t *testing.T) {
-		db := &Database{
+		db := &DB{
 			Config: &Config{ShowQuery: true},
 		}
 		// ViewQuery should not panic when ShowQuery is true
@@ -108,7 +108,7 @@ func TestDatabase_ViewQuery(t *testing.T) {
 	})
 
 	t.Run("disabled", func(t *testing.T) {
-		db := &Database{
+		db := &DB{
 			Config: &Config{ShowQuery: false},
 		}
 		assert.NotPanics(t, func() {
@@ -133,7 +133,7 @@ func TestDatabase_IsNoResult(t *testing.T) {
 		{"nil error", nil, false},
 	}
 
-	db := &Database{}
+	db := &DB{}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := db.IsNoResult(tt.err)
@@ -143,7 +143,7 @@ func TestDatabase_IsNoResult(t *testing.T) {
 }
 
 func TestDatabase_MustBePtr(t *testing.T) {
-	db := &Database{}
+	db := &DB{}
 
 	t.Run("valid pointer", func(t *testing.T) {
 		var val int
@@ -181,7 +181,7 @@ func TestDatabase_FormatRow(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			db := &Database{Config: &Config{DBType: tt.dbType}}
+			db := &DB{Config: &Config{DBType: tt.dbType}}
 			result := db.FormatRow(tt.idx)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -190,22 +190,22 @@ func TestDatabase_FormatRow(t *testing.T) {
 
 func TestDatabase_GetTemplate(t *testing.T) {
 	t.Run("SqlServer", func(t *testing.T) {
-		db := &Database{Config: &Config{DBType: SqlServer}}
+		db := &DB{Config: &Config{DBType: SqlServer}}
 		assert.Contains(t, db.GetTemplate(TemplateJSONArray), "FOR JSON PATH")
 		assert.Contains(t, db.GetTemplate(TemplateJSONObject), "WITHOUT_ARRAY_WRAPPER")
 	})
 	t.Run("Postgres", func(t *testing.T) {
-		db := &Database{Config: &Config{DBType: Postgres}}
+		db := &DB{Config: &Config{DBType: Postgres}}
 		assert.Contains(t, db.GetTemplate(TemplateJSONArray), "json_agg")
 		assert.Contains(t, db.GetTemplate(TemplateJSONObject), "row_to_json")
 	})
 	t.Run("MySQL", func(t *testing.T) {
-		db := &Database{Config: &Config{DBType: MySQL}}
+		db := &DB{Config: &Config{DBType: MySQL}}
 		assert.Contains(t, db.GetTemplate(TemplateJSONArray), "JSON_ARRAYAGG")
 		assert.Contains(t, db.GetTemplate(TemplateJSONObject), "JSON_OBJECT")
 	})
 	t.Run("Oracle_unknown", func(t *testing.T) {
-		db := &Database{Config: &Config{DBType: Oracle}}
+		db := &DB{Config: &Config{DBType: Oracle}}
 		assert.Empty(t, db.GetTemplate(TemplateJSONArray))
 		assert.Empty(t, db.GetTemplate(TemplateJSONObject))
 	})
@@ -856,7 +856,7 @@ func TestDatabase_RunTx_PanicRecovery(t *testing.T) {
 // Helper Functions
 // ============================================================================
 
-func buildExpectedInsertQuery(db *Database, table string, colNames []string, rowCount int) string {
+func buildExpectedInsertQuery(db *DB, table string, colNames []string, rowCount int) string {
 	var placeholders []string
 	colCount := len(colNames)
 

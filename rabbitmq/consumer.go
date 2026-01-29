@@ -26,15 +26,15 @@ type Consumer struct {
 
 // ConsumerManager manages multiple consumers with auto-reconnect and error handling.
 type ConsumerManager struct {
-	mq        *RabbitMQ
+	mq        *MQ
 	consumers map[string]*Consumer
 	mu        sync.Mutex
 	wg        sync.WaitGroup
 	log       *console.Logger
 }
 
-// newConsumer creates a new ConsumerManager for the given RabbitMQ instance.
-func newConsumer(r *RabbitMQ) *ConsumerManager {
+// newConsumer creates a new ConsumerManager for the given MQ instance.
+func newConsumer(r *MQ) *ConsumerManager {
 	return &ConsumerManager{
 		mq:        r,
 		consumers: make(map[string]*Consumer),

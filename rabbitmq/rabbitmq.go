@@ -14,8 +14,8 @@ import (
 
 type ChannelHandler func(ch *amqp.Channel) error
 
-// RabbitMQ represents a production-ready RabbitMQ client with automatic reconnection
-type RabbitMQ struct {
+// MQ represents a production-ready MQ client with automatic reconnection
+type MQ struct {
 	*options
 	config *Config
 
@@ -48,7 +48,7 @@ type RabbitMQ struct {
 //
 // Returns an error if the configuration is nil, the connection fails,
 // or the channel cannot be created.
-func New(cfg *Config, opts ...Option) (*RabbitMQ, error) {
+func New(cfg *Config, opts ...Option) (*MQ, error) {
 	if cfg == nil {
 		return nil, ErrNilConfig
 	}
@@ -60,7 +60,7 @@ func New(cfg *Config, opts ...Option) (*RabbitMQ, error) {
 
 	ctx, cancel := utils.NewCtxCancel(context.Background())
 
-	r := &RabbitMQ{
+	r := &MQ{
 		config:      cfg.clone(),
 		options:     opt,
 		reconnectCh: make(chan struct{}, 1),
@@ -94,7 +94,7 @@ func New(cfg *Config, opts ...Option) (*RabbitMQ, error) {
 }
 
 // monitorConnection monitors connection health and triggers reconnection
-func (r *RabbitMQ) monitorConnection() {
+func (r *MQ) monitorConnection() {
 	defer r.wg.Done()
 
 	for {
@@ -128,7 +128,7 @@ func (r *RabbitMQ) monitorConnection() {
 	}
 }
 
-func (r *RabbitMQ) connect() error {
+func (r *MQ) connect() error {
 	r.connMu.Lock()
 	defer r.connMu.Unlock()
 
@@ -154,14 +154,14 @@ func (r *RabbitMQ) connect() error {
 }
 
 // isClosed checks if the client is closed
-func (r *RabbitMQ) isClosed() bool {
+func (r *MQ) isClosed() bool {
 	r.closedMu.RLock()
 	defer r.closedMu.RUnlock()
 	return r.closed
 }
 
-// Close gracefully shuts down the RabbitMQ client
-func (r *RabbitMQ) Close() {
+// Close gracefully shuts down the MQ client
+func (r *MQ) Close() {
 	r.closedMu.Lock()
 	if r.closed {
 		r.closedMu.Unlock()
@@ -209,7 +209,7 @@ func (r *RabbitMQ) Close() {
 }
 
 // reconnect attempts to reconnect with exponential backoff
-func (r *RabbitMQ) reconnect() error {
+func (r *MQ) reconnect() error {
 	if r.isClosed() {
 		return ErrClientClosed
 	}
@@ -246,7 +246,7 @@ func (r *RabbitMQ) reconnect() error {
 }
 
 // Health checks the health status of the connection
-func (r *RabbitMQ) Health() error {
+func (r *MQ) Health() error {
 	if r.isClosed() {
 		return ErrClientClosed
 	}
@@ -267,7 +267,7 @@ func (r *RabbitMQ) Health() error {
 
 // GetConnection returns a live connection, reconnecting if needed.
 // It retries indefinitely until a connection is established.
-func (r *RabbitMQ) GetConnection() (*amqp.Connection, error) {
+func (r *MQ) GetConnection() (*amqp.Connection, error) {
 	if r.isClosed() {
 		return nil, ErrClientClosed
 	}
@@ -297,7 +297,7 @@ func (r *RabbitMQ) GetConnection() (*amqp.Connection, error) {
 }
 
 // GetChannel returns a new channel from the current connection.
-func (r *RabbitMQ) GetChannel() (*amqp.Channel, error) {
+func (r *MQ) GetChannel() (*amqp.Channel, error) {
 	conn, err := r.GetConnection()
 	if err != nil {
 		return nil, err
@@ -308,7 +308,7 @@ func (r *RabbitMQ) GetChannel() (*amqp.Channel, error) {
 
 // GetConsumerChannel returns a channel WITH QoS configured for consuming
 // Use this specifically for consumers
-func (r *RabbitMQ) GetConsumerChannel() (*amqp.Channel, error) {
+func (r *MQ) GetConsumerChannel() (*amqp.Channel, error) {
 	conn, err := r.GetConnection()
 	if err != nil {
 		return nil, fmt.Errorf("get connection: %w", err)
@@ -334,7 +334,7 @@ func (r *RabbitMQ) GetConsumerChannel() (*amqp.Channel, error) {
 	return ch, nil
 }
 
-func (r *RabbitMQ) WithChannel(fn ChannelHandler) error {
+func (r *MQ) WithChannel(fn ChannelHandler) error {
 	ch, err := r.GetChannel()
 	if err != nil {
 		return err
@@ -345,16 +345,16 @@ func (r *RabbitMQ) WithChannel(fn ChannelHandler) error {
 }
 
 // GetPublisher returns the publisher instance
-func (r *RabbitMQ) GetPublisher() *Publisher {
+func (r *MQ) GetPublisher() *Publisher {
 	return r.publisher
 }
 
 // GetConsumer returns the consumer instance
-func (r *RabbitMQ) GetConsumer() *ConsumerManager {
+func (r *MQ) GetConsumer() *ConsumerManager {
 	return r.consumer
 }
 
 // GetQueue returns the queue instance
-func (r *RabbitMQ) GetQueue() *Queue {
+func (r *MQ) GetQueue() *Queue {
 	return r.queue
 }

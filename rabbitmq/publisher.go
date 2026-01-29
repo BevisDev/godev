@@ -19,11 +19,11 @@ const (
 )
 
 type Publisher struct {
-	mq  *RabbitMQ
+	mq  *MQ
 	log *console.Logger
 }
 
-func newPublisher(mq *RabbitMQ) *Publisher {
+func newPublisher(mq *MQ) *Publisher {
 	return &Publisher{
 		mq:  mq,
 		log: console.New("publisher"),

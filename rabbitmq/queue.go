@@ -38,7 +38,7 @@ func (e ExchangeType) String() string {
 
 // Queue manages operations related to queue/exchange declarations
 type Queue struct {
-	mq *RabbitMQ
+	mq *MQ
 	Spec
 }
 
@@ -72,7 +72,7 @@ type Spec struct {
 	Exchanges []ExchangeSpec
 }
 
-func newQueue(mq *RabbitMQ) *Queue {
+func newQueue(mq *MQ) *Queue {
 	return &Queue{
 		mq: mq,
 	}
