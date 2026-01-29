@@ -72,7 +72,7 @@ func GetCode(code, message string, defCode string) (string, string) {
 }
 
 // Success sends a 200 OK response with the provided data.
-func Success[T any](c *gin.Context, data T) {
+func Success(c *gin.Context, data any) {
 	res := NewSuccess(c.Request.Context(), data)
 	c.JSON(http.StatusOK, res)
 }
