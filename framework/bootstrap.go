@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"sync"
@@ -12,6 +11,7 @@ import (
 	"time"
 
 	"github.com/BevisDev/godev/kafkax"
+	"github.com/BevisDev/godev/utils/console"
 
 	"github.com/BevisDev/godev/database"
 	"github.com/BevisDev/godev/ginfw/server"
@@ -29,6 +29,7 @@ import (
 // Bootstrap manages application lifecycle and dependencies.
 type Bootstrap struct {
 	*options
+	log *console.Logger
 
 	// Core services
 	Logger        *logger.Logger
@@ -65,6 +66,7 @@ func New(opts ...Option) *Bootstrap {
 	ctx, cancel := context.WithCancel(context.Background())
 	b := &Bootstrap{
 		options: new(options),
+		log:     console.New("bootstrap"),
 		ctx:     ctx,
 		cancel:  cancel,
 	}
@@ -123,7 +125,7 @@ func (b *Bootstrap) Init(ctx context.Context) error {
 	b.mu.Lock()
 	if b.initialized {
 		b.mu.Unlock()
-		return errors.New("[bootstrap] already initialized")
+		return errors.New("[boostrap] already initialized")
 	}
 	b.mu.Unlock()
 
@@ -134,9 +136,9 @@ func (b *Bootstrap) Init(ctx context.Context) error {
 		}
 	}
 
-	log.Println("[bootstrap] initializing services...")
+	b.log.Info("initializing services...")
 
-	// Logger: must be initialized first (synchronously) for other services
+	// 1. Logger: MUST be first (synchronous)
 	if b.Logger == nil {
 		if b.loggerConf == nil {
 			b.loggerConf = &logger.Config{
@@ -150,7 +152,40 @@ func (b *Bootstrap) Init(ctx context.Context) error {
 		b.Logger = l
 	}
 
-	// Init services in parallel (except logger which must be first)
+	// 2. Setup server config EARLY (before parallel init)
+	if b.serverConf == nil {
+		b.serverConf = &server.Config{}
+	}
+
+	if b.serverConf.Shutdown == nil {
+		b.serverConf.Shutdown = func(ctx context.Context) error {
+			b.closeServices()
+			return nil
+		}
+	}
+
+	// run services
+	if err := b.runServices(ctx); err != nil {
+		return nil
+	}
+
+	// Consume after init hooks (services are now available, can set Setup/Shutdown here)
+	for _, fn := range b.afterInit {
+		if err := fn(ctx); err != nil {
+			return fmt.Errorf("[bootstrap] after init hook failed: %w", err)
+		}
+	}
+
+	b.mu.Lock()
+	b.initialized = true
+	b.mu.Unlock()
+
+	b.log.Info("initialization completed")
+	return nil
+}
+
+func (b *Bootstrap) runServices(ctx context.Context) error {
+	// Init services in parallel
 	g, ctx := errgroup.WithContext(ctx)
 
 	// Database
@@ -158,7 +193,7 @@ func (b *Bootstrap) Init(ctx context.Context) error {
 		g.Go(func() error {
 			db, err := database.New(b.dbConf)
 			if err != nil {
-				return fmt.Errorf("[database] %w", err)
+				return err
 			}
 			b.Database = db
 			return nil
@@ -188,36 +223,6 @@ func (b *Bootstrap) Init(ctx context.Context) error {
 			return nil
 		})
 	}
-
-	// Kafka
-	//if b.kafkaConf != nil && b.Kafka == nil {
-	//	g.Go(func() error {
-	//		kafka, err := kafkax.New(b.kafkaConf)
-	//		if err != nil {
-	//			return fmt.Errorf("[kafka] %w", err)
-	//		}
-	//		b.Kafka = kafka
-	//		return nil
-	//	})
-	//} else if b.kafkaProducerConf != nil && b.KafkaProducer == nil {
-	//	g.Go(func() error {
-	//		p, err := kafkax.NewProducer(b.kafkaProducerConf)
-	//		if err != nil {
-	//			return fmt.Errorf("[kafka-producer] %w", err)
-	//		}
-	//		b.KafkaProducer = p
-	//		return nil
-	//	})
-	//} else if b.kafkaConsumerConf != nil && b.KafkaConsumer == nil {
-	//	g.Go(func() error {
-	//		c, err := kafkax.NewConsumer(b.kafkaConsumerConf)
-	//		if err != nil {
-	//			return fmt.Errorf("[kafka-consumer] %w", err)
-	//		}
-	//		b.KafkaConsumer = c
-	//		return nil
-	//	})
-	//}
 
 	// Keycloak
 	if b.keycloakConf != nil && b.Keycloak == nil {
@@ -255,28 +260,6 @@ func (b *Bootstrap) Init(ctx context.Context) error {
 		return err
 	}
 
-	// Consume after init hooks (services are now available, can set Setup/Shutdown here)
-	for _, fn := range b.afterInit {
-		if err := fn(ctx); err != nil {
-			return fmt.Errorf("[bootstrap] after init hook failed: %w", err)
-		}
-	}
-
-	// Ensure server config exists (for setting Setup/Shutdown later)
-	if b.serverConf == nil {
-		b.serverConf = &server.Config{
-			Shutdown: func(ctx context.Context) error {
-				b.closeServices()
-				return nil
-			},
-		}
-	}
-
-	b.mu.Lock()
-	b.initialized = true
-	b.mu.Unlock()
-
-	log.Println("[bootstrap] initialization completed")
 	return nil
 }
 
@@ -300,7 +283,7 @@ func (b *Bootstrap) Start(ctx context.Context) error {
 		}
 	}
 
-	log.Println("[bootstrap] starting services...")
+	b.log.Info("starting services...")
 
 	// Start scheduler if configured
 	if b.Scheduler != nil {
@@ -328,7 +311,7 @@ func (b *Bootstrap) Start(ctx context.Context) error {
 	b.started = true
 	b.mu.Unlock()
 
-	log.Println("[bootstrap] all services started")
+	b.log.Info("all services started")
 
 	// Setup signal handling
 	sig := make(chan os.Signal, 1)
@@ -338,9 +321,9 @@ func (b *Bootstrap) Start(ctx context.Context) error {
 	// Wait for shutdown signal
 	select {
 	case <-ctx.Done():
-		log.Println("[bootstrap] root context cancelled")
+		b.log.Info("root context cancelled")
 	case s := <-sig:
-		log.Printf("[bootstrap] received signal: %v", s)
+		b.log.Info("received signal: %v", s)
 	}
 
 	return nil
@@ -355,21 +338,21 @@ func (b *Bootstrap) Stop(ctx context.Context) error {
 	}
 	b.mu.Unlock()
 
-	log.Println("[bootstrap] stopping services...")
+	b.log.Info("stopping services...")
 
 	// Consume before stop hooks
 	for _, fn := range b.beforeStop {
 		if err := fn(ctx); err != nil {
-			log.Printf("[bootstrap] before stop hook error: %v", err)
+			return fmt.Errorf("[bootstrap] before stop hook error: %w", err)
 		}
 	}
 
 	// Stop HTTP server if configured
 	if b.HTTPApp != nil {
 		if err := b.HTTPApp.Stop(ctx); err != nil {
-			log.Printf("[bootstrap] HTTP server stop error: %v", err)
+			b.log.Info("HTTP server stop error: %v", err)
 		} else {
-			log.Println("[bootstrap] HTTP server stopped")
+			b.log.Info("HTTP server stopped")
 		}
 	}
 
@@ -379,7 +362,7 @@ func (b *Bootstrap) Stop(ctx context.Context) error {
 	// Consume after stop hooks
 	for _, fn := range b.afterStop {
 		if err := fn(ctx); err != nil {
-			log.Printf("[bootstrap] after stop hook error: %v", err)
+			b.log.Info("after stop hook error: %v", err)
 		}
 	}
 
@@ -387,7 +370,7 @@ func (b *Bootstrap) Stop(ctx context.Context) error {
 	b.started = false
 	b.mu.Unlock()
 
-	log.Println("[bootstrap] all services stopped")
+	b.log.Info("all services stopped")
 	return nil
 }
 

@@ -14,6 +14,15 @@ func decimalPtr(f float64) *decimal.Decimal {
 	return &d
 }
 
+type BadJSON struct {
+	Ch chan int
+}
+
+func intPtrPtr(i int) any {
+	p := &i
+	return &p
+}
+
 func TestToString(t *testing.T) {
 	now := time.Date(2024, 5, 1, 12, 30, 0, 0, time.UTC)
 	dec := decimal.NewFromFloat(12.345)
@@ -30,6 +39,7 @@ func TestToString(t *testing.T) {
 		input    any
 		expected string
 	}{
+		// primitives
 		{"int", 123, "123"},
 		{"int64", int64(999), "999"},
 		{"float64", 3.14159, "3.14159"},
@@ -42,6 +52,7 @@ func TestToString(t *testing.T) {
 
 		// pointer cases
 		{"*int", func() any { v := 42; return &v }(), "42"},
+		{"**int", intPtrPtr(77), "77"},
 		{"*int64", func() any { v := int64(888); return &v }(), "888"},
 		{"*string", func() any { s := "pointer"; return &s }(), "pointer"},
 		{"*bool", func() any { b := true; return &b }(), "true"},
@@ -52,12 +63,28 @@ func TestToString(t *testing.T) {
 		{"time.Time", now, now.Format(time.RFC3339)},
 		{"*time.Time", &now, now.Format(time.RFC3339)},
 
+		// slice
+		{"[]int", []int{1, 2, 3}, `[1,2,3]`},
+		{"[]string", []string{"a", "b"}, `["a","b"]`},
+		{"[]struct", []User{user}, `[{"name":"Bob","age":30}]`},
+		{"empty slice", []int{}, `[]`},
+
+		// array
+		{"array", [3]int{1, 2, 3}, `[1,2,3]`},
+
+		// map
+		{"map[string]int", map[string]int{"a": 1}, `{"a":1}`},
+		{"map empty", map[string]string{}, `{}`},
+
 		// decimal.Decimal
 		{"decimal.Decimal", dec, dec.String()},
 		{"*decimal.Decimal", decPtr, decPtr.String()},
 
 		// generic struct (JSON)
 		{"struct as JSON", user, `{"name":"Bob","age":30}`},
+
+		// fallback (marshal fail)
+		{"bad json struct", BadJSON{}, "{Ch:<nil>}"},
 	}
 
 	for _, tt := range tests {
@@ -261,7 +288,7 @@ func TestRemoveAccents(t *testing.T) {
 	}
 }
 
-func TestCleanText(t *testing.T) {
+func TestNormalizeText(t *testing.T) {
 	tests := []struct {
 		input    string
 		expected string
@@ -273,7 +300,7 @@ func TestCleanText(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			result := Clean(tt.input)
+			result := Normalize(tt.input)
 			if result != tt.expected {
 				t.Errorf("CleanText(%q) = %q; want %q", tt.input, result, tt.expected)
 			}

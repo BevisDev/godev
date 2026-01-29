@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
@@ -12,8 +11,6 @@ import (
 	"github.com/BevisDev/godev/utils/console"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
-
-type ConsumerHandler func(ctx context.Context, msg Message) error
 
 type ChannelHandler func(ch *amqp.Channel) error
 
@@ -80,14 +77,19 @@ func New(cfg *Config, opts ...Option) (*RabbitMQ, error) {
 
 	// Initialize components
 	r.queue = newQueue(r)
-	r.publisher = newPublisher(r)
-	r.consumer = newConsumer(r)
+	if r.publisherOn {
+		r.publisher = newPublisher(r)
+	}
+
+	if r.consumerOn {
+		r.consumer = newConsumer(r)
+	}
 
 	// Start connection monitor
 	r.wg.Add(1)
 	go r.monitorConnection()
 
-	log.Println("[rabbitmq] connected successfully")
+	r.log.Info("connected successfully")
 	return r, nil
 }
 
@@ -98,7 +100,7 @@ func (r *RabbitMQ) monitorConnection() {
 	for {
 		select {
 		case <-r.ctx.Done():
-			log.Printf("[rabbitmq] context is cannceled")
+			r.log.Info("context is cancelled")
 			return
 
 		case err := <-r.closeNotify:
@@ -106,7 +108,7 @@ func (r *RabbitMQ) monitorConnection() {
 				return
 			}
 
-			log.Printf("[rabbitmq] connection closed: %v", err)
+			r.log.Info("connection closed: %v", err)
 
 			// Trigger reconnection
 			select {
@@ -115,12 +117,12 @@ func (r *RabbitMQ) monitorConnection() {
 			}
 
 			if err := r.reconnect(); err != nil {
-				fmt.Printf("[rabbitmq] reconnect failed: %v", err)
+				r.log.Error("reconnect failed: %v", err)
 			}
 
 		case <-r.reconnectCh:
 			if err := r.reconnect(); err != nil {
-				fmt.Printf("[rabbitmq] manual reconnection failed: %v", err)
+				r.log.Error("manual reconnection failed: %v", err)
 			}
 		}
 	}
@@ -169,7 +171,7 @@ func (r *RabbitMQ) Close() {
 	r.closed = true
 	r.closedMu.Unlock()
 
-	log.Println("[rabbitmq] is shutting down")
+	r.log.Info("shutting down")
 
 	// Cancel context to stop background goroutines
 	r.cancel()
@@ -184,7 +186,7 @@ func (r *RabbitMQ) Close() {
 	select {
 	case <-done:
 	case <-time.After(10 * time.Second):
-		log.Println("[rabbitmq] shutdown timeout, forcing close")
+		r.log.Info("shutdown timeout, forcing close")
 	}
 
 	// Close components
@@ -203,7 +205,7 @@ func (r *RabbitMQ) Close() {
 	}
 	r.connMu.Unlock()
 
-	log.Println("[rabbitmq] shutdown complete")
+	r.log.Info("shutdown complete")
 }
 
 // reconnect attempts to reconnect with exponential backoff
@@ -222,7 +224,7 @@ func (r *RabbitMQ) reconnect() error {
 		default:
 		}
 
-		log.Printf("[rabbitmq] attempting %d to reconnect...", attempt)
+		r.log.Info("attempting %d to reconnect...", attempt)
 
 		if err := r.connect(); err != nil {
 			delay := baseDelay * time.Duration(1<<uint(attempt-1))
@@ -230,13 +232,13 @@ func (r *RabbitMQ) reconnect() error {
 				delay = 30 * time.Second
 			}
 
-			log.Printf("[rabbitmq] attempting to reconnect failed: %d, err=%v, retry after", delay, err)
+			r.log.Info("attempting to reconnect failed: %d, err=%v, retry after", delay, err)
 
 			time.Sleep(delay)
 			continue
 		}
 
-		log.Printf("[rabbitmq] reconnected successfully")
+		r.log.Info("reconnected successfully")
 		return nil
 	}
 

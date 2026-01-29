@@ -15,7 +15,7 @@ import (
 // Handler defines the interface for message consumers.
 type Handler interface {
 	// Handle processes a single message. Returns nil to ack, error to requeue.
-	Handle(ctx context.Context, msg Message) error
+	Handle(ctx context.Context, msg MsgHandler) error
 }
 
 type Consumer struct {
@@ -38,7 +38,7 @@ func newConsumer(r *RabbitMQ) *ConsumerManager {
 	return &ConsumerManager{
 		mq:        r,
 		consumers: make(map[string]*Consumer),
-		log:       console.New("rabbitmq-consumer"),
+		log:       console.New("consumer"),
 	}
 }
 
@@ -146,7 +146,7 @@ func (m *ConsumerManager) consume(ctx context.Context, consumer *Consumer) error
 	}
 	defer ch.Close()
 
-	if err := m.mq.queue.DeclareSimple(queueName); err != nil {
+	if err := m.mq.queue.Def(queueName); err != nil {
 		return err
 	}
 
@@ -179,7 +179,7 @@ func (m *ConsumerManager) consume(ctx context.Context, consumer *Consumer) error
 				return errors.New("message channel closed")
 			}
 
-			msg := Message{Delivery: delivery}
+			msg := MsgHandler{Delivery: delivery}
 			msgCtx := m.createMessageContext(msg)
 
 			if err := consumer.Handler.Handle(msgCtx, msg); err != nil {
@@ -193,7 +193,7 @@ func (m *ConsumerManager) consume(ctx context.Context, consumer *Consumer) error
 }
 
 // createMessageContext creates a new context with x-rid from message headers.
-func (m *ConsumerManager) createMessageContext(msg Message) context.Context {
+func (m *ConsumerManager) createMessageContext(msg MsgHandler) context.Context {
 	newCtx := utils.NewCtx()
 	if xRID := msg.Header(consts.XRequestID); xRID != nil {
 		if s, ok := xRID.(string); ok && s != "" {

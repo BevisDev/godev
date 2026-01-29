@@ -20,14 +20,32 @@ type options struct {
 
 	// consumeTimeout sets the timeout for consuming messages.
 	consumeTimeout time.Duration
+
+	publisherOn bool
+	consumerOn  bool
 }
 
 func withDefaults() *options {
 	return &options{
-		persistentMsg:  false,
 		prefetchCount:  10,
 		publishTimeout: 5 * time.Second,
 		consumeTimeout: 30 * time.Second,
+		publisherOn:    true,
+		consumerOn:     true,
+	}
+}
+
+func WithPublisherOnly() Option {
+	return func(o *options) {
+		o.publisherOn = true
+		o.consumerOn = false
+	}
+}
+
+func WithConsumerOnly() Option {
+	return func(o *options) {
+		o.consumerOn = true
+		o.publisherOn = false
 	}
 }
 

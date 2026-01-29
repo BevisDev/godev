@@ -18,21 +18,33 @@ func TestIsNilOrEmpty(t *testing.T) {
 	ch <- 1
 
 	tests := []testCase{
+		// --- basic ---
 		{"nil", nil, true},
 		{"empty string", "", true},
 		{"space string", "   ", true},
 		{"non-empty string", "hello", false},
+
+		// -- slice ---
 		{"empty slice", []int{}, true},
 		{"non-empty slice", []int{1}, false},
+
+		// -- array
 		{"empty array", [0]int{}, true},
 		{"non-empty array", [2]int{1, 2}, false},
+
+		// -- map
 		{"empty map", map[string]string{}, true},
 		{"non-empty map", map[string]string{"a": "b"}, false},
+
+		// channel
 		{"nil chan", (chan int)(nil), true},
 		{"empty chan", make(chan int), true},
 		{"non-empty chan", ch, false},
+
+		// pointer
 		{"nil pointer", (*int)(nil), true},
 		{"non-nil pointer", func() interface{} { i := 42; return &i }(), false},
+
 		{"int", 123, false},
 		{"struct", struct{ Name string }{"Hi"}, false},
 		{"nil *string", (*string)(nil), true},

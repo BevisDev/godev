@@ -13,7 +13,10 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-const maxMessageSize = 50000 // maxMessageSize max size message
+const (
+	maxMessageSize    = 50000 // maxMessageSize max size message
+	defaultBufferSize = 1024  // Default buffer size for message conversion
+)
 
 type Publisher struct {
 	mq  *RabbitMQ
@@ -23,7 +26,7 @@ type Publisher struct {
 func newPublisher(mq *RabbitMQ) *Publisher {
 	return &Publisher{
 		mq:  mq,
-		log: console.New("rabbitmq-publisher"),
+		log: console.New("publisher"),
 	}
 }
 
@@ -38,7 +41,7 @@ func (p *Publisher) PublishEvent(ctx context.Context, exchange, routingKey strin
 }
 
 // BroadcastEvent publishes an event to all consumers using a fanout exchange.
-func (p *Publisher) BroadcastEvent(ctx context.Context, exchange string, message interface{}) error {
+func (p *Publisher) BroadcastEvent(ctx context.Context, exchange string, message any) error {
 	return p.publish(ctx, exchange, "", message)
 }
 
@@ -46,23 +49,12 @@ func (p *Publisher) BroadcastEvent(ctx context.Context, exchange string, message
 // It sends a message to the specified exchange and routing key.
 func (p *Publisher) publish(ctx context.Context,
 	exchange, routingKey string,
-	message interface{},
+	message any,
 ) error {
 	return p.mq.WithChannel(func(ch *amqp.Channel) error {
-		contentType, body, err := p.buildMessage(message)
+		publishing, err := p.buildPublishing(ctx, cfg.message)
 		if err != nil {
-			return err
-		}
-
-		publishing := amqp.Publishing{
-			ContentType: contentType,
-			Body:        body,
-			Headers: amqp.Table{
-				consts.XRequestID: utils.GetRID(ctx),
-			},
-		}
-		if p.mq.persistentMsg {
-			publishing.DeliveryMode = amqp.Persistent
+			return fmt.Errorf("build message: %w", err)
 		}
 
 		return ch.PublishWithContext(ctx,
@@ -73,6 +65,42 @@ func (p *Publisher) publish(ctx context.Context,
 			publishing,
 		)
 	})
+}
+
+func (p *Publisher) buildPublishing(ctx context.Context, message any) (amqp.Publishing, error) {
+	contentType, body, err := p.buildMessage(message)
+	if err != nil {
+		return amqp.Publishing{}, err
+	}
+
+	publishing := amqp.Publishing{
+		ContentType: contentType,
+		Body:        body,
+		Headers: amqp.Table{
+			consts.XRequestID: utils.GetRID(ctx),
+		},
+	}
+
+	if p.mq.persistentMsg {
+		publishing.DeliveryMode = amqp.Persistent
+	}
+
+	return publishing, nil
+}
+
+// encodeMessage converts message to bytes with appropriate content type
+func (p *Publisher) encodeMessage(message interface{}) (string, []byte, error) {
+	encoder := &messageEncoder{}
+	contentType, body, err := encoder.encode(message)
+	if err != nil {
+		return "", nil, fmt.Errorf("%w: %v", ErrInvalidMessage, err)
+	}
+
+	if err := p.validateMessageSize(body); err != nil {
+		return "", nil, err
+	}
+
+	return contentType, body, nil
 }
 
 func (p *Publisher) buildMessage(message interface{}) (string, []byte, error) {
@@ -106,7 +134,7 @@ func (p *Publisher) buildMessage(message interface{}) (string, []byte, error) {
 		contentType = consts.ApplicationJSON
 	}
 	if len(body) > maxMessageSize {
-		return "", nil, fmt.Errorf("message is too large: %d", len(body))
+		return "", nil, fmt.Errorf("[publisher] message is too large: %d", len(body))
 	}
 
 	return contentType, body, nil

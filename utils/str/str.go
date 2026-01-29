@@ -44,7 +44,7 @@ func ToString(value any) string {
 	val := reflect.ValueOf(value)
 
 	// get val ptr
-	if val.Kind() == reflect.Ptr {
+	for val.Kind() == reflect.Interface || val.Kind() == reflect.Ptr {
 		if val.IsNil() {
 			return ""
 		}
@@ -64,21 +64,27 @@ func ToString(value any) string {
 		return strconv.FormatFloat(val.Float(), 'g', -1, 64)
 	case reflect.Bool:
 		return strconv.FormatBool(val.Bool())
-	case reflect.Slice:
+	case reflect.Slice, reflect.Array:
 		if val.Type().Elem().Kind() == reflect.Uint8 {
 			return string(val.Bytes()) // handle []byte
-		}
-	case reflect.Struct:
-		if t, ok := val.Interface().(time.Time); ok {
-			return t.Format(time.RFC3339)
-		}
-		if d, ok := val.Interface().(decimal.Decimal); ok {
-			return d.String()
 		}
 		if b, err := json.Marshal(val.Interface()); err == nil {
 			return string(b)
 		}
-		return fmt.Sprintf("%+v", val.Interface())
+	case reflect.Map:
+		if b, err := json.Marshal(val.Interface()); err == nil {
+			return string(b)
+		}
+	case reflect.Struct:
+		if d, ok := val.Interface().(decimal.Decimal); ok {
+			return d.String()
+		}
+		if t, ok := val.Interface().(time.Time); ok {
+			return t.Format(time.RFC3339)
+		}
+		if b, err := json.Marshal(val.Interface()); err == nil {
+			return string(b)
+		}
 	default:
 		return fmt.Sprintf("%+v", val.Interface())
 	}
@@ -239,15 +245,15 @@ func RemoveAccents(str string) string {
 	return builder.String()
 }
 
-// Clean normalizes a string to ASCII and removes all non-alphanumeric characters,
+// Normalize normalizes a string to ASCII and removes all non-alphanumeric characters,
 // except spaces.
 //
 // It is useful for generating slugs, sanitized input, or matching keywords.
 //
 // Example:
 //
-//	Clean("Đặng Thị Ánh ♥ 123!") → "Dang Thi Anh 123"
-func Clean(str string) string {
+//	Normalize("Đặng Thị Ánh ♥ 123!") → "Dang Thi Anh 123"
+func Normalize(str string) string {
 	o := RemoveAccents(str)
 	re := regexp.MustCompile(`[^a-zA-Z0-9\s]+`)
 	return re.ReplaceAllString(o, "")
