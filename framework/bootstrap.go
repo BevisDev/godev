@@ -351,8 +351,6 @@ func (b *Bootstrap) Stop(ctx context.Context) error {
 	if b.httpApp != nil {
 		if err := b.httpApp.Stop(ctx); err != nil {
 			b.log.Info("HTTP server stop error: %v", err)
-		} else {
-			b.log.Info("HTTP server stopped")
 		}
 	}
 

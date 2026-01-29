@@ -26,7 +26,7 @@ type Logger struct {
 func New(pkg string) *Logger {
 	return &Logger{
 		pkg: pkg,
-		l:   log.New(os.Stderr, "", log.Lmicroseconds),
+		l:   log.New(os.Stderr, "", log.LstdFlags),
 	}
 }
 
