@@ -52,7 +52,7 @@ func (p *Publisher) publish(ctx context.Context,
 	message any,
 ) error {
 	return p.mq.WithChannel(func(ch *amqp.Channel) error {
-		publishing, err := p.buildPublishing(ctx, cfg.message)
+		publishing, err := p.buildPublishing(ctx, message)
 		if err != nil {
 			return fmt.Errorf("build message: %w", err)
 		}
@@ -86,21 +86,6 @@ func (p *Publisher) buildPublishing(ctx context.Context, message any) (amqp.Publ
 	}
 
 	return publishing, nil
-}
-
-// encodeMessage converts message to bytes with appropriate content type
-func (p *Publisher) encodeMessage(message interface{}) (string, []byte, error) {
-	encoder := &messageEncoder{}
-	contentType, body, err := encoder.encode(message)
-	if err != nil {
-		return "", nil, fmt.Errorf("%w: %v", ErrInvalidMessage, err)
-	}
-
-	if err := p.validateMessageSize(body); err != nil {
-		return "", nil, err
-	}
-
-	return contentType, body, nil
 }
 
 func (p *Publisher) buildMessage(message interface{}) (string, []byte, error) {
