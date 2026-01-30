@@ -133,10 +133,10 @@ func TestMustSucceed(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := MustSucceed(tt.err, tt.value)
+			err := RequireNonEmpty(tt.err, tt.value)
 			if (err != nil) != tt.hasError {
 				t.Errorf(
-					"MustSucceed(%v, %v) error = %v; want error = %v",
+					"RequireNonEmpty(%v, %v) error = %v; want error = %v",
 					tt.err, tt.value, err, tt.hasError,
 				)
 			}
@@ -229,46 +229,36 @@ func TestIsTimedOut(t *testing.T) {
 	}
 }
 
-func TestIsNumeric(t *testing.T) {
+func TestIsDigits(t *testing.T) {
 	tests := []struct {
 		input string
-		size  int
 		want  bool
 	}{
 		// check valid phone number
-		{"0123456789", 10, true},
-		{"01234", 10, false},
-		{"012345678901", 10, false},
-		{"01234abc89", 10, false},
+		{"0123456789", true},
+		{"01234", true},
+		{"012345678901", true},
 
 		// check string
-		{"", 0, false},
-		{"    ", 4, false},
-		{"01234567890", 11, true},
-		{"abcdefghij", 10, false},
-		{"01234-7890", 10, false},
-
-		// Valid cases
-		{"012345678901", 12, true},
-		{"123456789", 9, true},
-
-		// Invalid length
-		{"12345678", 9, false},
-		{"0123456789012", 12, false},
+		{"", false},
+		{"    ", false},
+		{"01234567890", true},
+		{"abcdefghij", false},
+		{"01234-7890", false},
 
 		// Contains non-numeric characters
-		{"12345678a901", 12, false},
-		{"abcdefghi", 9, false},
-		{"1234 56789", 9, false},
+		{"12345678a901", false},
+		{"abcdefghi", false},
+		{"1234 56789", false},
 
 		// Empty
-		{"", 12, false},
+		{"", false},
 	}
 
 	for _, tt := range tests {
-		got := IsNumeric(tt.input, tt.size)
+		got := IsDigits(tt.input)
 		if got != tt.want {
-			t.Errorf("IsValidID(%q, %d) = %v; want %v", tt.input, tt.size, got, tt.want)
+			t.Errorf("IsDigits(%q) = %v; want %v", tt.input, got, tt.want)
 		}
 	}
 }
@@ -403,6 +393,194 @@ func TestIsValidFileName(t *testing.T) {
 			if got != tt.want {
 				t.Errorf("IsValidFileName(%q, %v) = %v, want %v",
 					tt.filename, tt.allowedExt, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsValidJSON(t *testing.T) {
+	tests := []struct {
+		name  string
+		input interface{}
+		want  bool
+	}{
+		{
+			name:  "valid json string",
+			input: `{"a":1,"b":true}`,
+			want:  true,
+		},
+		{
+			name:  "invalid json string redundant ,",
+			input: `{"a":1,,"b":true}`,
+			want:  false,
+		},
+		{
+			name:  "invalid json string miss }",
+			input: `{"a":1,`,
+			want:  false,
+		},
+		{
+			name:  "valid json bytes",
+			input: []byte(`["a", 1, true]`),
+			want:  true,
+		},
+		{
+			name:  "invalid json bytes",
+			input: []byte(`{abc}`),
+			want:  false,
+		},
+		{
+			name: "map is valid json",
+			input: map[string]interface{}{
+				"a": 1,
+				"b": true,
+			},
+			want: true,
+		},
+		{
+			name: "struct is valid json",
+			input: struct {
+				A int
+				B string
+			}{A: 1, B: "x"},
+			want: true,
+		},
+		{
+			name:  "channel cannot be marshaled",
+			input: make(chan int),
+			want:  false,
+		},
+		{
+			name:  "function cannot be marshaled",
+			input: func() {},
+			want:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsValidJSON(tt.input); got != tt.want {
+				t.Fatalf("IsValidJSON(%v) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsNumber(t *testing.T) {
+	tests := []struct {
+		name  string
+		input interface{}
+		want  bool
+	}{
+		{"int", 1, true},
+		{"int64", int64(10), true},
+		{"uint", uint(5), true},
+		{"float32", float32(1.5), true},
+		{"float64", 3.14, true},
+
+		{"string number", "123", false},
+		{"bool", true, false},
+		{"nil", nil, false},
+		{"struct", struct{}{}, false},
+		{"json number as string", `1`, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsNumber(tt.input); got != tt.want {
+				t.Fatalf("IsNumber(%v) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsBoolean(t *testing.T) {
+	tests := []struct {
+		name  string
+		input interface{}
+		want  bool
+	}{
+		{"true", true, true},
+		{"false", false, true},
+
+		{"string true", "true", false},
+		{"number", 1, false},
+		{"nil", nil, false},
+		{"struct", struct{}{}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsBoolean(tt.input); got != tt.want {
+				t.Fatalf("IsBoolean(%v) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsSlice(t *testing.T) {
+	tests := []struct {
+		name  string
+		input interface{}
+		want  bool
+	}{
+		{
+			name:  "nil",
+			input: nil,
+			want:  false,
+		},
+		{
+			name:  "int slice",
+			input: []int{1, 2, 3},
+			want:  true,
+		},
+		{
+			name:  "string slice",
+			input: []string{"a", "b"},
+			want:  true,
+		},
+		{
+			name:  "empty slice",
+			input: []int{},
+			want:  true,
+		},
+		{
+			name:  "array is not slice",
+			input: [3]int{1, 2, 3},
+			want:  false,
+		},
+		{
+			name:  "map is not slice",
+			input: map[string]int{"a": 1},
+			want:  false,
+		},
+		{
+			name:  "string is not slice",
+			input: "abc",
+			want:  false,
+		},
+		{
+			name:  "struct is not slice",
+			input: struct{}{},
+			want:  false,
+		},
+		{
+			name:  "typed nil slice",
+			input: []int(nil),
+			want:  true,
+		},
+		{
+			name:  "pointer to slice is not slice",
+			input: &[]int{1, 2},
+			want:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := IsSlice(tt.input)
+			if got != tt.want {
+				t.Fatalf("IsSlice(%#v) = %v, want %v", tt.input, got, tt.want)
 			}
 		})
 	}

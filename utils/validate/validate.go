@@ -2,6 +2,7 @@ package validate
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -84,10 +85,10 @@ func IsNilOrNumericZero(v interface{}) bool {
 	}
 }
 
-// MustSucceed returns an error if:
+// RequireNonEmpty returns an error if:
 //   - err is not nil, OR
 //   - data is nil / empty
-func MustSucceed(err error, i interface{}) error {
+func RequireNonEmpty(err error, i interface{}) error {
 	if err != nil {
 		return err
 	}
@@ -194,8 +195,8 @@ func IsVietnamID(s string) bool {
 	return Matches(s, consts.VNIDNumber)
 }
 
-func IsNumeric(s string, size int) bool {
-	if s == "" || len(s) != size {
+func IsDigits(s string) bool {
+	if s == "" {
 		return false
 	}
 
@@ -282,4 +283,50 @@ func IsValidFileName(s string, allowedExt []string) bool {
 		}
 	}
 	return false
+}
+
+func IsValidJSON(v interface{}) bool {
+	switch val := v.(type) {
+	case string:
+		var js json.RawMessage
+		if err := json.Unmarshal([]byte(val), &js); err != nil {
+			return false
+		}
+
+	case []byte:
+		var js json.RawMessage
+		if err := json.Unmarshal(val, &js); err != nil {
+			return false
+		}
+
+	default:
+		if _, err := json.Marshal(val); err != nil {
+			return false
+		}
+	}
+
+	return true
+}
+
+func IsNumber(v interface{}) bool {
+	switch v.(type) {
+	case int, int8, int16, int32, int64,
+		uint, uint8, uint16, uint32, uint64,
+		float32, float64:
+		return true
+	default:
+		return false
+	}
+}
+
+func IsBoolean(v interface{}) bool {
+	_, ok := v.(bool)
+	return ok
+}
+
+func IsSlice(v interface{}) bool {
+	if v == nil {
+		return false
+	}
+	return reflect.TypeOf(v).Kind() == reflect.Slice
 }
