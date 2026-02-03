@@ -77,3 +77,50 @@ func main() {
 }
 
 ```
+
+---
+
+## 3. Model-Based CRUD (GORM-like)
+
+Define `TableName()` on your model, then use `database.Model[T]` for CRUD operations.
+
+```go
+type User struct {
+	ID    int    `db:"id"`
+	Name  string `db:"name"`
+	Email string `db:"email"`
+}
+
+func (User) TableName() string {
+	return "users"
+}
+
+// Find
+users, err := database.Model[User](db).
+	Where("age > ?", 18).
+	Find(ctx)
+
+// First
+user, err := database.Model[User](db).
+	Where("id = ?", 1).
+	First(ctx)
+
+// Create
+_, err = database.Model[User](db).
+	Create(ctx, User{Name: "Alice", Email: "alice@example.com"})
+
+// Updates
+rows, err := database.Model[User](db).
+	Where("id = ?", 1).
+	Updates(ctx, map[string]interface{}{"name": "Alice Updated"})
+
+// Delete
+rows, err = database.Model[User](db).
+	Where("id = ?", 1).
+	Delete(ctx)
+
+// Count
+count, err := database.Model[User](db).
+	Where("age > ?", 18).
+	Count(ctx)
+```

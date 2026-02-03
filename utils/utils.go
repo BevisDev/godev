@@ -8,11 +8,10 @@ import (
 	"time"
 
 	"github.com/BevisDev/godev/consts"
+	"github.com/BevisDev/godev/types"
 	"github.com/BevisDev/godev/utils/random"
 	"golang.org/x/exp/constraints"
 )
-
-type MapObject map[string]interface{}
 
 func NewCtx() context.Context {
 	ctx := context.Background()
@@ -164,7 +163,7 @@ func Parse[T any](obj interface{}) (T, error) {
 	return val, nil
 }
 
-func ParseValueMap[T any](key string, objMap MapObject) (T, error) {
+func ParseValueMap[T any](key string, objMap types.Object) (T, error) {
 	var zero T
 
 	raw, ok := objMap[key]

@@ -17,3 +17,5 @@ type SignedUint interface {
 type SignedFloat interface {
 	~float32 | ~float64
 }
+
+type Object map[string]any

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/BevisDev/godev/consts"
+	"github.com/BevisDev/godev/types"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/exp/constraints"
 )
@@ -301,7 +302,7 @@ func TestParse_Pointer_CastFail(t *testing.T) {
 }
 
 func TestParseMap_Success(t *testing.T) {
-	m := MapObject{
+	m := types.Object{
 		"user": User{Name: "Alice", Age: 30},
 	}
 
@@ -313,7 +314,7 @@ func TestParseMap_Success(t *testing.T) {
 }
 
 func TestParseValueMap_MissingKey(t *testing.T) {
-	m := MapObject{}
+	m := types.Object{}
 
 	val, err := ParseValueMap[int]("notfound", m)
 
@@ -322,7 +323,7 @@ func TestParseValueMap_MissingKey(t *testing.T) {
 }
 
 func TestParseValueMap_TypeMismatch(t *testing.T) {
-	m := MapObject{
+	m := types.Object{
 		"age": "not-an-int",
 	}
 
@@ -490,6 +491,14 @@ func TestRoundUpToMul(t *testing.T) {
 }
 
 func TestPtrTo(t *testing.T) {
+	const hello = "hello"
+
+	t.Run("const", func(t *testing.T) {
+		p := GetPointer(hello)
+		assert.NotNil(t, p)
+		assert.Equal(t, "hello", *p)
+	})
+
 	t.Run("string", func(t *testing.T) {
 		s := "hello"
 		p := GetPointer(s)
