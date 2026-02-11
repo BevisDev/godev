@@ -38,8 +38,12 @@ func NewSuccess(ctx context.Context, data any) *Response {
 		RID:        utils.GetRID(ctx),
 		Success:    true,
 		Data:       data,
-		ResponseAt: datetime.ToString(time.Now(), datetime.DateTimeLayout),
+		ResponseAt: responseAt(),
 	}
+}
+
+func responseAt() string {
+	return datetime.ToString(time.Now(), datetime.DateTimeLayout)
 }
 
 // NewFailure creates a failure response with error code and message.
@@ -47,12 +51,20 @@ func NewFailure(ctx context.Context, code, message string) *Response {
 	return &Response{
 		RID:        utils.GetRID(ctx),
 		Success:    false,
-		ResponseAt: datetime.ToString(time.Now(), datetime.DateTimeLayout),
+		ResponseAt: responseAt(),
 		Error: &Error{
 			Code:    code,
 			Message: message,
 		},
 	}
+}
+
+func SuccessPagination(c *gin.Context, T []any, total int) *Response {
+	res := NewSuccess(c, &Pagination{
+		Items: T,
+		Total: total,
+	})
+	return res
 }
 
 // Error represents an error in the API response.
