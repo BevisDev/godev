@@ -24,7 +24,7 @@ type Config struct {
 
 type Response[T any] struct {
 	Settings map[string]any
-	Data     *T
+	Data     T
 }
 
 // Load loads configuration and panics on failure.
@@ -75,7 +75,7 @@ func Load[T any](cf *Config) (Response[T], error) {
 		return Response[T]{}, fmt.Errorf("[config] failed to unmarshal: %v", err)
 	}
 
-	out.Data = &t
+	out.Data = t
 	out.Settings = v.AllSettings()
 	return out, nil
 }

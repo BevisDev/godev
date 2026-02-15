@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/BevisDev/godev/kafkax"
+	"github.com/BevisDev/godev/utils"
 	"github.com/BevisDev/godev/utils/console"
 
 	"github.com/BevisDev/godev/database"
@@ -63,7 +64,7 @@ type Bootstrap struct {
 
 // New creates a new Bootstrap instance with the provided options.
 func New(opts ...Option) *Bootstrap {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := utils.NewCtxCancel(nil)
 	b := &Bootstrap{
 		options: new(options),
 		log:     console.New("bootstrap"),
@@ -188,14 +189,42 @@ func (b *Bootstrap) runServices(ctx context.Context) error {
 	// Init services in parallel
 	g, ctx := errgroup.WithContext(ctx)
 
-	// DB
-	if b.dbConf != nil && b.database == nil {
+	// DB n Migration
+	if b.dbConf != nil && b.database == nil &&
+		b.migrationConf != nil && b.migration == nil {
 		g.Go(func() error {
 			db, err := database.New(b.dbConf)
 			if err != nil {
 				return err
 			}
 			b.database = db
+
+			b.migrationConf.DB = db.GetDB().DB
+			m, err := migration.New(b.migrationConf)
+			if err != nil {
+				return err
+			}
+			b.migration = m
+			return nil
+		})
+	} else if b.dbConf != nil && b.database == nil {
+		g.Go(func() error {
+			db, err := database.New(b.dbConf)
+			if err != nil {
+				return err
+			}
+			b.database = db
+			return nil
+		})
+	}
+
+	if b.migrationConf != nil && b.migration == nil {
+		g.Go(func() error {
+			m, err := migration.New(b.migrationConf)
+			if err != nil {
+				return err
+			}
+			b.migration = m
 			return nil
 		})
 	}
