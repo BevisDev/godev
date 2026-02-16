@@ -73,7 +73,7 @@ func (m *modelChain[T]) First(ctx context.Context) (*T, error) {
 	}
 
 	var obj T
-	cctx, cancel := utils.NewCtxTimeout(ctx, m.Timeout)
+	cctx, cancel := utils.NewCtxTimeout(ctx, m.cfg.Timeout)
 	defer cancel()
 
 	if err := m.db.GetContext(cctx, &obj, query, args...); err != nil {
@@ -97,7 +97,7 @@ func (m *modelChain[T]) Find(ctx context.Context) ([]*T, error) {
 	}
 
 	var list []*T
-	cctx, cancel := utils.NewCtxTimeout(ctx, m.Timeout)
+	cctx, cancel := utils.NewCtxTimeout(ctx, m.cfg.Timeout)
 	defer cancel()
 
 	if err := m.db.SelectContext(cctx, &list, query, args...); err != nil {
@@ -128,7 +128,7 @@ func (m *modelChain[T]) Create(ctx context.Context, data any) (*T, error) {
 	)
 
 	// Databases with RETURNING/OUTPUT support
-	switch m.DBType {
+	switch m.cfg.DBType {
 	case Postgres:
 		query += " RETURNING *"
 	case SqlServer:
@@ -145,11 +145,11 @@ func (m *modelChain[T]) Create(ctx context.Context, data any) (*T, error) {
 		return nil, err
 	}
 
-	cctx, cancel := utils.NewCtxTimeout(ctx, m.Timeout)
+	cctx, cancel := utils.NewCtxTimeout(ctx, m.cfg.Timeout)
 	defer cancel()
 
 	// If the DB supports RETURNING/OUTPUT, fetch the inserted row.
-	if m.DBType == Postgres || m.DBType == SqlServer {
+	if m.cfg.DBType == Postgres || m.cfg.DBType == SqlServer {
 		var dest T
 		row := m.db.QueryRowxContext(cctx, query, vals...)
 		if err := row.StructScan(&dest); err != nil {
@@ -212,7 +212,7 @@ func (m *modelChain[T]) Updates(ctx context.Context, data any) (int64, error) {
 		return 0, err
 	}
 
-	cctx, cancel := utils.NewCtxTimeout(ctx, m.Timeout)
+	cctx, cancel := utils.NewCtxTimeout(ctx, m.cfg.Timeout)
 	defer cancel()
 
 	res, err := m.db.ExecContext(cctx, query, vals...)
@@ -241,7 +241,7 @@ func (m *modelChain[T]) Delete(ctx context.Context) (int64, error) {
 		return 0, err
 	}
 
-	cctx, cancel := utils.NewCtxTimeout(ctx, m.Timeout)
+	cctx, cancel := utils.NewCtxTimeout(ctx, m.cfg.Timeout)
 	defer cancel()
 
 	res, err := m.db.ExecContext(cctx, query, args...)
@@ -266,7 +266,7 @@ func (m *modelChain[T]) Count(ctx context.Context) (int64, error) {
 		return 0, err
 	}
 
-	cctx, cancel := utils.NewCtxTimeout(ctx, m.Timeout)
+	cctx, cancel := utils.NewCtxTimeout(ctx, m.cfg.Timeout)
 	defer cancel()
 
 	var count int64
@@ -279,7 +279,7 @@ func (m *modelChain[T]) Count(ctx context.Context) (int64, error) {
 func (m *modelChain[T]) buildSelect(limit int) (string, []interface{}) {
 	var sb strings.Builder
 	sb.WriteString("SELECT ")
-	if m.DBType == SqlServer && limit > 0 {
+	if m.cfg.DBType == SqlServer && limit > 0 {
 		sb.WriteString(fmt.Sprintf("TOP %d ", limit))
 	}
 	sb.WriteString("* FROM ")
@@ -290,7 +290,7 @@ func (m *modelChain[T]) buildSelect(limit int) (string, []interface{}) {
 		sb.WriteString(strings.Join(m.where, " AND "))
 	}
 
-	if m.DBType != SqlServer && limit > 0 {
+	if m.cfg.DBType != SqlServer && limit > 0 {
 		sb.WriteString(fmt.Sprintf(" LIMIT %d", limit))
 	}
 	return sb.String(), m.args

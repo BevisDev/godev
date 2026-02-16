@@ -123,7 +123,7 @@ func (d *Chain[T]) ToSql() (string, []interface{}) {
 	sb.WriteString("SELECT ")
 
 	// top only support mssql
-	if d.DBType == SqlServer && d.top > 0 {
+	if d.cfg.DBType == SqlServer && d.top > 0 {
 		sb.WriteString(fmt.Sprintf("TOP %d ", d.top))
 	}
 
@@ -151,10 +151,10 @@ func (d *Chain[T]) ToSql() (string, []interface{}) {
 	}
 
 	// LIMIT/OFFSET
-	if d.DBType != SqlServer && d.limit > 0 {
+	if d.cfg.DBType != SqlServer && d.limit > 0 {
 		sb.WriteString(fmt.Sprintf(" LIMIT %d", d.limit))
 	}
-	if d.DBType != SqlServer && d.offset > 0 {
+	if d.cfg.DBType != SqlServer && d.offset > 0 {
 		sb.WriteString(fmt.Sprintf(" OFFSET %d", d.offset))
 	}
 
@@ -174,7 +174,7 @@ func (d *Chain[T]) getAny(c context.Context) (*T, error) {
 		return nil, err
 	}
 
-	ctx, cancel := utils.NewCtxTimeout(c, d.Timeout)
+	ctx, cancel := utils.NewCtxTimeout(c, d.cfg.Timeout)
 	defer cancel()
 
 	db := d.GetDB()
@@ -205,7 +205,7 @@ func (d *Chain[T]) FindAll(c context.Context) ([]*T, error) {
 		return nil, err
 	}
 
-	ctx, cancel := utils.NewCtxTimeout(c, d.Timeout)
+	ctx, cancel := utils.NewCtxTimeout(c, d.cfg.Timeout)
 	defer cancel()
 
 	db := d.GetDB()
@@ -242,7 +242,7 @@ func (d *Chain[T]) Insert(ctx context.Context, data any, outputs ...string) (*T,
 		strings.Join(d.columns, ", :"),
 	)
 
-	switch d.DBType {
+	switch d.cfg.DBType {
 	case Postgres:
 		if hasOutput {
 			query += fmt.Sprintf(" RETURNING %s", returnCols)
