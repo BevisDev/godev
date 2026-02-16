@@ -16,7 +16,7 @@ func TestDeclare_DirectExchange(t *testing.T) {
 		"it.direct.queue1",
 	}
 
-	err = mq.GetQueue().Def(queues...)
+	err = mq.Queue().Def(queues...)
 	require.NoError(t, err)
 }
 
@@ -28,7 +28,7 @@ func TestDeclare_TopicExchange(t *testing.T) {
 	queue := "it.topic.queue"
 	exchange := "it.topic.exchange"
 
-	err = mq.GetQueue().Declare(Spec{
+	err = mq.Queue().Declare(Spec{
 		Queues: []QueueSpec{
 			{Name: queue},
 		},
@@ -57,7 +57,7 @@ func TestDeclare_FanoutExchange(t *testing.T) {
 	queue2 := "it.fanout.q2"
 	exchange := "it.fanout.exchange"
 
-	err = mq.GetQueue().Declare(Spec{
+	err = mq.Queue().Declare(Spec{
 		Queues: []QueueSpec{
 			{Name: queue1},
 			{Name: queue2},

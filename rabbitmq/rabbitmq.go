@@ -344,17 +344,17 @@ func (r *MQ) WithChannel(fn ChannelHandler) error {
 	return fn(ch)
 }
 
-// GetPublisher returns the publisher instance
-func (r *MQ) GetPublisher() *Publisher {
+// Publisher returns the publisher instance
+func (r *MQ) Publisher() *Publisher {
 	return r.publisher
 }
 
-// GetConsumer returns the consumer instance
-func (r *MQ) GetConsumer() *ConsumerManager {
+// Consumer returns the consumer instance
+func (r *MQ) Consumer() *ConsumerManager {
 	return r.consumer
 }
 
-// GetQueue returns the queue instance
-func (r *MQ) GetQueue() *Queue {
+// Queue returns the queue instance
+func (r *MQ) Queue() *Queue {
 	return r.queue
 }

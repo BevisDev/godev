@@ -185,9 +185,9 @@ func (b *Bootstrap) Init(ctx context.Context) error {
 	return nil
 }
 
-func (b *Bootstrap) runServices(ctx context.Context) error {
+func (b *Bootstrap) runServices(c context.Context) error {
 	// Init services in parallel
-	g, ctx := errgroup.WithContext(ctx)
+	g, _ := errgroup.WithContext(c)
 
 	// DB n Migration
 	if b.dbConf != nil && b.database == nil &&

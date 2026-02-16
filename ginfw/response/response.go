@@ -16,6 +16,7 @@ var Code = map[string]string{
 	"403": "Forbidden",
 	"404": "Not Found",
 	"405": "Method Not Allowed",
+	"408": "Request Timeout",
 	"409": "Conflict",
 	"429": "Too Many Requests",
 	"500": "Internal Server Error",
@@ -73,7 +74,11 @@ type Error struct {
 	Message string `json:"message,omitempty"`
 }
 
-func GetCode(code, message string, defCode string) (string, string) {
+func GetCode(
+	code string,
+	message string,
+	defCode string,
+) (string, string) {
 	if code == "" {
 		code = defCode
 	}
@@ -140,6 +145,13 @@ func MethodNotAllow(c *gin.Context, code, message string) {
 	code, message = GetCode(code, message, "405")
 	res := NewFailure(c.Request.Context(), code, message)
 	c.JSON(http.StatusMethodNotAllowed, res)
+}
+
+// RequestTimeout sends a 408 Method Not Allowed response with error code and message.
+func RequestTimeout(c *gin.Context, code, message string) {
+	code, message = GetCode(code, message, "408")
+	res := NewFailure(c.Request.Context(), code, message)
+	c.JSON(http.StatusRequestTimeout, res)
 }
 
 // Conflict sends a 409 Conflict response with error code and message.
