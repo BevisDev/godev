@@ -8,6 +8,7 @@ import (
 	"log"
 	"runtime/debug"
 	"strings"
+	"time"
 
 	"github.com/BevisDev/godev/utils"
 	"github.com/BevisDev/godev/utils/validate"
@@ -27,8 +28,8 @@ const (
 // It embeds *Config to provide access to database configuration,
 // and maintains an internal sqlx.DB connection for executing queries.
 type DB struct {
-	*Config
-	db *sqlx.DB // db is the initialized sqlx.DB connection.
+	cfg *Config
+	db  *sqlx.DB // db is the initialized sqlx.DB connection.
 }
 
 // New creates a new DB instance from the given Config.
@@ -41,10 +42,9 @@ func New(cfg *Config) (*DB, error) {
 		return nil, errors.New("[database] config is nil")
 	}
 
-	// Apply defaults
-	cfg.clone()
-
-	db := &DB{Config: cfg}
+	db := &DB{
+		cfg: cfg.clone(),
+	}
 
 	// Initialize connection
 	dbx, err := db.connect()
@@ -58,7 +58,7 @@ func New(cfg *Config) (*DB, error) {
 
 // connect establishes a database connection using the configured settings.
 func (d *DB) connect() (*sqlx.DB, error) {
-	cfg := d.Config
+	cfg := d.cfg
 
 	// Get connection string
 	connStr := cfg.getDSN()
@@ -109,9 +109,14 @@ func (d *DB) GetDB() *sqlx.DB {
 	return d.db
 }
 
+// SetTimeout returns the underlying sqlx.DB connection.
+func (d *DB) SetTimeout(t time.Duration) {
+	d.cfg.Timeout = t
+}
+
 // ViewQuery logs the SQL query if ShowQuery is enabled.
 func (d *DB) ViewQuery(query string) {
-	if d.ShowQuery {
+	if d.cfg.ShowQuery {
 		log.Printf("[database] query: %s", query)
 	}
 }
@@ -131,7 +136,7 @@ func (d *DB) MustBePtr(dest interface{}) error {
 
 // GetTemplate returns the SQL template for the given template type and database type.
 func (d *DB) GetTemplate(template TemplateJSON) string {
-	if tempDB, ok := TemplateDBMap[d.DBType]; ok {
+	if tempDB, ok := TemplateDBMap[d.cfg.DBType]; ok {
 		if tpl, ok := tempDB[template]; ok {
 			return tpl
 		}
@@ -142,8 +147,8 @@ func (d *DB) GetTemplate(template TemplateJSON) string {
 // FormatRow formats a parameter placeholder for the current database type.
 // For MySQL, returns "?"; for others, returns formatted placeholder with index (e.g., "$1", "@p1").
 func (d *DB) FormatRow(idx int) string {
-	placeholder := d.DBType.GetPlaceHolder()
-	if d.DBType == MySQL {
+	placeholder := d.cfg.DBType.GetPlaceHolder()
+	if d.cfg.DBType == MySQL {
 		return placeholder
 	}
 	return fmt.Sprintf("%s%d", placeholder, idx)
@@ -176,7 +181,7 @@ func (d *DB) rebind(query string, args ...interface{}) (string, []interface{}, e
 func (d *DB) RunTx(ctx context.Context, level sql.IsolationLevel,
 	fn func(ctx context.Context, tx *sqlx.Tx) error,
 ) error {
-	txCtx, cancel := utils.NewCtxTimeout(ctx, d.Timeout)
+	txCtx, cancel := utils.NewCtxTimeout(ctx, d.cfg.Timeout)
 	defer cancel()
 
 	db := d.GetDB()
@@ -219,7 +224,7 @@ func (d *DB) GetList(c context.Context, dest interface{}, query string, args ...
 		return err
 	}
 
-	ctx, cancel := utils.NewCtxTimeout(c, d.Timeout)
+	ctx, cancel := utils.NewCtxTimeout(c, d.cfg.Timeout)
 	defer cancel()
 
 	db := d.GetDB()
@@ -244,7 +249,7 @@ func (d *DB) GetAny(c context.Context, dest interface{}, query string, args ...i
 		return err
 	}
 
-	ctx, cancel := utils.NewCtxTimeout(c, d.Timeout)
+	ctx, cancel := utils.NewCtxTimeout(c, d.cfg.Timeout)
 	defer cancel()
 
 	db := d.GetDB()
@@ -413,7 +418,7 @@ func (d *DB) InsertReturning(c context.Context, query string, dest interface{}, 
 	}
 	d.ViewQuery(query)
 
-	ctx, cancel := utils.NewCtxTimeout(c, d.Timeout)
+	ctx, cancel := utils.NewCtxTimeout(c, d.cfg.Timeout)
 	defer cancel()
 
 	db := d.GetDB()
@@ -443,7 +448,12 @@ func (d *DB) InsertReturning(c context.Context, query string, dest interface{}, 
 //	colNames := []string{"name", "email"}
 //	args := []interface{}{"Alice", "alice@example.com", "Bob", "bob@example.com"}
 //	err := db.InsertBulk(ctx, "users", 2, colNames, args...)
-func (d *DB) InsertBulk(ctx context.Context, table string, row int, colNames []string, args ...interface{}) error {
+func (d *DB) InsertBulk(ctx context.Context,
+	table string,
+	row int,
+	colNames []string,
+	args ...interface{},
+) error {
 	col := len(colNames)
 	if col <= 0 {
 		return errors.New("[database] column count must be greater than 0")
