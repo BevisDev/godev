@@ -37,5 +37,7 @@ func (r *Client) GetClient() *http.Client {
 }
 
 func (r *Client) SetTimeout(timeout time.Duration) {
-	r.timeout = timeout
+	if timeout > 0 {
+		r.timeout = timeout
+	}
 }

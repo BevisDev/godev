@@ -232,7 +232,7 @@ func (r *MQ) reconnect() error {
 				delay = 30 * time.Second
 			}
 
-			r.log.Info("attempting to reconnect failed: %d, err=%v, retry after", delay, err)
+			r.log.Info("reconnect failed: err=%v, retry after %v", err, delay)
 
 			time.Sleep(delay)
 			continue

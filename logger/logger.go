@@ -83,7 +83,7 @@ func New(cfg *Config) (*Logger, error) {
 	return l, nil
 }
 
-// GetZap returns instance *zap.logger
+// GetZap returns the underlying *zap.Logger instance.
 func (l *Logger) GetZap() *zap.Logger {
 	return l.zap
 }

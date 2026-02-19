@@ -75,6 +75,7 @@ func (r *Cache) Ping(ctx context.Context) error {
 func (r *Cache) Close() {
 	if r.client != nil {
 		_ = r.client.Close()
+		r.client = nil
 	}
 }
 

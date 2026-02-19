@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/BevisDev/godev/kafkax"
+	"github.com/BevisDev/godev/mailer"
 	"github.com/BevisDev/godev/utils"
 	"github.com/BevisDev/godev/utils/console"
 
@@ -37,6 +38,7 @@ type Bootstrap struct {
 	database   *database.DB
 	migration  *migration.Migration
 	redisCache *redis.Cache
+	mailer     *mailer.Mailer
 	rabbitmq   *rabbitmq.MQ
 	keycloak   *keycloak.KC
 	kafka      *kafkax.Kafka
@@ -126,7 +128,7 @@ func (b *Bootstrap) Init(ctx context.Context) error {
 	b.mu.Lock()
 	if b.initialized {
 		b.mu.Unlock()
-		return errors.New("[boostrap] already initialized")
+		return errors.New("[bootstrap] already initialized")
 	}
 	b.mu.Unlock()
 
@@ -167,7 +169,7 @@ func (b *Bootstrap) Init(ctx context.Context) error {
 
 	// run services
 	if err := b.runServices(ctx); err != nil {
-		return nil
+		return err
 	}
 
 	// Consume after init hooks (services are now available, can set Setup/Shutdown here)
@@ -242,9 +244,21 @@ func (b *Bootstrap) runServices(c context.Context) error {
 	}
 
 	// MQ
-	if b.rabbitmqConf != nil && b.rabbitmq == nil {
+	if b.rabbitConf != nil && b.rabbitmq == nil {
 		g.Go(func() error {
-			mq, err := rabbitmq.New(b.rabbitmqConf)
+			mq, err := rabbitmq.New(b.rabbitConf, b.rabbitOpt...)
+			if err != nil {
+				return fmt.Errorf("[rabbitmq] %w", err)
+			}
+			b.rabbitmq = mq
+			return nil
+		})
+	}
+
+	// Mailer
+	if b.mailerConf != nil && b.rabbitmq == nil {
+		g.Go(func() error {
+			mq, err := rabbitmq.New(b.rabbitConf, b.rabbitOpt...)
 			if err != nil {
 				return fmt.Errorf("[rabbitmq] %w", err)
 			}
@@ -270,17 +284,37 @@ func (b *Bootstrap) runServices(c context.Context) error {
 	}
 
 	// REST client: init after logger is ready (may need logger)
-	// If logger is not in options, inject it automatically
 	if b.restOn && b.restClient == nil {
 		g.Go(func() error {
 			opts := b.restOpts
-			// Check if WithLogger is already in options by checking if logger was passed
-			// (rest.New will handle duplicates gracefully or user can avoid passing nil)
 			if b.logger != nil {
-				// Inject logger - if user passed nil, this will override it
 				opts = append(opts, rest.WithLogger(b.logger))
 			}
 			b.restClient = rest.New(opts...)
+			return nil
+		})
+	}
+
+	// Kafka
+	if b.kafkaConf != nil && b.kafka == nil {
+		g.Go(func() error {
+			k, err := kafkax.New(b.kafkaConf)
+			if err != nil {
+				return err
+			}
+			b.kafka = k
+			return nil
+		})
+	}
+
+	// Mailer
+	if b.mailerConf != nil && b.mailer == nil {
+		g.Go(func() error {
+			mailer, err := mailer.New(b.mailerConf)
+			if err != nil {
+				return err
+			}
+			b.mailer = mailer
 			return nil
 		})
 	}
@@ -454,6 +488,14 @@ func (b *Bootstrap) Health(ctx context.Context) map[string]interface{} {
 		}
 	}
 
+	if b.kafka != nil {
+		if b.kafka.IsClosed() {
+			health["kafka"] = fmt.Errorf("client closed")
+		} else {
+			health["kafka"] = "OK"
+		}
+	}
+
 	for _, entry := range b.healthCheckers {
 		if err := entry.fn(ctx); err != nil {
 			health[entry.name] = err
@@ -501,18 +543,10 @@ func (b *Bootstrap) closeServices() {
 	}
 
 	// Close Kafka
-	//if b.Kafka == nil {
-	//	b.Kafka.Close()
-	//	b.Kafka = nil
-	//	b.KafkaProducer = nil
-	//	b.KafkaConsumer = nil
-	//} else if b.KafkaProducer != nil {
-	//	b.KafkaProducer.Close()
-	//	b.KafkaProducer = nil
-	//} else if b.KafkaConsumer != nil {
-	//	b.KafkaConsumer.Close()
-	//	b.KafkaConsumer = nil
-	//}
+	if b.kafka != nil {
+		b.kafka.Close()
+		b.kafka = nil
+	}
 }
 
 // SetServerSetup sets the server Setup function after services are initialized.
@@ -569,4 +603,8 @@ func (b *Bootstrap) Migration() *migration.Migration {
 
 func (b *Bootstrap) Kafka() *kafkax.Kafka {
 	return b.kafka
+}
+
+func (b *Bootstrap) Mailer() *mailer.Mailer {
+	return b.mailer
 }

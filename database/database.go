@@ -109,9 +109,11 @@ func (d *DB) GetDB() *sqlx.DB {
 	return d.db
 }
 
-// SetTimeout returns the underlying sqlx.DB connection.
+// SetTimeout sets the query timeout for database operations.
 func (d *DB) SetTimeout(t time.Duration) {
-	d.cfg.Timeout = t
+	if t > 0 {
+		d.cfg.Timeout = t
+	}
 }
 
 // ViewQuery logs the SQL query if ShowQuery is enabled.

@@ -8,6 +8,7 @@ import (
 	"github.com/BevisDev/godev/kafkax"
 	"github.com/BevisDev/godev/keycloak"
 	"github.com/BevisDev/godev/logger"
+	"github.com/BevisDev/godev/mailer"
 	"github.com/BevisDev/godev/migration"
 	"github.com/BevisDev/godev/rabbitmq"
 	"github.com/BevisDev/godev/redis"
@@ -27,19 +28,21 @@ type healthChecker struct {
 }
 
 type options struct {
-	loggerConf    *logger.Config
+	loggerConf *logger.Config
+
+	// database
 	dbConf        *database.Config
 	migrationConf *migration.Config
-	redisConf     *redis.Config
-	rabbitmqConf  *rabbitmq.Config
 	keycloakConf  *keycloak.Config
+	redisConf     *redis.Config
+	rabbitConf    *rabbitmq.Config
+	rabbitOpt     []rabbitmq.Option
 	kafkaConf     *kafkax.Config
-
-	restOn   bool
-	restOpts []rest.Option
-
-	schedulerOn  bool
-	schedulerOpt []scheduler.Option
+	restOn        bool
+	restOpts      []rest.Option
+	mailerConf    *mailer.Config
+	schedulerOn   bool
+	schedulerOpt  []scheduler.Option
 
 	serverConf *server.Config
 
@@ -76,9 +79,17 @@ func WithRedis(cfg *redis.Config) Option {
 }
 
 // WithRabbitMQ configures RabbitMQ connection.
-func WithRabbitMQ(cfg *rabbitmq.Config) Option {
+func WithRabbitMQ(cfg *rabbitmq.Config, opts ...rabbitmq.Option) Option {
 	return func(o *options) {
-		o.rabbitmqConf = cfg
+		o.rabbitConf = cfg
+		o.rabbitOpt = append(o.rabbitOpt, opts...)
+	}
+}
+
+// WithMailer configures the mailer.
+func WithMailer(cfg *mailer.Config) Option {
+	return func(o *options) {
+		o.mailerConf = cfg
 	}
 }
 
