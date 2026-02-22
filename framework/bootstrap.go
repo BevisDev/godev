@@ -51,6 +51,7 @@ type Bootstrap struct {
 	// Lifecycle hooks
 	beforeInit  []func(ctx context.Context) error
 	afterInit   []func(ctx context.Context) error
+	services    []func(ctx context.Context) error
 	beforeStart []func(ctx context.Context) error
 	afterStart  []func(ctx context.Context) error
 	beforeStop  []func(ctx context.Context) error
@@ -123,6 +124,13 @@ func (b *Bootstrap) AfterStop(fn func(ctx context.Context) error) {
 	b.afterStop = append(b.afterStop, fn)
 }
 
+// AddServices registers a hook to run services.
+func (b *Bootstrap) AddServices(fn func(ctx context.Context) error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.services = append(b.services, fn)
+}
+
 // Init initializes all configured services.
 func (b *Bootstrap) Init(ctx context.Context) error {
 	b.mu.Lock()
@@ -189,7 +197,14 @@ func (b *Bootstrap) Init(ctx context.Context) error {
 
 func (b *Bootstrap) runServices(c context.Context) error {
 	// Init services in parallel
-	g, _ := errgroup.WithContext(c)
+	g, ctx := errgroup.WithContext(c)
+
+	for _, f := range b.services {
+		fn := f
+		g.Go(func() error {
+			return fn(ctx)
+		})
+	}
 
 	// DB n Migration
 	if b.dbConf != nil && b.database == nil &&
