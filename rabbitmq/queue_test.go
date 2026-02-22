@@ -16,7 +16,7 @@ func TestDeclare_DirectExchange(t *testing.T) {
 		"it.direct.queue1",
 	}
 
-	err = mq.Queue().Def(queues...)
+	err = mq.Queue().CreateQueues(queues...)
 	require.NoError(t, err)
 }
 

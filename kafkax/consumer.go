@@ -183,6 +183,8 @@ func (c *Consumer) CommitMessage(ctx context.Context, msg *ConsumedMessage) erro
 }
 
 // ConsumeWithRetry wraps Consume with retry logic on handler error.
+// When all retries are exhausted, the message is committed (skipped) to avoid
+// blocking the partition on a poison message; the final error is logged.
 func (c *Consumer) ConsumeWithRetry(
 	ctx context.Context,
 	handler Handler,
@@ -206,7 +208,11 @@ func (c *Consumer) ConsumeWithRetry(
 				}
 			}
 		}
-		return err
+		// Commit (skip) poison message so consumer does not block forever on this partition
+		log.Printf("[kafkax-consumer] retries exhausted for topic=%s partition=%d offset=%d: %v (message committed/skipped)",
+			msg.Topic, msg.Partition, msg.Offset, err)
+		_ = msg.Commit(ctx)
+		return nil
 	}
 
 	return c.Consume(ctx, wrapped)

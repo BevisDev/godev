@@ -44,21 +44,15 @@ type Queue struct {
 
 // QueueSpec defines configuration for a queue
 type QueueSpec struct {
-	Name       string                 // Queue name (required)
-	Durable    bool                   // Survive broker restart (default: true)
-	AutoDelete bool                   // Auto-delete when no consumers
-	Exclusive  bool                   // Only usable by the connection that created it
-	Args       map[string]interface{} // Additional arguments (TTL, DLX, etc.)
+	Name string                 // Queue name (required)
+	Args map[string]interface{} // Additional arguments (TTL, DLX, etc.)
 }
 
 // ExchangeSpec defines configuration for an exchange
 type ExchangeSpec struct {
-	Name       string        // Exchange name (required)
-	Type       ExchangeType  // Exchange type: Direct, Topic, Fanout
-	Durable    bool          // Survive broker restart (default: true)
-	AutoDelete bool          // Auto-delete when no bindings
-	Internal   bool          // Only other exchanges can publish
-	Bindings   []BindingSpec // List of bindings
+	Name     string        // Exchange name (required)
+	Type     ExchangeType  // Exchange type: Direct, Topic, Fanout
+	Bindings []BindingSpec // List of bindings
 }
 
 type BindingSpec struct {
@@ -78,7 +72,7 @@ func newQueue(mq *MQ) *Queue {
 	}
 }
 
-func (q *Queue) Def(names ...string) error {
+func (q *Queue) CreateQueues(names ...string) error {
 	if len(names) == 0 {
 		return errors.New("[queue] at least one queue name is required")
 	}
@@ -105,12 +99,12 @@ func (q *Queue) Declare(spec Spec) error {
 	q.Spec = spec
 	return q.mq.WithChannel(func(ch *amqp.Channel) error {
 		// 1. Declare queues first
-		if err := q.defQueues(ch, spec.Queues); err != nil {
+		if err := q.declareQueues(ch, spec.Queues); err != nil {
 			return fmt.Errorf("[queue] declare queues: %w", err)
 		}
 
 		// 2. Declare exchanges and bindings
-		if err := q.defExchanges(ch, spec.Exchanges); err != nil {
+		if err := q.declareExchanges(ch, spec.Exchanges); err != nil {
 			return fmt.Errorf("[queue] declare exchanges: %w", err)
 		}
 
@@ -119,15 +113,15 @@ func (q *Queue) Declare(spec Spec) error {
 }
 
 // defQueues declares all queues in spec
-func (q *Queue) defQueues(ch *amqp.Channel, queues []QueueSpec) error {
+func (q *Queue) declareQueues(ch *amqp.Channel, queues []QueueSpec) error {
 	for _, qu := range queues {
 		if _, err := ch.QueueDeclare(
 			qu.Name,
-			qu.Durable,    // default: true (survive restart)
-			qu.AutoDelete, // default: false
-			qu.Exclusive,  // default: false
-			false,         // noWait: false
-			qu.Args,       // arguments (TTL, DLX, etc.)
+			true,
+			false,
+			false,
+			false,
+			qu.Args, // arguments (TTL, DLX, etc.)
 		); err != nil {
 			return fmt.Errorf("queue '%s': %w", qu.Name, err)
 		}
@@ -136,23 +130,26 @@ func (q *Queue) defQueues(ch *amqp.Channel, queues []QueueSpec) error {
 }
 
 // defExchanges declares all exchanges and bindings in spec
-func (q *Queue) defExchanges(ch *amqp.Channel, exchanges []ExchangeSpec) error {
+func (q *Queue) declareExchanges(
+	ch *amqp.Channel,
+	exchanges []ExchangeSpec,
+) error {
 	for _, ex := range exchanges {
 		// Declare exchange
 		if err := ch.ExchangeDeclare(
 			ex.Name,
 			ex.Type.String(),
-			ex.Durable,    // default: true (survive restart)
-			ex.AutoDelete, // default: false
-			ex.Internal,   // default: false
-			false,         // noWait: false
-			nil,           // args
+			true,
+			false,
+			false,
+			false,
+			nil,
 		); err != nil {
 			return fmt.Errorf("exchange '%s': %w", ex.Name, err)
 		}
 
 		// Declare bindings
-		if err := q.defBindings(ch, ex.Name, ex.Bindings); err != nil {
+		if err := q.declareBindings(ch, ex.Name, ex.Bindings); err != nil {
 			return fmt.Errorf("exchange '%s' bindings: %w", ex.Name, err)
 		}
 	}
@@ -160,7 +157,11 @@ func (q *Queue) defExchanges(ch *amqp.Channel, exchanges []ExchangeSpec) error {
 }
 
 // declareBindings declares all bindings for an exchange
-func (q *Queue) defBindings(ch *amqp.Channel, exchangeName string, bindings []BindingSpec) error {
+func (q *Queue) declareBindings(
+	ch *amqp.Channel,
+	exchangeName string,
+	bindings []BindingSpec,
+) error {
 	for _, b := range bindings {
 		if err := ch.QueueBind(
 			b.Queue,      // queue name

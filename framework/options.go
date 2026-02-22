@@ -2,6 +2,7 @@ package framework
 
 import (
 	"context"
+	"time"
 
 	"github.com/BevisDev/godev/database"
 	"github.com/BevisDev/godev/ginfw/server"
@@ -35,14 +36,25 @@ type options struct {
 	migrationConf *migration.Config
 	keycloakConf  *keycloak.Config
 	redisConf     *redis.Config
-	rabbitConf    *rabbitmq.Config
-	rabbitOpt     []rabbitmq.Option
-	kafkaConf     *kafkax.Config
-	restOn        bool
-	restOpts      []rest.Option
-	mailerConf    *mailer.Config
-	schedulerOn   bool
-	schedulerOpt  []scheduler.Option
+
+	rabbitConf *rabbitmq.Config
+	rabbitOpt  []rabbitmq.Option
+
+	kafkaConf            *kafkax.Config
+	kafkaConsumerHandler kafkax.Handler
+	kafkaConsumerRetry   struct {
+		enabled    bool
+		maxRetries int
+		retryDelay time.Duration
+	}
+
+	restOn   bool
+	restOpts []rest.Option
+
+	mailerConf *mailer.Config
+
+	schedulerOn  bool
+	schedulerOpt []scheduler.Option
 
 	serverConf *server.Config
 
@@ -127,6 +139,25 @@ func WithServer(cfg *server.Config) Option {
 func WithKafka(cfg *kafkax.Config) Option {
 	return func(o *options) {
 		o.kafkaConf = cfg
+	}
+}
+
+// WithKafkaConsumer registers a handler to consume Kafka messages. The consumer loop is started
+// automatically in Bootstrap.Start() when Kafka is configured with Consumer.GroupID and Consumer.Topics.
+func WithKafkaConsumer(handler kafkax.Handler) Option {
+	return func(o *options) {
+		o.kafkaConsumerHandler = handler
+	}
+}
+
+// WithKafkaConsumerRetry registers a handler with retry logic. The consumer loop is started
+// automatically in Bootstrap.Start(). Failed messages are retried up to maxRetries with retryDelay between attempts.
+func WithKafkaConsumerRetry(handler kafkax.Handler, maxRetries int, retryDelay time.Duration) Option {
+	return func(o *options) {
+		o.kafkaConsumerHandler = handler
+		o.kafkaConsumerRetry.enabled = true
+		o.kafkaConsumerRetry.maxRetries = maxRetries
+		o.kafkaConsumerRetry.retryDelay = retryDelay
 	}
 }
 

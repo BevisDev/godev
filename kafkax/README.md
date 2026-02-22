@@ -1,392 +1,77 @@
-# kafkax - Quick Start Guide
+# kafkax – Production Readiness Review
 
-## 📦 Package Structure
+## Overview
 
-```
-type Kafka struct {
-    cfg      *Config
-    producer *Producer
-    consumer *Consumer
-}
-
-func New(cfg *Config) (*Kafka, error)
-```
-
-Single struct `Kafka` chứa cả Producer và Consumer, khởi tạo thông qua `New()`.
-
-## 🚀 Installation
-
-```bash
-go get github.com/segmentio/kafka-go
-```
-
-Copy package `kafkax` vào project của bạn:
-
-```bash
-cp -r kafkax/ /your/project/pkg/
-```
-
-## 📝 Quick Examples
-
-### 1️⃣ Producer Only (Chỉ gửi messages)
-
-```go
-package main
-
-import (
-	"context"
-	"your-project/pkg/kafkax"
-)
-
-func main() {
-	// Create config
-	cfg := kafkax.DefaultConfig([]string{"localhost:9092"})
-
-	// Create Kafka client
-	kafka, err := kafkax.New(cfg)
-	if err != nil {
-		panic(err)
-	}
-	defer kafka.Close()
-
-	ctx := context.Background()
-
-	// Send message
-	kafka.Send(ctx, &kafkax.Message{
-		Topic: "orders",
-		Key:   []byte("order-1"),
-		Value: []byte("order data"),
-	})
-
-	// Send JSON
-	kafka.SendJSON(ctx, "orders", "order-2", map[string]interface{}{
-		"order_id": "order-2",
-		"amount":   99.99,
-	})
-}
-```
-
-### 2️⃣ Consumer Only (Chỉ nhận messages)
-
-```go
-package main
-
-import (
-	"context"
-	"fmt"
-	"your-project/pkg/kafkax"
-)
-
-func main() {
-	cfg := kafkax.DefaultConfig([]string{"localhost:9092"})
-
-	// Set consumer config để enable consumer
-	cfg.Consumer.GroupID = "order-processor"
-	cfg.Consumer.Topics = []string{"orders"}
-	cfg.Consumer.AutoCommit = false
-
-	kafka, err := kafkax.New(cfg)
-	if err != nil {
-		panic(err)
-	}
-	defer kafka.Close()
-
-	ctx := context.Background()
-
-	// Consume messages
-	kafka.Consume(ctx, func(ctx context.Context, msg *kafkax.ConsumedMessage) error {
-		fmt.Printf("Received: %s\n", string(msg.Value))
-
-		// Process message here
-
-		return nil // Return nil to commit
-	})
-}
-```
-
-### 3️⃣ Both Producer & Consumer
-
-```go
-package main
-
-import (
-	"context"
-	"your-project/pkg/kafkax"
-)
-
-func main() {
-	cfg := kafkax.DefaultConfig([]string{"localhost:9092"})
-
-	// Enable consumer
-	cfg.Consumer.GroupID = "payment-processor"
-	cfg.Consumer.Topics = []string{"payment-requests"}
-
-	kafka, err := kafkax.New(cfg)
-	if err != nil {
-		panic(err)
-	}
-	defer kafka.Close()
-
-	ctx := context.Background()
-
-	// Consume requests và produce results
-	kafka.Consume(ctx, func(ctx context.Context, msg *kafkax.ConsumedMessage) error {
-		// Process payment
-		result := processPayment(msg)
-
-		// Send result to another topic
-		return kafka.SendJSON(ctx, "payment-results", "key", result)
-	})
-}
-```
-
-## 🎯 Key Concepts
-
-### Config Structure
-
-```go
-type Config struct {
-    Brokers  []string       // Kafka brokers
-    Producer ProducerConfig // Producer settings
-    Consumer ConsumerConfig  // Consumer settings
-}
-```
-
-### Initialization Rules
-
-1. **Producer**: Luôn được khởi tạo (lightweight nếu không dùng)
-2. **Consumer**: Chỉ khởi tạo khi set `Consumer.GroupID` và `Consumer.Topics`
-
-```go
-cfg := kafkax.DefaultConfig(brokers)
-
-// Producer only (consumer = nil)
-kafka, _ := kafkax.New(cfg)
-
-// Both producer and consumer
-cfg.Consumer.GroupID = "my-group"
-cfg.Consumer.Topics = []string{"topic1"}
-kafka, _ := kafkax.New(cfg)
-```
-
-### Check Initialization
-
-```go
-kafka.HasProducer() // true
-kafka.HasConsumer() // true/false (depends on config)
-```
-
-## 🔧 Common Operations
-
-### Send Messages
-
-```go
-// Simple send
-kafka.Send(ctx, &kafkax.Message{
-Topic: "orders",
-Key:   []byte("key"),
-Value: []byte("value"),
-})
-
-// Send JSON
-kafka.SendJSON(ctx, "orders", "key", orderObject)
-
-// Send batch
-messages := []*kafkax.Message{ /* ... */ }
-kafka.SendBatch(ctx, messages)
-
-// With headers
-producer, _ := kafka.Producer()
-producer.SendWithHeaders(ctx, "orders", key, value, map[string]string{
-"trace-id": "abc",
-})
-```
-
-### Consume Messages
-
-```go
-// Basic consume
-kafka.Consume(ctx, func (ctx context.Context, msg *kafkax.ConsumedMessage) error {
-// Process message
-return nil // Commit on success
-})
-
-// With retry
-kafka.ConsumeWithRetry(ctx, handler, 3, time.Second)
-
-// Read single message
-consumer, _ := kafka.Consumer()
-msg, _ := consumer.ReadMessage(ctx)
-
-// Manual commit
-consumer.CommitMessage(ctx, msg)
-```
-
-### Access Producer/Consumer Directly
-
-```go
-// Get producer
-producer, err := kafka.Producer()
-if err != nil {
-// Handle error (not initialized)
-}
-
-// Get consumer
-consumer, err := kafka.Consumer()
-if err != nil {
-// Handle error (not initialized)
-}
-
-// Use directly
-producer.Send(ctx, msg)
-consumer.ReadMessage(ctx)
-```
-
-## ⚙️ Configuration Examples
-
-### High Throughput Producer
-
-```go
-cfg := kafkax.DefaultConfig(brokers)
-cfg.Producer.BatchSize = 1000
-cfg.Producer.BatchTimeout = 10 * time.Millisecond
-cfg.Producer.Compression = compress.Snappy
-cfg.Producer.Async = true
-```
-
-### Reliable Consumer
-
-```go
-cfg := kafkax.DefaultConfig(brokers)
-cfg.Consumer.GroupID = "my-group"
-cfg.Consumer.Topics = []string{"orders"}
-cfg.Consumer.AutoCommit = false // Manual commit
-cfg.Consumer.StartOffset = kafka.FirstOffset
-cfg.Consumer.CommitInterval = 1 * time.Second
-```
-
-## 🛠️ Development
-
-### Run Local Kafka
-
-```bash
-docker-compose up -d      # Start Kafka
-docker-compose down -v    # Stop Kafka
-```
-
-Access Kafka UI: http://localhost:8080
-
-### Run Tests
-
-```bash
-make test           # All tests
-make test-short     # Unit tests only
-make bench          # Benchmarks
-```
-
-### Run Example
-
-```bash
-cd examples
-go run main.go
-```
-
-## ✅ Best Practices
-
-1. **Always defer Close()**
-   ```go
-   kafka, _ := kafkax.New(cfg)
-   defer kafka.Close()
-   ```
-
-2. **Use context for timeout**
-   ```go
-   ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-   defer cancel()
-   ```
-
-3. **Manual commit for reliability**
-   ```go
-   cfg.Consumer.AutoCommit = false
-   ```
-
-4. **Handle errors properly**
-   ```go
-   kafka.Consume(ctx, func(ctx context.Context, msg *kafkax.ConsumedMessage) error {
-       if err := process(msg); err != nil {
-           return err // Don't commit on error
-       }
-       return nil // Commit on success
-   })
-   ```
-
-5. **Graceful shutdown**
-   ```go
-   ctx, cancel := context.WithCancel(context.Background())
-   defer cancel()
-   
-   sigChan := make(chan os.Signal, 1)
-   signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-   go func() {
-       <-sigChan
-       cancel()
-   }()
-   
-   kafka.Consume(ctx, handler)
-   ```
-
-## 📊 Monitoring
-
-```go
-// Producer stats
-producer, _ := kafka.Producer()
-stats := producer.Stats()
-fmt.Printf("Messages: %d, Errors: %d\n", stats.Messages, stats.Errors)
-
-// Consumer lag
-consumer, _ := kafka.Consumer()
-lag := consumer.Lag()
-fmt.Printf("Lag: %d\n", lag)
-```
-
-## 🚨 Error Handling
-
-```go
-// Config validation error
-kafka, err := kafkax.New(cfg)
-if err != nil {
-// Handle invalid config
-}
-
-// Producer not initialized
-producer, err := kafka.Producer()
-if err == kafkax.ErrProducerNotInitialized {
-// Producer not available
-}
-
-// Consumer not initialized (GroupID/Topics not set)
-consumer, err := kafka.Consumer()
-if err == kafkax.ErrConsumerNotInitialized {
-// Consumer not available
-}
-
-// Message errors
-err = kafka.Send(ctx, &kafkax.Message{Topic: ""})
-if err == kafkax.ErrEmptyTopic {
-// Invalid message
-}
-```
-
-## 📚 More Examples
-
-Check `examples/main.go` for:
-
-- ✅ Producer only example
-- ✅ Consumer only example
-- ✅ Both producer and consumer
-- ✅ Full featured with retry
-- ✅ Direct producer/consumer access
+Package `kafkax` is a wrapper around `github.com/segmentio/kafka-go` with sensible configuration, a unified producer/consumer API, and support for RID (request ID), retries, and manual commit.
 
 ---
 
-**Happy coding! 🚀**
+## What’s Already Production-Ready
+
+| Area | Details |
+|------|---------|
+| **Config** | `Validate()`, `DefaultConfig()`, and config is cloned in `New()` so caller mutations do not affect the client |
+| **Producer** | Send, SendBatch, SendJSON, SendWithHeaders, Produce (RID), ProduceBatch; mutex and closed checks; Stats, Close, IsClosed |
+| **Consumer** | Consume, ConsumeWithRetry, ReadMessage, CommitMessage; manual/auto commit; Lag, Stats, SetOffset; RID from header → context |
+| **Errors** | Clear sentinel errors (ErrNoBrokers, ErrProducerClosed, ErrConsumerNotInitialized, etc.) |
+| **Graceful** | Consumer exits on `ctx.Done()`; `Close()` shuts down both producer and consumer and logs close errors |
+| **Poison message** | ConsumeWithRetry: after retries are exhausted the message is **committed (skipped)** and logged, so the partition is not blocked forever |
+
+---
+
+## Fixes Applied in This Review
+
+1. **kafka.go**
+   - Producer init errors are no longer ignored; `New()` returns an error if `newProducer` fails.
+   - `Close()`: log errors when closing producer/consumer and set references to `nil` after close.
+   - Config is cloned inside `New()`.
+
+2. **producer.go**
+   - `Produce` / `ProduceBatch`: added lock, closed and nil writer checks, topic validation; ProduceBatch preserves each message’s headers and adds RID.
+
+3. **consumer.go**
+   - `ConsumeWithRetry`: when retries are exhausted, the message is committed (skipped) and logged to avoid an infinite loop on a single failing message.
+
+4. **config.go**
+   - Documented that `Idempotent` is not yet applied to the kafka-go Writer (reserved for when the driver supports it).
+
+---
+
+## Further Recommendations for Production
+
+### 1. Logging
+
+- The package currently uses `fmt.Printf` / `log.Printf`. Prefer injecting a logger (e.g. `logger.Logger`) via config or options so logs align with the rest of the app (level, format, tracing).
+
+### 2. Observability
+
+- Producer: `Stats()` (kafka.WriterStats) is available – consider exporting metrics (message count, errors, batch size).
+- Consumer: `Stats()` and `Lag()` are available – monitor lag and messages/sec to detect backlogs.
+
+### 3. Consumer: AutoCommit
+
+- `AutoCommit == true`: kafka-go commits according to `CommitInterval`.
+- `AutoCommit == false`: commit only after the handler returns successfully. This gives at-least-once delivery; implement idempotent handling in the handler if you need to avoid duplicates.
+
+### 4. Idempotent / Exactly-once
+
+- `Config.Producer.Idempotent` exists but is **not** yet passed to the kafka-go Writer (the driver does not fully support it). When kafka-go supports it, wire it in `newProducer`.
+
+### 5. Consumer SetOffset
+
+- `SetOffset(topic, partition, offset)` currently only calls `reader.SetOffset(offset)`; the topic/partition arguments are unused (the Reader is group-based). To set offset per partition you need a different approach (e.g. a Reader per partition or a low-level API). Consider renaming or documenting this to avoid confusion.
+
+### 6. Tests
+
+- There are no `*_test.go` files yet. Add unit tests for Validate and config clone, and integration tests (e.g. testcontainers or mocks) for basic Send/Consume flows.
+
+### 7. Graceful Shutdown
+
+- The consumer runs in a loop; when `ctx.Done()` (shutdown), `Consume` returns. In main/bootstrap, cancel the context on SIGTERM/SIGINT and then call `Kafka.Close()` so producer and consumer shut down cleanly.
+
+---
+
+## Conclusion
+
+- **Suitable for production** after the changes in this review: correct producer init, thread-safe Produce/ProduceBatch, poison-message handling in ConsumeWithRetry, and safe Close with config clone.
+- **Recommended next steps**: inject a logger, monitor Stats/Lag, add tests, and (when needed) clarify or refactor the SetOffset API and enable Idempotent once the driver supports it.

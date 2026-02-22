@@ -37,7 +37,8 @@ type ProducerConfig struct {
 	// Balancer strategy
 	Balancer kafka.Balancer
 
-	// Idempotent writes (exactly-once semantics)
+	// Idempotent writes (exactly-once semantics).
+	// Note: not yet applied to kafka-go Writer; reserved for when the driver supports it.
 	Idempotent bool
 }
 
@@ -123,6 +124,20 @@ func (c *Config) validateConsumerConfig() error {
 	}
 
 	return nil
+}
+
+// clone returns a shallow copy of the config (Brokers slice is copied so it can be mutated by caller).
+func (c *Config) clone() *Config {
+	if c == nil {
+		return nil
+	}
+	brokers := make([]string, len(c.Brokers))
+	copy(brokers, c.Brokers)
+	return &Config{
+		Brokers:  brokers,
+		Producer: c.Producer,
+		Consumer: c.Consumer,
+	}
 }
 
 // DefaultConfig returns a configuration with sensible defaults for producer and consumer.

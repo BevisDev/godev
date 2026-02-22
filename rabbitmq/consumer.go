@@ -146,7 +146,7 @@ func (m *ConsumerManager) consume(ctx context.Context, consumer *Consumer) error
 	}
 	defer ch.Close()
 
-	if err := m.mq.queue.Def(queueName); err != nil {
+	if err := m.mq.queue.CreateQueues(queueName); err != nil {
 		return err
 	}
 

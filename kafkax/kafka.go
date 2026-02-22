@@ -3,6 +3,7 @@ package kafkax
 import (
 	"context"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 )
@@ -15,9 +16,15 @@ type Kafka struct {
 	closed   bool
 }
 
-// New creates a new Kafka client
-// It initializes Producer and/or Consumer based on the config
+// New creates a new Kafka client.
+// It initializes Producer and/or Consumer based on the config.
+// Config is cloned so later changes to cfg do not affect the client.
 func New(cfg *Config) (*Kafka, error) {
+	if cfg == nil {
+		return nil, fmt.Errorf("config is nil")
+	}
+	cfg = cfg.clone()
+
 	if err := cfg.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
@@ -27,8 +34,11 @@ func New(cfg *Config) (*Kafka, error) {
 		closed: false,
 	}
 
-	// Initialize producer (always initialized by default)
-	k.producer, _ = newProducer(cfg)
+	producer, err := newProducer(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create producer: %w", err)
+	}
+	k.producer = producer
 
 	// Initialize consumer only if GroupID and Topics are set
 	if cfg.Consumer.GroupID != "" && len(cfg.Consumer.Topics) > 0 {
@@ -86,7 +96,9 @@ func (k *Kafka) Send(ctx context.Context, msg *Message) error {
 }
 
 // SendJSON is a convenience method to send a JSON message
-func (k *Kafka) SendJSON(ctx context.Context, topic string, key string, value interface{}) error {
+func (k *Kafka) SendJSON(ctx context.Context,
+	topic string, key string, value interface{},
+) error {
 	producer, err := k.Producer()
 	if err != nil {
 		return err
@@ -113,7 +125,11 @@ func (k *Kafka) Consume(ctx context.Context, handler Handler) error {
 }
 
 // ConsumeWithRetry is a convenience method to consume with retry logic
-func (k *Kafka) ConsumeWithRetry(ctx context.Context, handler Handler, maxRetries int, retryDelay time.Duration) error {
+func (k *Kafka) ConsumeWithRetry(ctx context.Context,
+	handler Handler,
+	maxRetries int,
+	retryDelay time.Duration,
+) error {
 	consumer, err := k.Consumer()
 	if err != nil {
 		return err
@@ -122,7 +138,8 @@ func (k *Kafka) ConsumeWithRetry(ctx context.Context, handler Handler, maxRetrie
 	return consumer.ConsumeWithRetry(ctx, handler, maxRetries, retryDelay)
 }
 
-// Close closes both producer and consumer
+// Close closes both producer and consumer.
+// Logs and ignores close errors so both sides are always attempted.
 func (k *Kafka) Close() {
 	k.mu.Lock()
 	defer k.mu.Unlock()
@@ -134,11 +151,17 @@ func (k *Kafka) Close() {
 	k.closed = true
 
 	if k.producer != nil {
-		k.producer.Close()
+		if err := k.producer.Close(); err != nil {
+			log.Printf("[kafkax] producer close error: %v", err)
+		}
+		k.producer = nil
 	}
 
 	if k.consumer != nil {
-		k.consumer.Close()
+		if err := k.consumer.Close(); err != nil {
+			log.Printf("[kafkax] consumer close error: %v", err)
+		}
+		k.consumer = nil
 	}
 }
 

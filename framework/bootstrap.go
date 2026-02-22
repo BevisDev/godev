@@ -353,6 +353,27 @@ func (b *Bootstrap) Start(ctx context.Context) error {
 		b.scheduler.Start(ctx)
 	}
 
+	if b.rabbitmq != nil && b.rabbitmq.Consumer() != nil {
+		b.rabbitmq.Consumer().Start(ctx)
+	}
+
+	// Start Kafka consumer if configured (handler registered and consumer initialized)
+	if b.kafka != nil && b.kafka.HasConsumer() && b.kafkaConsumerHandler != nil {
+		handler := b.kafkaConsumerHandler
+		if b.kafkaConsumerRetry.enabled {
+			maxRetries := b.kafkaConsumerRetry.maxRetries
+			retryDelay := b.kafkaConsumerRetry.retryDelay
+			go func() {
+				_ = b.kafka.ConsumeWithRetry(b.ctx, handler, maxRetries, retryDelay)
+			}()
+		} else {
+			go func() {
+				_ = b.kafka.Consume(b.ctx, handler)
+			}()
+		}
+		b.log.Info("Kafka consumer started")
+	}
+
 	// Start HTTP server if configured
 	if b.serverConf != nil {
 		b.httpApp = server.New(b.serverConf)
@@ -400,6 +421,9 @@ func (b *Bootstrap) Stop(ctx context.Context) error {
 		return nil
 	}
 	b.mu.Unlock()
+
+	// Cancel bootstrap context so Kafka consumer and other goroutines using b.ctx exit
+	b.cancel()
 
 	b.log.Info("stopping services...")
 

@@ -191,27 +191,39 @@ func (p *Producer) IsClosed() bool {
 	return p.closed
 }
 
+// Produce sends a single message with RID header from context (thread-safe).
 func (p *Producer) Produce(
 	ctx context.Context,
 	topic string,
 	key, value []byte,
 ) error {
-	rid := utils.GetRID(ctx)
-	var headers []kafka.Header
-	headers = append(headers, kafka.Header{
-		Key:   consts.XRequestID,
-		Value: []byte(rid),
-	})
+	p.mu.RLock()
+	defer p.mu.RUnlock()
 
+	if p.closed {
+		return ErrProducerClosed
+	}
+	if p.writer == nil {
+		return ErrProducerNotInitialized
+	}
+	if topic == "" {
+		return ErrEmptyTopic
+	}
+
+	rid := utils.GetRID(ctx)
 	return p.writer.WriteMessages(ctx, kafka.Message{
-		Topic:   topic,
-		Key:     key,
-		Value:   value,
-		Headers: headers,
-		Time:    time.Now(),
+		Topic: topic,
+		Key:   key,
+		Value: value,
+		Headers: []kafka.Header{{
+			Key:   consts.XRequestID,
+			Value: []byte(rid),
+		}},
+		Time: time.Now(),
 	})
 }
 
+// ProduceBatch sends multiple messages, each with RID header from context (thread-safe).
 func (p *Producer) ProduceBatch(
 	ctx context.Context,
 	messages []*Message,
@@ -220,24 +232,38 @@ func (p *Producer) ProduceBatch(
 		return nil
 	}
 
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	if p.closed {
+		return ErrProducerClosed
+	}
+	if p.writer == nil {
+		return ErrProducerNotInitialized
+	}
+
 	rid := utils.GetRID(ctx)
-	var headers []kafka.Header
-	headers = append(headers, kafka.Header{
-		Key:   consts.XRequestID,
-		Value: []byte(rid),
-	})
-
+	ridHeader := kafka.Header{Key: consts.XRequestID, Value: []byte(rid)}
 	msgs := make([]kafka.Message, 0, len(messages))
-	for _, msg := range messages {
-		kafkaMsg := kafka.Message{
-			Topic:   msg.Topic,
-			Key:     msg.Key,
-			Value:   msg.Value,
-			Headers: headers,
-			Time:    time.Now(),
-		}
 
-		msgs = append(msgs, kafkaMsg)
+	for i, msg := range messages {
+		if msg.Topic == "" {
+			return fmt.Errorf("message %d: %w", i, ErrEmptyTopic)
+		}
+		headers := []kafka.Header{ridHeader}
+		if len(msg.Headers) > 0 {
+			for _, h := range msg.Headers {
+				headers = append(headers, kafka.Header{Key: h.Key, Value: h.Value})
+			}
+		}
+		msgs = append(msgs, kafka.Message{
+			Topic:     msg.Topic,
+			Key:       msg.Key,
+			Value:     msg.Value,
+			Headers:   headers,
+			Time:      time.Now(),
+			Partition: msg.Partition,
+		})
 	}
 
 	return p.writer.WriteMessages(ctx, msgs...)

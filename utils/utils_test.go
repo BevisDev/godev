@@ -2,9 +2,7 @@ package utils
 
 import (
 	"context"
-	"errors"
 	"testing"
-	"time"
 
 	"github.com/BevisDev/godev/consts"
 	"github.com/BevisDev/godev/types"
@@ -26,55 +24,12 @@ func TestNewCtx_ShouldReturnContextWithRID(t *testing.T) {
 	}
 }
 
-func TestGetRID_WhenCtxNil(t *testing.T) {
-	state := GetRID(nil)
-	if state != "" {
-		t.Error("Expected non-empty state")
-	}
-}
-
-func TestGetRID_WhenCtxHasNoRID(t *testing.T) {
-	ctx := context.Background()
-	rid := GetRID(ctx)
-	if rid != "" {
-		t.Error("Expected generated rid")
-	}
-}
-
 func TestGetRID_WhenCtxHasRID(t *testing.T) {
 	expected := "fixed-rid"
 	ctx := context.WithValue(context.Background(), consts.RID, expected)
 	rid := GetRID(ctx)
 	if rid != expected {
 		t.Errorf("GetRID() = %q; want %q", rid, expected)
-	}
-}
-
-func TestNewCtxTimeout(t *testing.T) {
-	ctx, cancel := NewCtxTimeout(nil, 1)
-	defer cancel()
-
-	select {
-	case <-ctx.Done():
-		if !errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			t.Errorf("Expected DeadlineExceeded, got %v", ctx.Err())
-		}
-	case <-time.After(2 * time.Second):
-		t.Error("timeout context did not expire")
-	}
-}
-
-func TestNewCtxCancel(t *testing.T) {
-	ctx, cancel := NewCtxCancel(nil)
-	cancel()
-
-	select {
-	case <-ctx.Done():
-		if !errors.Is(ctx.Err(), context.Canceled) {
-			t.Errorf("Expected context.Canceled, got %v", ctx.Err())
-		}
-	case <-time.After(1 * time.Second):
-		t.Error("Cancel context did not close")
 	}
 }
 

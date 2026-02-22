@@ -118,9 +118,6 @@ const (
 | Field | Type | Description | Default |
 |-------|------|-------------|---------|
 | `Name` | `string` | Queue name (required) | - |
-| `Durable` | `bool` | Survive broker restart | `false` |
-| `AutoDelete` | `bool` | Delete when no consumers | `false` |
-| `Exclusive` | `bool` | Single connection only | `false` |
 | `Args` | `map[string]interface{}` | Additional arguments | `nil` |
 
 ### ExchangeSpec Fields
@@ -129,9 +126,6 @@ const (
 |-------|------|-------------|---------|
 | `Name` | `string` | Exchange name (required) | - |
 | `Type` | `ExchangeType` | Direct, Topic, or Fanout | - |
-| `Durable` | `bool` | Survive broker restart | `false` |
-| `AutoDelete` | `bool` | Delete when no bindings | `false` |
-| `Internal` | `bool` | Only exchanges can publish | `false` |
 | `Bindings` | `[]BindingSpec` | Queue bindings | `nil` |
 
 ## Examples
@@ -143,7 +137,7 @@ Declare multiple queues with default settings (non-durable).
 ```go
 queue := mq.GetQueue()
 
-err := queue.Def(
+err := queue.CreateQueues(
     "order.queue",
     "payment.queue",
     "notification.queue",
@@ -276,11 +270,11 @@ err := queue.Declare(rabbitmq.Spec{
 
 ### Queue Methods
 
-#### `Def(names ...string) error`
+#### `CreateQueues(names ...string) error`
 Declare one or more simple queues with default settings.
 
 ```go
-err := queue.Def("queue1", "queue2", "queue3")
+err := queue.CreateQueues("queue1", "queue2", "queue3")
 ```
 
 #### `Declare(spec Spec) error`
@@ -325,9 +319,6 @@ type Spec struct {
 ```go
 type QueueSpec struct {
     Name       string
-    Durable    bool
-    AutoDelete bool
-    Exclusive  bool
     Args       map[string]interface{}
 }
 ```
@@ -337,9 +328,6 @@ type QueueSpec struct {
 type ExchangeSpec struct {
     Name       string
     Type       ExchangeType
-    Durable    bool
-    AutoDelete bool
-    Internal   bool
     Bindings   []BindingSpec
 }
 ```
@@ -476,7 +464,6 @@ queue.Declare(rabbitmq.Spec{
         {
             Name:    "events.topic",
             Type:    rabbitmq.Topic,
-            Durable: true,
             Bindings: []rabbitmq.BindingSpec{
                 {Queue: "analytics.queue", RoutingKey: "#"},
                 {Queue: "email.queue", RoutingKey: "user.#"},
@@ -494,14 +481,12 @@ queue.Declare(rabbitmq.Spec{
     Queues: []rabbitmq.QueueSpec{
         {
             Name:    "order.queue",
-            Durable: true,
             Args: map[string]interface{}{
                 rabbitmq.DeadLetterExchange: "order.retry",
             },
         },
         {
             Name:    "order.retry.queue",
-            Durable: true,
             Args: map[string]interface{}{
                 rabbitmq.MessageTTL:         30000, // Retry after 30s
                 rabbitmq.DeadLetterExchange: "order.main",

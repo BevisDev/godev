@@ -13,15 +13,18 @@ import (
 	"golang.org/x/exp/constraints"
 )
 
+func NewCtxWithRequest(r context.Context) context.Context {
+	var rid = GetRID(r)
+	ctx := NewCtx()
+	return SetValueCtx(ctx, consts.RID, rid)
+}
+
 func NewCtx() context.Context {
 	ctx := context.Background()
 	return context.WithValue(ctx, consts.RID, random.NewUUID())
 }
 
 func SetValueCtx(ctx context.Context, key string, value interface{}) context.Context {
-	if ctx == nil {
-		ctx = context.Background()
-	}
 	return context.WithValue(ctx, key, value)
 }
 
@@ -39,16 +42,10 @@ func GetRID(ctx context.Context) string {
 }
 
 func NewCtxTimeout(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
-	if ctx == nil {
-		ctx = context.Background()
-	}
 	return context.WithTimeout(ctx, timeout)
 }
 
 func NewCtxCancel(ctx context.Context) (context.Context, context.CancelFunc) {
-	if ctx == nil {
-		ctx = context.Background()
-	}
 	return context.WithCancel(ctx)
 }
 
