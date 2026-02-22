@@ -369,7 +369,7 @@ func (b *Bootstrap) Start(ctx context.Context) error {
 	}
 
 	if b.rabbitmq != nil && b.rabbitmq.Consumer() != nil {
-		b.rabbitmq.Consumer().Start(ctx)
+		go b.rabbitmq.Consumer().Start(ctx)
 	}
 
 	// Start Kafka consumer if configured (handler registered and consumer initialized)

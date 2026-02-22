@@ -157,18 +157,16 @@ func (m *ConsumerManager) consume(ctx context.Context, consumer *Consumer) error
 	msgs, err := ch.ConsumeWithContext(
 		ctx,
 		queueName,
-		"",    // consumer tag (empty = auto-generated)
-		false, // auto-ack (false = manual ack)
-		false, // exclusive
-		false, // no-local
-		false, // no-wait
-		nil,   // args
+		"",
+		false,
+		false,
+		false,
+		false,
+		nil,
 	)
 	if err != nil {
 		return err
 	}
-
-	m.log.Info("[%s] started consuming messages", queueName)
 
 	for {
 		select {
