@@ -2,30 +2,34 @@ package rabbitmq
 
 import amqp "github.com/rabbitmq/amqp091-go"
 
-type MsgHandler struct {
+type Message struct {
 	amqp.Delivery
 }
 
-func (m MsgHandler) GetBody() []byte {
+func (m Message) GetBody() []byte {
 	return m.Body
 }
 
-func (m MsgHandler) Header(key string) any {
+func (m Message) Header(key string) any {
 	return m.Headers[key]
 }
 
-func (m MsgHandler) Commit() {
+func (m Message) Commit() {
 	m.Ack(false)
 }
 
-func (m MsgHandler) CommitMulti() {
+func (m Message) CommitMulti() {
 	m.Ack(true)
 }
 
-func (m MsgHandler) Requeue() {
+func (m Message) Requeue() {
 	m.Nack(false, true)
 }
 
-func (m MsgHandler) RequeueMulti() {
+func (m Message) RequeueMulti() {
 	m.Nack(true, true)
+}
+
+func (m Message) Reject(requeue bool) {
+	m.Reject(requeue)
 }

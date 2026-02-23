@@ -3,6 +3,7 @@ package rabbitmq
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -15,7 +16,7 @@ import (
 // Handler defines the interface for message consumers.
 type Handler interface {
 	// Handle processes a single message. Returns nil to ack, error to requeue.
-	Handle(ctx context.Context, msg MsgHandler) error
+	Handle(ctx context.Context, msg Message) error
 }
 
 type Consumer struct {
@@ -108,14 +109,13 @@ func (m *ConsumerManager) run(ctx context.Context, consumer *Consumer) {
 			return
 		default:
 			err := m.consume(ctx, consumer)
-
 			if err != nil {
 				consecutiveErrors++
-				m.log.Info("[%s] error: %v (consecutive errors: %d)",
+				m.log.Error("[%s] error: %v (consecutive errors: %d)",
 					queueName, err, consecutiveErrors)
 
 				if consecutiveErrors >= maxConsecutiveErrors {
-					m.log.Info("[%s] exceeded max consecutive errors (%d), stopping",
+					m.log.Error("[%s] exceeded max consecutive errors (%d), stopping",
 						queueName, maxConsecutiveErrors)
 					return
 				}
@@ -123,7 +123,7 @@ func (m *ConsumerManager) run(ctx context.Context, consumer *Consumer) {
 				var amqpErr *amqp.Error
 				if errors.As(err, &amqpErr) {
 					if amqpErr.Code == 504 || amqpErr.Code == 320 || amqpErr.Code == 501 {
-						m.log.Warn("[%s] connection error, reconnecting...", queueName)
+						m.log.Error("[%s] connection error, reconnecting...", queueName)
 						time.Sleep(retryDelay)
 						continue
 					}
@@ -150,7 +150,7 @@ func (m *ConsumerManager) consume(ctx context.Context, consumer *Consumer) error
 		return err
 	}
 
-	if err := ch.Qos(1, 0, false); err != nil {
+	if err := ch.Qos(m.mq.prefetchCount, 0, false); err != nil {
 		return err
 	}
 
@@ -177,21 +177,40 @@ func (m *ConsumerManager) consume(ctx context.Context, consumer *Consumer) error
 				return errors.New("message channel closed")
 			}
 
-			msg := MsgHandler{Delivery: delivery}
-			msgCtx := m.createMessageContext(msg)
+			msg := Message{Delivery: delivery}
+			msgCtx := m.NewMsgCtx(msg)
 
-			if err := consumer.Handler.Handle(msgCtx, msg); err != nil {
-				m.log.Info("[rabbitmq] consumer [%s] handle error: %v", queueName, err)
-				msg.Requeue()
-			} else {
+			if err := m.execute(msgCtx, queueName, consumer.Handler, msg); err != nil {
+				m.log.Info("[%s] error: %v", queueName, err)
+				if !m.mq.autoCommit {
+					msg.Requeue()
+				}
+				continue
+			}
+
+			if m.mq.autoCommit {
 				msg.Commit()
 			}
 		}
 	}
 }
 
-// createMessageContext creates a new context with x-rid from message headers.
-func (m *ConsumerManager) createMessageContext(msg MsgHandler) context.Context {
+// execute runs Handler.Handle and recovers from panic.
+func (m *ConsumerManager) execute(ctx context.Context,
+	queueName string,
+	h Handler,
+	msg Message,
+) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("[RECOVER][%s] err: %v", queueName, r)
+		}
+	}()
+	return h.Handle(ctx, msg)
+}
+
+// NewMsgCtx creates a new context with x-rid from message headers.
+func (m *ConsumerManager) NewMsgCtx(msg Message) context.Context {
 	newCtx := utils.NewCtx()
 	if xRID := msg.Header(consts.XRequestID); xRID != nil {
 		if s, ok := xRID.(string); ok && s != "" {
