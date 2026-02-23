@@ -9,29 +9,43 @@ import (
 	"golang.org/x/time/rate"
 )
 
+// Response codes returned in JSON when the request is rejected.
 const (
-	codeTooManyRequests = "TOO_MANY_REQUESTS"
-	codeRequestTimeout  = "REQUEST_TIMEOUT"
+	CodeTooManyRequests = "TOO_MANY_REQUESTS"
+	CodeRequestTimeout  = "REQUEST_TIMEOUT"
 )
 
-type RateLimit struct {
-	*options
+// RateLimiter applies rate limiting to HTTP requests using golang.org/x/time/rate.
+type RateLimiter struct {
+	opts    *options
 	limiter *rate.Limiter
 }
 
-func New(fs ...Option) *RateLimit {
+// RateLimit is an alias for RateLimiter for backward compatibility.
+type RateLimit = RateLimiter
+
+// New returns a new RateLimiter with the given options.
+func New(opts ...Option) *RateLimiter {
 	o := defaultOptions()
-	for _, opt := range fs {
+	for _, opt := range opts {
 		opt(o)
 	}
-
-	return &RateLimit{
-		options: o,
-		limiter: rate.NewLimiter(o.rps, o.burst),
+	burst := max(o.burst, 1)
+	return &RateLimiter{
+		opts:    o,
+		limiter: rate.NewLimiter(o.rps, burst),
 	}
 }
 
-func (r *RateLimit) AllowHandler() gin.HandlerFunc {
+// Middleware returns a Gin middleware that allows requests up to the rate limit
+// and rejects with 429 (Too Many Requests) when exceeded. Non-blocking.
+func (r *RateLimiter) Middleware() gin.HandlerFunc {
+	return r.AllowHandler()
+}
+
+// AllowHandler returns a Gin middleware that allows requests when a token is
+// available and aborts with 429 when the rate is exceeded (non-blocking).
+func (r *RateLimiter) AllowHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if !r.limiter.Allow() {
 			r.reject(c, errors.New("rate limit exceeded"))
@@ -41,35 +55,36 @@ func (r *RateLimit) AllowHandler() gin.HandlerFunc {
 	}
 }
 
-func (r *RateLimit) WaitHandler() gin.HandlerFunc {
+// WaitHandler returns a Gin middleware that waits up to the configured timeout
+// for a token; if the wait times out or the context is cancelled, it aborts with
+// 408 (Request Timeout) or 429 respectively.
+func (r *RateLimiter) WaitHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx, cancel := context.WithTimeout(c.Request.Context(), r.timeout)
+		ctx, cancel := context.WithTimeout(c.Request.Context(), r.opts.timeout)
 		defer cancel()
 
 		if err := r.limiter.Wait(ctx); err != nil {
 			r.reject(c, err)
 			return
 		}
-
 		c.Next()
 	}
 }
 
-func (r *RateLimit) reject(c *gin.Context, err error) {
-	if r.onReject != nil {
-		r.onReject(c, err)
+func (r *RateLimiter) reject(c *gin.Context, err error) {
+	if r.opts.onReject != nil {
+		r.opts.onReject(c, err)
 		return
 	}
-
-	// Default error handling
 	if errors.Is(err, context.DeadlineExceeded) {
 		c.AbortWithStatusJSON(http.StatusRequestTimeout, gin.H{
-			"code": codeRequestTimeout,
+			"code":    CodeRequestTimeout,
+			"message": "rate limit wait timeout",
 		})
 		return
 	}
-
 	c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
-		"code": codeTooManyRequests,
+		"code":    CodeTooManyRequests,
+		"message": "rate limit exceeded",
 	})
 }

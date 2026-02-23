@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/BevisDev/godev/utils/str"
+	"github.com/BevisDev/godev/utils/validate"
 	"github.com/spf13/viper"
 )
 
@@ -65,7 +66,7 @@ func Load[T any](cf *Config) (Response[T], error) {
 
 	// RETURN
 	var out Response[T]
-	if settings == nil || len(settings) <= 0 {
+	if validate.IsNilOrEmpty(settings) {
 		return Response[T]{}, fmt.Errorf("[config] settings is empty")
 	}
 

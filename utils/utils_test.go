@@ -337,15 +337,15 @@ func TestPercent(t *testing.T) {
 
 			switch v := tt.input.(type) {
 			case int:
-				actual = Percent[int](v)
+				actual = Percent(v)
 			case int8:
-				actual = Percent[int8](v)
+				actual = Percent(v)
 			case int16:
-				actual = Percent[int16](v)
+				actual = Percent(v)
 			case int32:
-				actual = Percent[int32](v)
+				actual = Percent(v)
 			case int64:
-				actual = Percent[int64](v)
+				actual = Percent(v)
 			default:
 				t.Fatalf("unsupported type: %T", v)
 			}
