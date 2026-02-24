@@ -10,12 +10,15 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/BevisDev/godev/consts"
 )
 
 // Mailer handles email sending.
 type Mailer struct {
 	cfg  *Config
 	auth smtp.Auth
+	addr string
 }
 
 // Mail represents an email message.
@@ -42,10 +45,12 @@ func New(cfg *Config) (*Mailer, error) {
 	}
 
 	auth := smtp.PlainAuth("", cfg.Username, cfg.Password, cfg.Host)
+	addr := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
 
 	return &Mailer{
 		cfg:  cfg,
 		auth: auth,
+		addr: addr,
 	}, nil
 }
 
@@ -60,9 +65,8 @@ func (m *Mailer) Send(mail Mail) error {
 		return err
 	}
 
-	addr := fmt.Sprintf("%s:%d", m.cfg.Host, m.cfg.Port)
 	return smtp.SendMail(
-		addr,
+		m.addr,
 		m.auth,
 		m.cfg.From,
 		append(mail.To, mail.Cc...),
@@ -95,25 +99,25 @@ func (m *Mailer) buildMessage(mail Mail) ([]byte, error) {
 	}
 
 	boundary := fmt.Sprintf("boundary_%d", time.Now().UnixNano())
-	buf.WriteString(fmt.Sprintf("Content-Type: multipart/mixed; boundary=\"%s\"\r\n\r\n", boundary))
+	fmt.Fprintf(&buf, "Content-Type: multipart/mixed; boundary=\"%s\"\r\n\r\n", boundary)
 
 	m.writeBodyPart(&buf, mail, boundary)
 	for _, att := range mail.Attachments {
 		m.writeAttachmentPart(&buf, att, boundary)
 	}
-	buf.WriteString(fmt.Sprintf("--%s--\r\n", boundary))
+	fmt.Fprintf(&buf, "--%s--\r\n", boundary)
 
 	return buf.Bytes(), nil
 }
 
 func (m *Mailer) writeHeaders(buf *bytes.Buffer, mail Mail) {
-	buf.WriteString(fmt.Sprintf("From: %s\r\n", m.cfg.From))
-	buf.WriteString(fmt.Sprintf("To: %s\r\n", strings.Join(mail.To, ", ")))
+	fmt.Fprintf(buf, "From: %s\r\n", m.cfg.From)
+	fmt.Fprintf(buf, "To: %s\r\n", strings.Join(mail.To, ", "))
 	if len(mail.Cc) > 0 {
-		buf.WriteString(fmt.Sprintf("Cc: %s\r\n", strings.Join(mail.Cc, ", ")))
+		fmt.Fprintf(buf, "Cc: %s\r\n", strings.Join(mail.Cc, ", "))
 	}
-	buf.WriteString(fmt.Sprintf("Subject: %s\r\n", mail.Subject))
-	buf.WriteString("MIME-Version: 1.0\r\n")
+	fmt.Fprintf(buf, "Subject: %s\r\n", mail.Subject)
+	fmt.Fprintf(buf, "MIME-Version: 1.0\r\n")
 }
 
 func (m *Mailer) writeSimpleBody(buf *bytes.Buffer, mail Mail) {
@@ -127,38 +131,34 @@ func (m *Mailer) writeSimpleBody(buf *bytes.Buffer, mail Mail) {
 }
 
 func (m *Mailer) writeBodyPart(buf *bytes.Buffer, mail Mail, boundary string) {
-	buf.WriteString(fmt.Sprintf("--%s\r\n", boundary))
+	fmt.Fprintf(buf, "--%s\r\n", boundary)
 	if mail.IsHTML {
-		buf.WriteString("Content-Type: text/html; charset=UTF-8\r\n")
+		fmt.Fprintf(buf, "Content-Type: text/html; charset=UTF-8\r\n")
 	} else {
-		buf.WriteString("Content-Type: text/plain; charset=UTF-8\r\n")
+		fmt.Fprintf(buf, "Content-Type: text/plain; charset=UTF-8\r\n")
 	}
-	buf.WriteString("\r\n")
-	buf.WriteString(mail.Body)
-	buf.WriteString("\r\n")
+	fmt.Fprintf(buf, "\r\n")
+	fmt.Fprintf(buf, "%s\r\n", mail.Body)
 }
 
 func (m *Mailer) writeAttachmentPart(buf *bytes.Buffer, att Attachment, boundary string) {
-	buf.WriteString(fmt.Sprintf("--%s\r\n", boundary))
+	fmt.Fprintf(buf, "--%s\r\n", boundary)
 
 	contentType := mime.TypeByExtension(filepath.Ext(att.Filename))
 	if contentType == "" {
-		contentType = "application/octet-stream"
+		contentType = consts.ApplicationOctetStream
 	}
 
-	buf.WriteString(fmt.Sprintf("Content-Type: %s; name=\"%s\"\r\n", contentType, att.Filename))
-	buf.WriteString(fmt.Sprintf("Content-Disposition: attachment; filename=\"%s\"\r\n", att.Filename))
-	buf.WriteString("Content-Transfer-Encoding: base64\r\n\r\n")
+	fmt.Fprintf(buf, "Content-Type: %s; name=\"%s\"\r\n", contentType, att.Filename)
+	fmt.Fprintf(buf, "Content-Disposition: attachment; filename=\"%s\"\r\n", att.Filename)
+	fmt.Fprintf(buf, "Content-Transfer-Encoding: base64\r\n\r\n")
 
 	encoded := base64.StdEncoding.EncodeToString(att.Content)
 	const lineLen = 76
 	for i := 0; i < len(encoded); i += lineLen {
-		end := i + lineLen
-		if end > len(encoded) {
-			end = len(encoded)
-		}
-		buf.WriteString(encoded[i:end])
-		buf.WriteString("\r\n")
+		end := min(i+lineLen, len(encoded))
+		fmt.Fprintf(buf, "%s\r\n", encoded[i:end])
+		fmt.Fprintf(buf, "\r\n")
 	}
 }
 

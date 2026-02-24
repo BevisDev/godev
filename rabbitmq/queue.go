@@ -1,7 +1,6 @@
 package rabbitmq
 
 import (
-	"errors"
 	"fmt"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -74,7 +73,7 @@ func newQueue(mq *MQ) *Queue {
 
 func (q *Queue) CreateQueues(names ...string) error {
 	if len(names) == 0 {
-		return errors.New("[queue] at least one queue name is required")
+		return ErrRequiredQueue
 	}
 
 	var queues []QueueSpec
@@ -112,7 +111,7 @@ func (q *Queue) Declare(spec Spec) error {
 	})
 }
 
-// defQueues declares all queues in spec
+// declareQueues declares all queues in spec
 func (q *Queue) declareQueues(ch *amqp.Channel, queues []QueueSpec) error {
 	for _, qu := range queues {
 		if _, err := ch.QueueDeclare(
@@ -123,13 +122,13 @@ func (q *Queue) declareQueues(ch *amqp.Channel, queues []QueueSpec) error {
 			false,
 			qu.Args, // arguments (TTL, DLX, etc.)
 		); err != nil {
-			return fmt.Errorf("queue '%s': %w", qu.Name, err)
+			return fmt.Errorf("[queue] %s: %w", qu.Name, err)
 		}
 	}
 	return nil
 }
 
-// defExchanges declares all exchanges and bindings in spec
+// declareExchanges declares all exchanges and bindings in spec
 func (q *Queue) declareExchanges(
 	ch *amqp.Channel,
 	exchanges []ExchangeSpec,

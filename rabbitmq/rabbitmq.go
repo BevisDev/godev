@@ -190,13 +190,9 @@ func (r *MQ) Close() {
 	}
 
 	// Close components
-	//if r.consumer != nil {
-	//	r.consumer.Close()
-	//}
-
-	//if r.publisher != nil {
-	//	r.publisher.
-	//}
+	if r.consumer != nil {
+		r.consumer.Close()
+	}
 
 	// Close connection
 	r.connMu.Lock()

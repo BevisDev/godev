@@ -73,6 +73,20 @@ func (m *ConsumerManager) All() map[string]*Consumer {
 	return cp
 }
 
+// Close waits for all consumer goroutines to exit (e.g. after context is cancelled).
+func (m *ConsumerManager) Close() {
+	done := make(chan struct{})
+	go func() {
+		m.wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		m.log.Info("consumer shutdown timeout")
+	}
+}
+
 // Start starts all registered consumers in separate goroutines until context is canceled.
 func (m *ConsumerManager) Start(ctx context.Context) {
 	if len(m.consumers) == 0 {
@@ -172,15 +186,15 @@ func (m *ConsumerManager) consume(ctx context.Context, consumer *Consumer) error
 		select {
 		case <-ctx.Done():
 			return nil
-		case delivery, ok := <-msgs:
+		case d, ok := <-msgs:
 			if !ok {
 				return errors.New("message channel closed")
 			}
 
-			msg := Message{Delivery: delivery}
+			msg := Message{d: d}
 			msgCtx := m.NewMsgCtx(msg)
 
-			if err := m.execute(msgCtx, queueName, consumer.Handler, msg); err != nil {
+			if err := m.handleMsg(msgCtx, queueName, consumer.Handler, msg); err != nil {
 				m.log.Info("[%s] error: %v", queueName, err)
 				if !m.mq.autoCommit {
 					msg.Requeue()
@@ -195,8 +209,9 @@ func (m *ConsumerManager) consume(ctx context.Context, consumer *Consumer) error
 	}
 }
 
-// execute runs Handler.Handle and recovers from panic.
-func (m *ConsumerManager) execute(ctx context.Context,
+// handleMsg runs Handler.Handle and recovers from panic.
+func (m *ConsumerManager) handleMsg(
+	ctx context.Context,
 	queueName string,
 	h Handler,
 	msg Message,
@@ -204,6 +219,7 @@ func (m *ConsumerManager) execute(ctx context.Context,
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("[RECOVER][%s] err: %v", queueName, r)
+			msg.Reject()
 		}
 	}()
 	return h.Handle(ctx, msg)

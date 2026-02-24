@@ -10,6 +10,7 @@ var (
 	ErrMaxRetriesReached = errors.New("[rabbitmq]: max connection retries reached")
 
 	// queue
+	ErrRequiredQueue       = errors.New("[queue] at least one queue name is required")
 	ErrEmptyQueueName      = errors.New("[queue] name cannot be empty")
 	ErrEmptyExchangeName   = errors.New("[queue] exchange name cannot be empty")
 	ErrInvalidExchangeType = errors.New("[queue] invalid exchange type")

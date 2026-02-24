@@ -3,33 +3,37 @@ package rabbitmq
 import amqp "github.com/rabbitmq/amqp091-go"
 
 type Message struct {
-	amqp.Delivery
+	d amqp.Delivery
 }
 
 func (m Message) GetBody() []byte {
-	return m.Body
+	return m.d.Body
 }
 
 func (m Message) Header(key string) any {
-	return m.Headers[key]
+	return m.d.Headers[key]
 }
 
 func (m Message) Commit() {
-	m.Ack(false)
+	m.d.Ack(false)
 }
 
 func (m Message) CommitMulti() {
-	m.Ack(true)
+	m.d.Ack(true)
 }
 
 func (m Message) Requeue() {
-	m.Nack(false, true)
+	m.d.Nack(false, true)
 }
 
 func (m Message) RequeueMulti() {
-	m.Nack(true, true)
+	m.d.Nack(true, true)
 }
 
-func (m Message) Reject(requeue bool) {
-	m.Reject(requeue)
+func (m Message) Reject() {
+	m.d.Reject(false)
+}
+
+func (m Message) RejectRequeue() {
+	m.d.Reject(true)
 }
