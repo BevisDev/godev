@@ -22,7 +22,11 @@ const (
 //	id := NewUUID()
 //	fmt.Println(id) // "550e8400-e29b-71d4-a716-446655440000"
 func NewUUID() string {
-	return uuid.Must(uuid.NewV7()).String()
+	u, err := uuid.NewV7()
+	if err != nil {
+		return NewLowerStringNumeric(36)
+	}
+	return u.String()
 }
 
 // NewInt returns a random integer in the half-open interval [min, max).

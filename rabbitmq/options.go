@@ -9,9 +9,6 @@ type options struct {
 	// prefetchCount limits the number of unacknowledged messages per consumer.
 	prefetchCount int
 
-	// persistentMsg marks published messages as persistent (delivery mode = 2).
-	persistentMsg bool
-
 	// autoCommit enables automatic message acknowledgment.
 	autoCommit bool
 
@@ -46,12 +43,6 @@ func WithConsumerOnly() Option {
 	return func(o *options) {
 		o.consumerOn = true
 		o.publisherOn = false
-	}
-}
-
-func WithPersistentMsg() Option {
-	return func(o *options) {
-		o.persistentMsg = true
 	}
 }
 

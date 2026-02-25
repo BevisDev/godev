@@ -73,10 +73,10 @@ func (s *Scheduler) Timezone() string {
 	return s.cron.Location().String()
 }
 
-// register iterates over all registered jobs and schedules enabled ones
+// run iterates over all registered jobs and schedules enabled ones
 // based on their cron configuration.
 // It safely wraps job execution with panic recovery.
-func (s *Scheduler) register() {
+func (s *Scheduler) run() {
 	s.mu.Lock()
 	jobs := make(map[string]*Job, len(s.jobs))
 	for k, v := range s.jobs {
@@ -89,7 +89,7 @@ func (s *Scheduler) register() {
 		job := v
 
 		if !job.IsOn {
-			s.log.Info("job %s is disabled", name)
+			s.log.Info("job %s is off", name)
 			continue
 		}
 
@@ -112,7 +112,7 @@ func (s *Scheduler) register() {
 	}
 }
 
-// Start registers all jobs, starts the cron scheduler,
+// Start run all jobs, starts the cron scheduler,
 // and stops it gracefully when the context is canceled.
 func (s *Scheduler) Start(ctx context.Context) {
 	s.mu.Lock()
@@ -124,7 +124,7 @@ func (s *Scheduler) Start(ctx context.Context) {
 	s.started = true
 	s.mu.Unlock()
 
-	s.register()
+	s.run()
 
 	if len(s.cron.Entries()) == 0 {
 		s.log.Info("no jobs registered")

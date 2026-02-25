@@ -1,6 +1,7 @@
 package rabbitmq
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/BevisDev/godev/consts"
@@ -64,7 +65,7 @@ func TestBuildMessage_TooLarge(t *testing.T) {
 	large := make([]byte, maxMessageSize+1)
 	_, _, err := p.buildMessage(large)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "message is too large")
+	assert.True(t, errors.Is(err, ErrMessageTooLarge))
 }
 
 func TestRabbitMQ_New_NilConfig(t *testing.T) {

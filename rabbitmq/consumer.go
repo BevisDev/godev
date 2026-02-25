@@ -16,7 +16,8 @@ import (
 // Handler defines the interface for message consumers.
 type Handler interface {
 	// Handle processes a single message. Returns nil to ack, error to requeue.
-	Handle(ctx context.Context, msg Message) error
+	// When autoCommit is false, handler must call msg.Commit() on success.
+	Handle(ctx context.Context, msg *MsgHandler) error
 }
 
 type Consumer struct {
@@ -96,6 +97,11 @@ func (m *ConsumerManager) Start(ctx context.Context) {
 
 	m.log.Info("consumer(s) %d are starting", len(m.consumers))
 	for _, consumer := range m.consumers {
+		if !consumer.IsOn {
+			m.log.Info("consumer %s is off", consumer.Queue)
+			continue
+		}
+
 		m.wg.Add(1)
 		go m.run(ctx, consumer)
 	}
@@ -159,7 +165,6 @@ func (m *ConsumerManager) consume(ctx context.Context, consumer *Consumer) error
 		return err
 	}
 	defer ch.Close()
-
 	if err := m.mq.queue.CreateQueues(queueName); err != nil {
 		return err
 	}
@@ -191,7 +196,10 @@ func (m *ConsumerManager) consume(ctx context.Context, consumer *Consumer) error
 				return errors.New("message channel closed")
 			}
 
-			msg := Message{d: d}
+			msg := &MsgHandler{
+				queueName: queueName,
+				d:         d,
+			}
 			msgCtx := m.NewMsgCtx(msg)
 
 			if err := m.handleMsg(msgCtx, queueName, consumer.Handler, msg); err != nil {
@@ -214,7 +222,7 @@ func (m *ConsumerManager) handleMsg(
 	ctx context.Context,
 	queueName string,
 	h Handler,
-	msg Message,
+	msg *MsgHandler,
 ) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -225,14 +233,13 @@ func (m *ConsumerManager) handleMsg(
 	return h.Handle(ctx, msg)
 }
 
-// NewMsgCtx creates a new context with x-rid from message headers.
-func (m *ConsumerManager) NewMsgCtx(msg Message) context.Context {
+// NewMsgCtx creates a new context with correlation from msg
+func (m *ConsumerManager) NewMsgCtx(msg *MsgHandler) context.Context {
 	newCtx := utils.NewCtx()
-	if xRID := msg.Header(consts.XRequestID); xRID != nil {
-		if s, ok := xRID.(string); ok && s != "" {
-			newCtx = utils.SetValueCtx(newCtx, consts.RID, s)
-		}
-	}
+	newCtx = utils.SetValueCtx(newCtx,
+		consts.RID,
+		msg.CorrelationID(),
+	)
 
 	return newCtx
 }
