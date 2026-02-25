@@ -211,6 +211,8 @@ func (m *ConsumerManager) consume(ctx context.Context, consumer *Consumer) error
 			}
 
 			if m.mq.autoCommit {
+				m.log.Info("[%s] committed correlationID: %s",
+					queueName, msg.CorrelationID())
 				msg.Commit()
 			}
 		}

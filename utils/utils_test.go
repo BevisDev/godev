@@ -478,3 +478,117 @@ func TestPtrTo(t *testing.T) {
 		assert.Equal(t, 1, p.ID)
 	})
 }
+
+func TestToBytes(t *testing.T) {
+	t.Run("nil value returns error", func(t *testing.T) {
+		b, err := ToBytes(nil)
+		assert.Error(t, err)
+		assert.Nil(t, b)
+		assert.Contains(t, err.Error(), "value is nil")
+	})
+
+	t.Run("nil pointer returns error", func(t *testing.T) {
+		var p *int
+		b, err := ToBytes(p)
+		assert.Error(t, err)
+		assert.Nil(t, b)
+		assert.Contains(t, err.Error(), "value is nil")
+	})
+
+	t.Run("nil slice returns error", func(t *testing.T) {
+		var s []byte
+		b, err := ToBytes(s)
+		assert.Error(t, err)
+		assert.Nil(t, b)
+	})
+
+	t.Run("[]byte returns as-is", func(t *testing.T) {
+		raw := []byte("hello")
+		b, err := ToBytes(raw)
+		assert.NoError(t, err)
+		assert.Equal(t, []byte("hello"), b)
+	})
+
+	t.Run("empty []byte returns as-is", func(t *testing.T) {
+		raw := []byte{}
+		b, err := ToBytes(raw)
+		assert.NoError(t, err)
+		assert.Equal(t, []byte{}, b)
+	})
+
+	t.Run("string to bytes", func(t *testing.T) {
+		b, err := ToBytes("hello")
+		assert.NoError(t, err)
+		assert.Equal(t, []byte("hello"), b)
+	})
+
+	t.Run("empty string to bytes", func(t *testing.T) {
+		b, err := ToBytes("")
+		assert.NoError(t, err)
+		assert.Equal(t, []byte(""), b)
+	})
+
+	t.Run("bool to bytes", func(t *testing.T) {
+		bt, err := ToBytes(true)
+		assert.NoError(t, err)
+		assert.Equal(t, []byte("true"), bt)
+
+		bf, err := ToBytes(false)
+		assert.NoError(t, err)
+		assert.Equal(t, []byte("false"), bf)
+	})
+
+	t.Run("int types to bytes", func(t *testing.T) {
+		cases := []struct {
+			value    any
+			expected string
+		}{
+			{42, "42"},
+			{int8(-1), "-1"},
+			{int16(100), "100"},
+			{int32(0), "0"},
+			{int64(999), "999"},
+			{uint(1), "1"},
+			{uint8(255), "255"},
+			{uint16(65535), "65535"},
+			{uint32(0), "0"},
+			{uint64(1), "1"},
+		}
+		for _, c := range cases {
+			b, err := ToBytes(c.value)
+			assert.NoError(t, err)
+			assert.Equal(t, []byte(c.expected), b, "value %v", c.value)
+		}
+	})
+
+	t.Run("float types to bytes", func(t *testing.T) {
+		b32, err := ToBytes(float32(3.14))
+		assert.NoError(t, err)
+		assert.Equal(t, []byte("3.14"), b32)
+
+		b64, err := ToBytes(3.14)
+		assert.NoError(t, err)
+		assert.Equal(t, []byte("3.14"), b64)
+	})
+
+	t.Run("struct to JSON bytes", func(t *testing.T) {
+		u := User{Name: "Alice", Age: 30}
+		b, err := ToBytes(u)
+		assert.NoError(t, err)
+		assert.Equal(t, []byte(`{"Name":"Alice","Age":30}`), b)
+	})
+
+	t.Run("map to JSON bytes", func(t *testing.T) {
+		m := map[string]int{"a": 1, "b": 2}
+		b, err := ToBytes(m)
+		assert.NoError(t, err)
+		assert.JSONEq(t, `{"a":1,"b":2}`, string(b))
+	})
+
+	t.Run("pointer to struct to JSON bytes", func(t *testing.T) {
+		u := &User{Name: "Bob", Age: 25}
+		b, err := ToBytes(u)
+		assert.NoError(t, err)
+		assert.Equal(t, []byte(`{"Name":"Bob","Age":25}`), b)
+	})
+}

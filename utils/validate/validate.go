@@ -31,7 +31,7 @@ import (
 //	IsNilOrEmpty([]int{})                     // true
 //	IsNilOrEmpty(map[string]string{})         // true
 //	IsNilOrEmpty(123)                         // false
-func IsNilOrEmpty(inp interface{}) bool {
+func IsNilOrEmpty(inp any) bool {
 	if inp == nil {
 		return true
 	}
@@ -59,7 +59,7 @@ func IsNilOrEmpty(inp interface{}) bool {
 
 // IsNilOrNumericZero checks whether a value is nil or equals to numeric zero.
 // It supports int, int64, float64, uint, pointers to those types.
-func IsNilOrNumericZero(v interface{}) bool {
+func IsNilOrNumericZero(v any) bool {
 	if v == nil {
 		return true
 	}
@@ -88,7 +88,7 @@ func IsNilOrNumericZero(v interface{}) bool {
 // RequireNonEmpty returns an error if:
 //   - err is not nil, OR
 //   - data is nil / empty
-func RequireNonEmpty(err error, i interface{}) error {
+func RequireNonEmpty(err error, i any) error {
 	if err != nil {
 		return err
 	}
@@ -99,7 +99,7 @@ func RequireNonEmpty(err error, i interface{}) error {
 }
 
 // IsNonNilPointer reports whether i is a non-nil pointer.
-func IsNonNilPointer(i interface{}) bool {
+func IsNonNilPointer(i any) bool {
 	if i == nil {
 		return false
 	}
@@ -107,7 +107,7 @@ func IsNonNilPointer(i interface{}) bool {
 	return v.Kind() == reflect.Ptr && !v.IsNil()
 }
 
-func IsStruct(i interface{}) bool {
+func IsStruct(i any) bool {
 	if i == nil {
 		return false
 	}
@@ -285,7 +285,7 @@ func IsValidFileName(s string, allowedExt []string) bool {
 	return false
 }
 
-func IsValidJSON(v interface{}) bool {
+func IsValidJSON(v any) bool {
 	switch val := v.(type) {
 	case string:
 		var js json.RawMessage
@@ -308,7 +308,7 @@ func IsValidJSON(v interface{}) bool {
 	return true
 }
 
-func IsNumber(v interface{}) bool {
+func IsNumber(v any) bool {
 	switch v.(type) {
 	case int, int8, int16, int32, int64,
 		uint, uint8, uint16, uint32, uint64,
@@ -319,12 +319,12 @@ func IsNumber(v interface{}) bool {
 	}
 }
 
-func IsBoolean(v interface{}) bool {
+func IsBoolean(v any) bool {
 	_, ok := v.(bool)
 	return ok
 }
 
-func IsSlice(v interface{}) bool {
+func IsSlice(v any) bool {
 	if v == nil {
 		return false
 	}

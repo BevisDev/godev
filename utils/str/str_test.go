@@ -85,6 +85,9 @@ func TestToString(t *testing.T) {
 
 		// fallback (marshal fail)
 		{"bad json struct", BadJSON{}, "{Ch:<nil>}"},
+		// nil slice (JSON marshal produces "null")
+		{"nil slice []int", []int(nil), "null"},
+		{"nil slice []byte", []byte(nil), ""},
 	}
 
 	for _, tt := range tests {
@@ -95,6 +98,27 @@ func TestToString(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestIsEmpty(t *testing.T) {
+	assert.True(t, IsEmpty(""))
+	assert.False(t, IsEmpty(" "))
+	assert.False(t, IsEmpty("hello"))
+}
+
+func TestIsNilOrEmpty_String(t *testing.T) {
+	t.Run("nil pointer", func(t *testing.T) {
+		var s *string
+		assert.True(t, IsNilOrEmpty(s))
+	})
+	t.Run("empty string pointer", func(t *testing.T) {
+		empty := ""
+		assert.True(t, IsNilOrEmpty(&empty))
+	})
+	t.Run("non-empty string pointer", func(t *testing.T) {
+		hello := "hello"
+		assert.False(t, IsNilOrEmpty(&hello))
+	})
 }
 
 func TestToInt(t *testing.T) {

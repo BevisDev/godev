@@ -22,10 +22,13 @@ func TestIsNilOrEmpty(t *testing.T) {
 		{"nil", nil, true},
 		{"empty string", "", true},
 		{"space string", "   ", true},
+		{"tab and newline only", "\t\n", true},
 		{"non-empty string", "hello", false},
 
 		// -- slice ---
 		{"empty slice", []int{}, true},
+		{"nil slice", []int(nil), true},
+		{"nil []byte", []byte(nil), true},
 		{"non-empty slice", []int{1}, false},
 
 		// -- array

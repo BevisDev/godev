@@ -2,14 +2,18 @@ package utils
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"reflect"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/BevisDev/godev/consts"
 	"github.com/BevisDev/godev/types"
+	"github.com/BevisDev/godev/utils/jsonx"
 	"github.com/BevisDev/godev/utils/random"
+	"github.com/BevisDev/godev/utils/str"
 	"golang.org/x/exp/constraints"
 )
 
@@ -259,4 +263,36 @@ func RoundUpToMul[T constraints.Integer](n T, mul T) T {
 //	n := ptrTo(123)      // *int → 123
 func GetPointer[T any](v T) *T {
 	return &v
+}
+
+func ToBytes(value any) ([]byte, error) {
+	if value == nil {
+		return nil, errors.New("value is nil")
+	}
+
+	rv := reflect.ValueOf(value)
+	switch rv.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
+		if rv.IsNil() {
+			return nil, errors.New("value is nil")
+		}
+	}
+
+	switch v := value.(type) {
+	case []byte:
+		return v, nil
+	case string:
+		return []byte(v), nil
+	case bool,
+		int, int8, int16, int32, int64,
+		uint, uint8, uint16, uint32, uint64,
+		float32, float64:
+		return []byte(str.ToString(v)), nil
+	default:
+		body, err := jsonx.ToJSONBytes(v)
+		if err != nil {
+			return nil, err
+		}
+		return body, nil
+	}
 }

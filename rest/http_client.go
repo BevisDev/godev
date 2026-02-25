@@ -311,7 +311,6 @@ func (r *HTTPRequest[T]) execute(request *http.Request) (HTTPResponse[T], error)
 // type T. It supports []byte, json.RawMessage, string and arbitrary structs.
 func (r *HTTPRequest[T]) getData(raw []byte) (T, error) {
 	var result T
-
 	switch any(result).(type) {
 	case []byte, json.RawMessage:
 		return any(raw).(T), nil
