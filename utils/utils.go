@@ -296,3 +296,37 @@ func ToBytes(value any) ([]byte, error) {
 		return body, nil
 	}
 }
+
+// ToValue decodes bytes into type T.
+// It tries JSON unmarshal first; if that fails and T is string, the raw bytes are returned as the string.
+// Empty data: returns zero string for T string, empty slice for T []byte, error for other types.
+func ToValue[T any](data []byte) (T, error) {
+	var zero T
+	if len(data) == 0 {
+		if _, ok := any(zero).(string); ok {
+			return any("").(T), nil
+		}
+		if _, ok := any(zero).([]byte); ok {
+			return any([]byte(nil)).(T), nil
+		}
+		return zero, errors.New("empty data")
+	}
+
+	rt := reflect.TypeOf(zero)
+	if rt.Kind() == reflect.Slice && rt.Elem().Kind() == reflect.Uint8 {
+		out := make([]byte, len(data))
+		copy(out, data)
+		return any(out).(T), nil
+	}
+
+	// Try JSON first (so "world" decodes to world for T string)
+	t, err := jsonx.FromJSONBytes[T](data)
+	if err == nil {
+		return t, nil
+	}
+	// If JSON fails and T is string, use raw bytes
+	if rt.Kind() == reflect.String {
+		return any(string(data)).(T), nil
+	}
+	return zero, err
+}

@@ -24,7 +24,7 @@ func TestModel_First(t *testing.T) {
 	ctx := context.Background()
 
 	mock.ExpectQuery(
-		regexp.QuoteMeta("SELECT TOP 1 * FROM users WHERE id = @p1"),
+		regexp.QuoteMeta("SELECT TOP 1 * FROM users WHERE id = ?"),
 	).
 		WithArgs(1).
 		WillReturnRows(sqlmock.NewRows([]string{"name", "email"}).
@@ -48,7 +48,7 @@ func TestModel_Find(t *testing.T) {
 	ctx := context.Background()
 
 	mock.ExpectQuery(
-		regexp.QuoteMeta("SELECT * FROM users WHERE age > @p1"),
+		regexp.QuoteMeta("SELECT * FROM users WHERE age > ?"),
 	).
 		WithArgs(18).
 		WillReturnRows(sqlmock.NewRows([]string{"name", "email"}).
@@ -73,7 +73,7 @@ func TestModel_Count(t *testing.T) {
 	ctx := context.Background()
 
 	mock.ExpectQuery(
-		regexp.QuoteMeta("SELECT COUNT(1) FROM users WHERE age > @p1"),
+		regexp.QuoteMeta("SELECT COUNT(1) FROM users WHERE age > ?"),
 	).
 		WithArgs(18).
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(2))
@@ -94,7 +94,7 @@ func TestModel_Create_SqlServer(t *testing.T) {
 	ctx := context.Background()
 
 	mock.ExpectQuery(
-		regexp.QuoteMeta("INSERT INTO users (name, email) OUTPUT INSERTED.* VALUES (@p1, @p2)"),
+		regexp.QuoteMeta("INSERT INTO users (name, email) OUTPUT INSERTED.* VALUES (?, ?)"),
 	).
 		WithArgs("Alice", "alice@example.com").
 		WillReturnRows(sqlmock.NewRows([]string{"name", "email"}).
@@ -116,7 +116,7 @@ func TestModel_Updates(t *testing.T) {
 	ctx := context.Background()
 
 	mock.ExpectExec(
-		regexp.QuoteMeta("UPDATE users SET name = @p1 WHERE id = @p2"),
+		regexp.QuoteMeta("UPDATE users SET name = ? WHERE id = ?"),
 	).
 		WithArgs("Alice Updated", 1).
 		WillReturnResult(sqlmock.NewResult(0, 1))
@@ -137,7 +137,7 @@ func TestModel_Delete(t *testing.T) {
 	ctx := context.Background()
 
 	mock.ExpectExec(
-		regexp.QuoteMeta("DELETE FROM users WHERE id = @p1"),
+		regexp.QuoteMeta("DELETE FROM users WHERE id = ?"),
 	).
 		WithArgs(1).
 		WillReturnResult(sqlmock.NewResult(0, 1))

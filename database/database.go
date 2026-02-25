@@ -182,29 +182,30 @@ func (d *DB) rebind(query string, args ...interface{}) (string, []interface{}, e
 // If the function returns an error or panics, the transaction is rolled back.
 func (d *DB) RunTx(ctx context.Context, level sql.IsolationLevel,
 	fn func(ctx context.Context, tx *sqlx.Tx) error,
-) error {
+) (err error) {
 	txCtx, cancel := utils.NewCtxTimeout(ctx, d.cfg.Timeout)
 	defer cancel()
 
 	db := d.GetDB()
-	tx, err := db.BeginTxx(txCtx, &sql.TxOptions{
+	tx, beginErr := db.BeginTxx(txCtx, &sql.TxOptions{
 		Isolation: level,
 	})
-	if err != nil {
-		return fmt.Errorf("[database] failed to begin transaction: %w", err)
+	if beginErr != nil {
+		return fmt.Errorf("[database] failed to begin transaction: %w", beginErr)
 	}
 
 	defer func() {
 		if p := recover(); p != nil {
 			_ = tx.Rollback()
 			err = fmt.Errorf("[database] panic recovered in transaction: %v\n%s", p, debug.Stack())
+			return
 		}
 		if err != nil {
 			_ = tx.Rollback()
-		} else {
-			if commitErr := tx.Commit(); commitErr != nil {
-				err = fmt.Errorf("[database] failed to commit transaction: %w", commitErr)
-			}
+			return
+		}
+		if commitErr := tx.Commit(); commitErr != nil {
+			err = fmt.Errorf("[database] failed to commit transaction: %w", commitErr)
 		}
 	}()
 

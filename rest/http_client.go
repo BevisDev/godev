@@ -3,7 +3,6 @@ package rest
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -298,31 +297,13 @@ func (r *HTTPRequest[T]) execute(request *http.Request) (HTTPResponse[T], error)
 		return resp, nil
 	}
 
-	result, err := r.getData(raw)
+	result, err := utils.ToValue[T](raw)
 	if err != nil {
 		return resp, err
 	}
 	resp.Data = result
 
 	return resp, nil
-}
-
-// getData converts the raw HTTP response bytes into the generic
-// type T. It supports []byte, json.RawMessage, string and arbitrary structs.
-func (r *HTTPRequest[T]) getData(raw []byte) (T, error) {
-	var result T
-	switch any(result).(type) {
-	case []byte, json.RawMessage:
-		return any(raw).(T), nil
-	case string:
-		return any(string(raw)).(T), nil
-	default:
-		result, err := jsonx.FromJSONBytes[T](raw)
-		if err != nil {
-			return result, fmt.Errorf("unmarshal response to %T failed: %w", result, err)
-		}
-		return result, nil
-	}
 }
 
 func (r *HTTPRequest[T]) logResponse(response *http.Response, body string) {

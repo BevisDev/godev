@@ -50,7 +50,9 @@ func TestDeclare_TopicExchange(t *testing.T) {
 
 func TestDeclare_FanoutExchange(t *testing.T) {
 	mq, err := NewMQTest()
-	require.NoError(t, err)
+	if err != nil {
+		t.Skipf("skip when RabbitMQ is not available: %v", err)
+	}
 	defer mq.Close()
 
 	queue1 := "it.fanout.q1"

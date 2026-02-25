@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/BevisDev/godev/utils"
-	"github.com/BevisDev/godev/utils/jsonx"
 	"github.com/BevisDev/godev/utils/str"
 	"github.com/BevisDev/godev/utils/validate"
 )
@@ -35,20 +34,23 @@ func (c *listBuilder[T]) Key(k string) *listBuilder[T] {
 	return c
 }
 
-// Values specifies multiple values to be stored with the key.
+// Values specifies multiple values to be stored with the key (as bytes via utils.ToBytes).
 func (c *listBuilder[T]) Values(values interface{}) *listBuilder[T] {
 	v := reflect.ValueOf(values)
 
 	if v.Kind() != reflect.Slice {
-		c.values = append(c.values, convertValue(values))
+		if body, err := utils.ToBytes(values); err == nil {
+			c.values = append(c.values, body)
+		}
 		return c
 	}
 
 	for i := 0; i < v.Len(); i++ {
 		val := v.Index(i).Interface()
-		c.values = append(c.values, convertValue(val))
+		if body, err := utils.ToBytes(val); err == nil {
+			c.values = append(c.values, body)
+		}
 	}
-
 	return c
 }
 
@@ -120,11 +122,12 @@ func (c *listBuilder[T]) Add(ctx context.Context) error {
 }
 
 // PopFront retrieves and removes the first element (head) of the list.
-// Returns nil if the list is empty (redis.Nil error).
+// Returns zero T if the list is empty (redis.Nil error).
 // Returns an error if the key is missing, or if the operation fails.
-func (c *listBuilder[T]) PopFront(ctx context.Context) (*T, error) {
+func (c *listBuilder[T]) PopFront(ctx context.Context) (T, error) {
+	var zero T
 	if c.key == "" {
-		return nil, ErrMissingKey
+		return zero, ErrMissingKey
 	}
 
 	rdb := c.cache.GetClient()
@@ -134,24 +137,21 @@ func (c *listBuilder[T]) PopFront(ctx context.Context) (*T, error) {
 	val, err := rdb.LPop(ct, c.key).Result()
 	if err != nil {
 		if c.cache.IsNil(err) {
-			return nil, nil
+			return zero, nil
 		}
-		return nil, err
+		return zero, err
 	}
 
-	t, err := jsonx.FromJSON[T](val)
-	if err != nil {
-		return nil, err
-	}
-	return &t, nil
+	return utils.ToValue[T]([]byte(val))
 }
 
 // Pop retrieves and removes the last element (tail) of the list.
-// Returns nil if the list is empty (redis.Nil error).
+// Returns zero T if the list is empty (redis.Nil error).
 // Returns an error if the key is missing, or if the operation fails.
-func (c *listBuilder[T]) Pop(ctx context.Context) (*T, error) {
+func (c *listBuilder[T]) Pop(ctx context.Context) (T, error) {
+	var zero T
 	if c.key == "" {
-		return nil, ErrMissingKey
+		return zero, ErrMissingKey
 	}
 
 	rdb := c.cache.GetClient()
@@ -161,22 +161,18 @@ func (c *listBuilder[T]) Pop(ctx context.Context) (*T, error) {
 	val, err := rdb.RPop(ct, c.key).Result()
 	if err != nil {
 		if c.cache.IsNil(err) {
-			return nil, nil
+			return zero, nil
 		}
-		return nil, err
+		return zero, err
 	}
 
-	t, err := jsonx.FromJSON[T](val)
-	if err != nil {
-		return nil, err
-	}
-	return &t, nil
+	return utils.ToValue[T]([]byte(val))
 }
 
 // GetRange returns a slice of elements between the specified start and stop indexes.
 // If end is not set, returns all elements from start to the end of the list.
 // Returns an error if the key is missing, or if the operation fails.
-func (c *listBuilder[T]) GetRange(ctx context.Context) ([]*T, error) {
+func (c *listBuilder[T]) GetRange(ctx context.Context) ([]T, error) {
 	if c.key == "" {
 		return nil, ErrMissingKey
 	}
@@ -194,23 +190,24 @@ func (c *listBuilder[T]) GetRange(ctx context.Context) ([]*T, error) {
 		return nil, err
 	}
 
-	result := make([]*T, 0, len(vals))
+	result := make([]T, 0, len(vals))
 	for _, v := range vals {
-		t, err := jsonx.FromJSON[T](v)
+		t, err := utils.ToValue[T]([]byte(v))
 		if err != nil {
 			return nil, err
 		}
-		result = append(result, &t)
+		result = append(result, t)
 	}
 	return result, nil
 }
 
 // Get retrieves the element at the specified index from the Redis list.
-// Returns nil if the index is out of range.
+// Returns zero T if the index is out of range.
 // Returns an error if the key is missing, or if the operation fails.
-func (c *listBuilder[T]) Get(ctx context.Context, index int64) (*T, error) {
+func (c *listBuilder[T]) Get(ctx context.Context, index int64) (T, error) {
+	var zero T
 	if c.key == "" {
-		return nil, ErrMissingKey
+		return zero, ErrMissingKey
 	}
 
 	rdb := c.cache.GetClient()
@@ -219,18 +216,14 @@ func (c *listBuilder[T]) Get(ctx context.Context, index int64) (*T, error) {
 
 	vals, err := rdb.LRange(ct, c.key, index, index).Result()
 	if err != nil {
-		return nil, err
+		return zero, err
 	}
 
 	if len(vals) == 0 {
-		return nil, nil
+		return zero, nil
 	}
 
-	t, err := jsonx.FromJSON[T](vals[0])
-	if err != nil {
-		return nil, err
-	}
-	return &t, nil
+	return utils.ToValue[T]([]byte(vals[0]))
 }
 
 // Size returns the number of elements in the list.

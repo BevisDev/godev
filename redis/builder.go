@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/BevisDev/godev/utils"
-	"github.com/BevisDev/godev/utils/jsonx"
 	"github.com/BevisDev/godev/utils/str"
 	"github.com/BevisDev/godev/utils/validate"
 )
@@ -18,8 +17,8 @@ type builder[T any] struct {
 	keys       []string
 	channel    string
 	prefix     string
-	value      interface{}
-	batches    map[string]interface{}
+	value      []byte
+	batches    map[string][]byte
 	expiration time.Duration
 }
 
@@ -42,29 +41,37 @@ func (c *builder[T]) Keys(keys ...string) *builder[T] {
 	return c
 }
 
-// Value specifies the single value to be stored with the key.
+// Value specifies the single value to be stored with the key (as bytes via utils.ToBytes).
 func (c *builder[T]) Value(v interface{}) *builder[T] {
-	c.value = convertValue(v)
+	body, err := utils.ToBytes(v)
+	if err != nil {
+		c.value = nil
+		return c
+	}
+	c.value = body
 	return c
 }
 
 // Put adds a key-value pair to the batch for SetMany operation.
 func (c *builder[T]) Put(k string, v interface{}) *builder[T] {
 	if c.batches == nil {
-		c.batches = make(map[string]interface{})
+		c.batches = make(map[string][]byte)
 	}
-	c.batches[k] = convertValue(v)
+	if body, err := utils.ToBytes(v); err == nil {
+		c.batches[k] = body
+	}
 	return c
 }
 
 // Batch sets multiple key-value pairs for SetMany operation.
 func (c *builder[T]) Batch(b map[string]interface{}) *builder[T] {
 	if c.batches == nil {
-		c.batches = make(map[string]interface{})
+		c.batches = make(map[string][]byte)
 	}
-
 	for k, v := range b {
-		c.batches[k] = convertValue(v)
+		if body, err := utils.ToBytes(v); err == nil {
+			c.batches[k] = body
+		}
 	}
 	return c
 }
@@ -145,9 +152,10 @@ func (c *builder[T]) SetMany(ct context.Context) error {
 	return nil
 }
 
-func (c *builder[T]) Get(ct context.Context) (*T, error) {
+func (c *builder[T]) Get(ct context.Context) (T, error) {
+	var zero T
 	if str.IsEmpty(c.key) {
-		return nil, ErrMissingKey
+		return zero, ErrMissingKey
 	}
 
 	rdb := c.cache.GetClient()
@@ -157,19 +165,15 @@ func (c *builder[T]) Get(ct context.Context) (*T, error) {
 	val, err := rdb.Get(ctx, c.key).Result()
 	if err != nil {
 		if c.cache.IsNil(err) {
-			return nil, nil
+			return zero, nil
 		}
-		return nil, err
+		return zero, err
 	}
 
-	t, err := jsonx.FromJSON[T](val)
-	if err != nil {
-		return nil, err
-	}
-	return &t, nil
+	return utils.ToValue[T]([]byte(val))
 }
 
-func (c *builder[T]) GetMany(ct context.Context) ([]*T, error) {
+func (c *builder[T]) GetMany(ct context.Context) ([]T, error) {
 	if len(c.keys) <= 0 {
 		return nil, ErrMissingKeys
 	}
@@ -183,37 +187,36 @@ func (c *builder[T]) GetMany(ct context.Context) ([]*T, error) {
 		return nil, err
 	}
 
-	result := make([]*T, 0, len(vals))
+	var zero T
+	result := make([]T, 0, len(vals))
 	for _, v := range vals {
 		if v == nil {
-			result = append(result, nil)
+			result = append(result, zero)
 			continue
 		}
 
 		switch val := v.(type) {
 		case string:
-			t, err := jsonx.FromJSON[T](val)
+			t, err := utils.ToValue[T]([]byte(val))
 			if err != nil {
 				return nil, err
 			}
-
-			result = append(result, &t)
+			result = append(result, t)
 		case []byte:
-			t, err := jsonx.FromJSONBytes[T](val)
+			t, err := utils.ToValue[T](val)
 			if err != nil {
 				return nil, err
 			}
-
-			result = append(result, &t)
+			result = append(result, t)
 		default:
-			continue
+			result = append(result, zero)
 		}
 	}
 
 	return result, nil
 }
 
-func (c *builder[T]) GetByPrefix(ct context.Context) ([]*T, error) {
+func (c *builder[T]) GetByPrefix(ct context.Context) ([]T, error) {
 	if str.IsEmpty(c.prefix) {
 		return nil, ErrMissingPrefix
 	}
@@ -224,7 +227,7 @@ func (c *builder[T]) GetByPrefix(ct context.Context) ([]*T, error) {
 
 	var (
 		cursor uint64
-		result []*T
+		result []T
 	)
 	for {
 		keys, nextCursor, err := rdb.Scan(ctx, cursor, c.prefix+"*", 0).Result()
@@ -240,9 +243,7 @@ func (c *builder[T]) GetByPrefix(ct context.Context) ([]*T, error) {
 			if err != nil {
 				return nil, err
 			}
-			if val != nil {
-				result = append(result, val)
-			}
+			result = append(result, val)
 		}
 
 		if nextCursor == 0 {

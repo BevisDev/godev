@@ -3,6 +3,7 @@ package rabbitmq
 import (
 	"time"
 
+	"github.com/BevisDev/godev/utils"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -29,6 +30,11 @@ func (m *MsgHandler) CorrelationID() string {
 
 func (m *MsgHandler) GetBody() []byte {
 	return m.d.Body
+}
+
+// BodyAs decodes the message body (produced by utils.ToBytes) into type T.
+func BodyAs[T any](m *MsgHandler) (T, error) {
+	return utils.ToValue[T](m.d.Body)
 }
 
 func (m *MsgHandler) Header(key string) any {

@@ -9,7 +9,6 @@ import (
 	"github.com/BevisDev/godev/consts"
 	"github.com/BevisDev/godev/utils"
 	"github.com/BevisDev/godev/utils/console"
-	"github.com/BevisDev/godev/utils/jsonx"
 	"github.com/BevisDev/godev/utils/str"
 	"github.com/BevisDev/godev/utils/validate"
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -160,39 +159,17 @@ func (p *Publisher) buildPublishing(
 	return publishing, nil
 }
 
-func (p *Publisher) buildMessage(message interface{}) (string, []byte, error) {
-	var (
-		body        []byte
-		contentType = consts.TextPlain
-	)
-	switch v := message.(type) {
-	case []byte:
-		body = v
-		if json.Valid(v) {
-			contentType = consts.ApplicationJSON
-			break
-		}
-	case string:
-		body = []byte(v)
-		if json.Valid(body) {
-			contentType = consts.ApplicationJSON
-		}
-	case bool,
-		int, int8, int16, int32, int64,
-		uint, uint8, uint16, uint32, uint64,
-		float32, float64:
-		body = []byte(str.ToString(v))
-	default:
-		var err error
-		body, err = jsonx.ToJSONBytes(v)
-		if err != nil {
-			return "", nil, err
-		}
-		contentType = consts.ApplicationJSON
+func (p *Publisher) buildMessage(message any) (string, []byte, error) {
+	body, err := utils.ToBytes(message)
+	if err != nil {
+		return "", nil, err
 	}
 	if len(body) > maxMessageSize {
 		return "", nil, ErrMessageTooLarge
 	}
-
+	contentType := consts.TextPlain
+	if json.Valid(body) {
+		contentType = consts.ApplicationJSON
+	}
 	return contentType, body, nil
 }

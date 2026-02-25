@@ -29,7 +29,8 @@ func TestBuildMessage_Number(t *testing.T) {
 	p := &Publisher{}
 	ct, body, err := p.buildMessage(123)
 	require.NoError(t, err)
-	assert.Equal(t, consts.TextPlain, ct)
+	// "123" is valid JSON, so content type is application/json
+	assert.Equal(t, consts.ApplicationJSON, ct)
 	assert.Equal(t, "123", string(body))
 }
 

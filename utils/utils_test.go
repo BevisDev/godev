@@ -592,3 +592,88 @@ func TestToBytes(t *testing.T) {
 		assert.Equal(t, []byte(`{"Name":"Bob","Age":25}`), b)
 	})
 }
+
+func TestToValue(t *testing.T) {
+	t.Run("string from bytes", func(t *testing.T) {
+		v, err := ToValue[string]([]byte("hello"))
+		assert.NoError(t, err)
+		assert.Equal(t, "hello", v)
+	})
+
+	t.Run("string from JSON", func(t *testing.T) {
+		v, err := ToValue[string]([]byte(`"world"`))
+		assert.NoError(t, err)
+		assert.Equal(t, "world", v)
+	})
+
+	t.Run("empty data string returns empty", func(t *testing.T) {
+		v, err := ToValue[string](nil)
+		assert.NoError(t, err)
+		assert.Equal(t, "", v)
+	})
+
+	t.Run("[]byte from bytes", func(t *testing.T) {
+		data := []byte("raw")
+		v, err := ToValue[[]byte](data)
+		assert.NoError(t, err)
+		assert.Equal(t, []byte("raw"), v)
+	})
+
+	t.Run("int from JSON", func(t *testing.T) {
+		v, err := ToValue[int]([]byte("42"))
+		assert.NoError(t, err)
+		assert.Equal(t, 42, v)
+	})
+
+	t.Run("int64 from JSON", func(t *testing.T) {
+		v, err := ToValue[int64]([]byte("-999"))
+		assert.NoError(t, err)
+		assert.Equal(t, int64(-999), v)
+	})
+
+	t.Run("bool from JSON", func(t *testing.T) {
+		vt, err := ToValue[bool]([]byte("true"))
+		assert.NoError(t, err)
+		assert.True(t, vt)
+		vf, err := ToValue[bool]([]byte("false"))
+		assert.NoError(t, err)
+		assert.False(t, vf)
+	})
+
+	t.Run("float32 from JSON", func(t *testing.T) {
+		v, err := ToValue[float32]([]byte("3.14"))
+		assert.NoError(t, err)
+		assert.InDelta(t, 3.14, float64(v), 1e-6)
+	})
+
+	t.Run("float64 from JSON", func(t *testing.T) {
+		v, err := ToValue[float64]([]byte("2.718"))
+		assert.NoError(t, err)
+		assert.InDelta(t, 2.718, v, 1e-6)
+	})
+
+	t.Run("uint from JSON", func(t *testing.T) {
+		v, err := ToValue[uint]([]byte("100"))
+		assert.NoError(t, err)
+		assert.Equal(t, uint(100), v)
+	})
+
+	t.Run("uint64 from JSON", func(t *testing.T) {
+		v, err := ToValue[uint64]([]byte("999"))
+		assert.NoError(t, err)
+		assert.Equal(t, uint64(999), v)
+	})
+
+	t.Run("struct from JSON", func(t *testing.T) {
+		v, err := ToValue[User]([]byte(`{"Name":"Alice","Age":30}`))
+		assert.NoError(t, err)
+		assert.Equal(t, "Alice", v.Name)
+		assert.Equal(t, 30, v.Age)
+	})
+
+	t.Run("empty data non-string returns error", func(t *testing.T) {
+		_, err := ToValue[int](nil)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "empty data")
+	})
+}

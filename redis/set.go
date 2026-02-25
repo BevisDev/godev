@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/BevisDev/godev/utils"
-	"github.com/BevisDev/godev/utils/jsonx"
 	"github.com/BevisDev/godev/utils/str"
 	"github.com/BevisDev/godev/utils/validate"
 )
@@ -32,20 +31,25 @@ func (c *setBuilder[T]) Key(k string) *setBuilder[T] {
 	return c
 }
 
-// Values specifies multiple values to be stored with the key.
+// Values specifies multiple values to be stored with the key (as bytes via utils.ToBytes).
+// Replaces any previously set values on the builder.
 func (c *setBuilder[T]) Values(values interface{}) *setBuilder[T] {
+	c.values = nil
 	v := reflect.ValueOf(values)
 
 	if v.Kind() != reflect.Slice {
-		c.values = append(c.values, convertValue(values))
+		if body, err := utils.ToBytes(values); err == nil {
+			c.values = append(c.values, body)
+		}
 		return c
 	}
 
 	for i := 0; i < v.Len(); i++ {
 		val := v.Index(i).Interface()
-		c.values = append(c.values, convertValue(val))
+		if body, err := utils.ToBytes(val); err == nil {
+			c.values = append(c.values, body)
+		}
 	}
-
 	return c
 }
 
@@ -107,16 +111,21 @@ func (c *setBuilder[T]) Contains(ctx context.Context, val interface{}) (bool, er
 		return false, ErrMissingKey
 	}
 
+	valBytes, err := utils.ToBytes(val)
+	if err != nil {
+		return false, err
+	}
+
 	rdb := c.cache.GetClient()
 	ct, cancel := utils.NewCtxTimeout(ctx, c.cache.cf.Timeout)
 	defer cancel()
 
-	return rdb.SIsMember(ct, c.key, val).Result()
+	return rdb.SIsMember(ct, c.key, valBytes).Result()
 }
 
 // GetAll returns all members of the set.
 // Returns an error if the key is missing, or if the operation fails.
-func (c *setBuilder[T]) GetAll(ctx context.Context) ([]*T, error) {
+func (c *setBuilder[T]) GetAll(ctx context.Context) ([]T, error) {
 	if c.key == "" {
 		return nil, ErrMissingKey
 	}
@@ -130,13 +139,13 @@ func (c *setBuilder[T]) GetAll(ctx context.Context) ([]*T, error) {
 		return nil, err
 	}
 
-	result := make([]*T, 0, len(res))
+	result := make([]T, 0, len(res))
 	for _, v := range res {
-		t, err := jsonx.FromJSON[T](v)
+		t, err := utils.ToValue[T]([]byte(v))
 		if err != nil {
 			return nil, err
 		}
-		result = append(result, &t)
+		result = append(result, t)
 	}
 
 	return result, nil

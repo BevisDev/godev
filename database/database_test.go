@@ -680,10 +680,10 @@ func TestDatabase_InsertMany(t *testing.T) {
 	}
 
 	mock.ExpectBegin()
-	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO users (name, email) VALUES (@p1, @p2)")).
+	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO users (name, email) VALUES (?, ?)")).
 		WithArgs("Alice", "alice@example.com").
 		WillReturnResult(sqlmock.NewResult(1, 1))
-	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO users (name, email) VALUES (@p1, @p2)")).
+	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO users (name, email) VALUES (?, ?)")).
 		WithArgs("Bob", "bob@example.com").
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
@@ -763,10 +763,10 @@ func TestDatabase_UpdateMany(t *testing.T) {
 	}
 
 	mock.ExpectBegin()
-	mock.ExpectExec(regexp.QuoteMeta("UPDATE users SET name = @p1 WHERE id = @p2")).
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE users SET name = ? WHERE id = ?")).
 		WithArgs("Alice Updated", 1).
 		WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec(regexp.QuoteMeta("UPDATE users SET name = @p1 WHERE id = @p2")).
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE users SET name = ? WHERE id = ?")).
 		WithArgs("Bob Updated", 2).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
@@ -787,7 +787,7 @@ func TestDatabase_UpdateManySafe(t *testing.T) {
 	}
 
 	mock.ExpectBegin()
-	mock.ExpectExec(regexp.QuoteMeta("UPDATE users SET name = @p1 WHERE id = @p2")).
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE users SET name = ? WHERE id = ?")).
 		WithArgs("Alice Updated", 1).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
@@ -840,7 +840,6 @@ func TestDatabase_RunTx_PanicRecovery(t *testing.T) {
 	ctx := context.Background()
 
 	mock.ExpectBegin()
-	mock.ExpectRollback()
 	mock.ExpectRollback()
 
 	err := db.RunTx(ctx, sql.LevelDefault, func(ctx context.Context, tx *sqlx.Tx) error {
