@@ -141,7 +141,7 @@ func (c *setBuilder[T]) GetAll(ctx context.Context) ([]T, error) {
 
 	result := make([]T, 0, len(res))
 	for _, v := range res {
-		t, err := utils.ToValue[T]([]byte(v))
+		t, err := utils.ValueFromString[T](v)
 		if err != nil {
 			return nil, err
 		}

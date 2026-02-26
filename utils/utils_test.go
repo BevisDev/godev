@@ -33,6 +33,11 @@ func TestGetRID_WhenCtxHasRID(t *testing.T) {
 	}
 }
 
+func TestGetRID_WhenCtxIsNil(t *testing.T) {
+	rid := GetRID(nil)
+	assert.NotEmpty(t, rid, "GetRID(nil) should return a new UUID")
+}
+
 func TestContainsIgnoreCase(t *testing.T) {
 	assert.True(t, ContainsIgnoreCase("Hello World", "hello"))
 	assert.True(t, ContainsIgnoreCase("GoLang Is Fun", "IS"))
@@ -591,89 +596,203 @@ func TestToBytes(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, []byte(`{"Name":"Bob","Age":25}`), b)
 	})
+
+	t.Run("nil map returns error", func(t *testing.T) {
+		var m map[string]int
+		b, err := ToBytes(m)
+		assert.Error(t, err)
+		assert.Nil(t, b)
+		assert.Contains(t, err.Error(), "value is nil")
+	})
 }
 
-func TestToValue(t *testing.T) {
+func TestValueFromBytes(t *testing.T) {
 	t.Run("string from bytes", func(t *testing.T) {
-		v, err := ToValue[string]([]byte("hello"))
+		v, err := ValueFromBytes[string]([]byte("hello"))
 		assert.NoError(t, err)
 		assert.Equal(t, "hello", v)
 	})
 
 	t.Run("string from JSON", func(t *testing.T) {
-		v, err := ToValue[string]([]byte(`"world"`))
+		v, err := ValueFromBytes[string]([]byte(`"world"`))
 		assert.NoError(t, err)
 		assert.Equal(t, "world", v)
 	})
 
 	t.Run("empty data string returns empty", func(t *testing.T) {
-		v, err := ToValue[string](nil)
+		v, err := ValueFromBytes[string](nil)
 		assert.NoError(t, err)
 		assert.Equal(t, "", v)
 	})
 
 	t.Run("[]byte from bytes", func(t *testing.T) {
 		data := []byte("raw")
-		v, err := ToValue[[]byte](data)
+		v, err := ValueFromBytes[[]byte](data)
 		assert.NoError(t, err)
 		assert.Equal(t, []byte("raw"), v)
 	})
 
 	t.Run("int from JSON", func(t *testing.T) {
-		v, err := ToValue[int]([]byte("42"))
+		v, err := ValueFromBytes[int]([]byte("42"))
 		assert.NoError(t, err)
 		assert.Equal(t, 42, v)
 	})
 
 	t.Run("int64 from JSON", func(t *testing.T) {
-		v, err := ToValue[int64]([]byte("-999"))
+		v, err := ValueFromBytes[int64]([]byte("-999"))
 		assert.NoError(t, err)
 		assert.Equal(t, int64(-999), v)
 	})
 
 	t.Run("bool from JSON", func(t *testing.T) {
-		vt, err := ToValue[bool]([]byte("true"))
+		vt, err := ValueFromBytes[bool]([]byte("true"))
 		assert.NoError(t, err)
 		assert.True(t, vt)
-		vf, err := ToValue[bool]([]byte("false"))
+		vf, err := ValueFromBytes[bool]([]byte("false"))
 		assert.NoError(t, err)
 		assert.False(t, vf)
 	})
 
 	t.Run("float32 from JSON", func(t *testing.T) {
-		v, err := ToValue[float32]([]byte("3.14"))
+		v, err := ValueFromBytes[float32]([]byte("3.14"))
 		assert.NoError(t, err)
 		assert.InDelta(t, 3.14, float64(v), 1e-6)
 	})
 
 	t.Run("float64 from JSON", func(t *testing.T) {
-		v, err := ToValue[float64]([]byte("2.718"))
+		v, err := ValueFromBytes[float64]([]byte("2.718"))
 		assert.NoError(t, err)
 		assert.InDelta(t, 2.718, v, 1e-6)
 	})
 
 	t.Run("uint from JSON", func(t *testing.T) {
-		v, err := ToValue[uint]([]byte("100"))
+		v, err := ValueFromBytes[uint]([]byte("100"))
 		assert.NoError(t, err)
 		assert.Equal(t, uint(100), v)
 	})
 
 	t.Run("uint64 from JSON", func(t *testing.T) {
-		v, err := ToValue[uint64]([]byte("999"))
+		v, err := ValueFromBytes[uint64]([]byte("999"))
 		assert.NoError(t, err)
 		assert.Equal(t, uint64(999), v)
 	})
 
 	t.Run("struct from JSON", func(t *testing.T) {
-		v, err := ToValue[User]([]byte(`{"Name":"Alice","Age":30}`))
+		v, err := ValueFromBytes[User]([]byte(`{"Name":"Alice","Age":30}`))
 		assert.NoError(t, err)
 		assert.Equal(t, "Alice", v.Name)
 		assert.Equal(t, 30, v.Age)
 	})
 
 	t.Run("empty data non-string returns error", func(t *testing.T) {
-		_, err := ToValue[int](nil)
+		_, err := ValueFromBytes[int](nil)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "empty data")
+	})
+}
+
+func TestValueFromString(t *testing.T) {
+	t.Run("string returns as-is", func(t *testing.T) {
+		v, err := ValueFromString[string]("hello")
+		assert.NoError(t, err)
+		assert.Equal(t, "hello", v)
+	})
+
+	t.Run("[]byte from string", func(t *testing.T) {
+		v, err := ValueFromString[[]byte]("raw")
+		assert.NoError(t, err)
+		assert.Equal(t, []byte("raw"), v)
+	})
+
+	t.Run("[]byte empty string returns nil slice", func(t *testing.T) {
+		v, err := ValueFromString[[]byte]("")
+		assert.NoError(t, err)
+		assert.Nil(t, v)
+	})
+
+	t.Run("int from JSON string", func(t *testing.T) {
+		v, err := ValueFromString[int]("42")
+		assert.NoError(t, err)
+		assert.Equal(t, 42, v)
+	})
+
+	t.Run("struct from JSON string", func(t *testing.T) {
+		v, err := ValueFromString[User](`{"Name":"Alice","Age":30}`)
+		assert.NoError(t, err)
+		assert.Equal(t, "Alice", v.Name)
+		assert.Equal(t, 30, v.Age)
+	})
+}
+
+func TestValueFromAny(t *testing.T) {
+	t.Run("nil returns zero", func(t *testing.T) {
+		v, err := ValueFromAny[string](nil)
+		assert.NoError(t, err)
+		assert.Equal(t, "", v)
+
+		n, err := ValueFromAny[int](nil)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, n)
+	})
+
+	t.Run("string to string", func(t *testing.T) {
+		v, err := ValueFromAny[string](interface{}("hello"))
+		assert.NoError(t, err)
+		assert.Equal(t, "hello", v)
+	})
+
+	t.Run("string to []byte", func(t *testing.T) {
+		v, err := ValueFromAny[[]byte](interface{}("bytes"))
+		assert.NoError(t, err)
+		assert.Equal(t, []byte("bytes"), v)
+	})
+
+	t.Run("[]byte to string", func(t *testing.T) {
+		v, err := ValueFromAny[string](interface{}([]byte("data")))
+		assert.NoError(t, err)
+		assert.Equal(t, "data", v)
+	})
+
+	t.Run("[]byte to []byte", func(t *testing.T) {
+		b := []byte("raw")
+		v, err := ValueFromAny[[]byte](interface{}(b))
+		assert.NoError(t, err)
+		assert.Equal(t, b, v)
+	})
+
+	t.Run("[]byte to int via JSON", func(t *testing.T) {
+		v, err := ValueFromAny[int](interface{}([]byte("99")))
+		assert.NoError(t, err)
+		assert.Equal(t, 99, v)
+	})
+
+	// ValueFromAny is permissive: other types are JSON-marshalled then decoded into T
+	t.Run("other type int → string via marshal", func(t *testing.T) {
+		v, err := ValueFromAny[string](42)
+		assert.NoError(t, err)
+		assert.Equal(t, "42", v)
+	})
+
+	t.Run("other type bool → string via marshal", func(t *testing.T) {
+		v, err := ValueFromAny[string](true)
+		assert.NoError(t, err)
+		assert.Equal(t, "true", v)
+	})
+
+	t.Run("other type map → string via marshal", func(t *testing.T) {
+		v, err := ValueFromAny[string](map[string]int{"a": 1})
+		assert.NoError(t, err)
+		assert.Equal(t, `{"a":1}`, v)
+	})
+
+	t.Run("same type T returns as-is", func(t *testing.T) {
+		v, err := ValueFromAny[int](42)
+		assert.NoError(t, err)
+		assert.Equal(t, 42, v)
+	})
+
+	t.Run("unsupported unmarshalable type returns error", func(t *testing.T) {
+		_, err := ValueFromAny[string](make(chan int))
+		assert.Error(t, err)
 	})
 }

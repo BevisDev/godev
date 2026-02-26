@@ -277,3 +277,13 @@ func TestChainList_Delete_MissingKey(t *testing.T) {
 	err := WithList[string](cache).Delete(ctx)
 	assert.ErrorIs(t, err, ErrMissingKey)
 }
+
+func TestChainList_Size_MissingKey(t *testing.T) {
+	ctx := context.Background()
+	rdb, _ := redismock.NewClientMock()
+	cache := &Cache{client: rdb, cf: &Config{Timeout: 5 * time.Second}}
+
+	size, err := WithList[string](cache).Size(ctx)
+	assert.ErrorIs(t, err, ErrMissingKey)
+	assert.Equal(t, int64(0), size)
+}

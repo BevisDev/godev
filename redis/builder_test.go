@@ -183,6 +183,22 @@ func TestRedisCache_Publish_JSON(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestRedisCache_Publish_MissingChannel(t *testing.T) {
+	rdb, _ := redismock.NewClientMock()
+	cache := &Cache{client: rdb, cf: &Config{Timeout: 5 * time.Second}}
+	ctx := context.Background()
+	err := With[string](cache).Value("msg").Publish(ctx)
+	assert.ErrorIs(t, err, ErrMissingChannel)
+}
+
+func TestRedisCache_Publish_MissingValue(t *testing.T) {
+	rdb, _ := redismock.NewClientMock()
+	cache := &Cache{client: rdb, cf: &Config{Timeout: 5 * time.Second}}
+	ctx := context.Background()
+	err := With[string](cache).Channel("ch").Publish(ctx)
+	assert.ErrorIs(t, err, ErrMissingValue)
+}
+
 func TestSetIfNotExists(t *testing.T) {
 	ctx := context.Background()
 
@@ -234,6 +250,32 @@ func TestSetIfNotExists_EnumValue(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, ok)
 	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestSetIfNotExists_MissingKey(t *testing.T) {
+	rdb, _ := redismock.NewClientMock()
+	cache := &Cache{client: rdb, cf: &Config{Timeout: 5 * time.Second}}
+	ctx := context.Background()
+	ok, err := With[string](cache).Value("x").SetIfNotExists(ctx)
+	assert.ErrorIs(t, err, ErrMissingKey)
+	assert.False(t, ok)
+}
+
+func TestSetIfNotExists_MissingValue(t *testing.T) {
+	rdb, _ := redismock.NewClientMock()
+	cache := &Cache{client: rdb, cf: &Config{Timeout: 5 * time.Second}}
+	ctx := context.Background()
+	ok, err := With[string](cache).Key("k").SetIfNotExists(ctx)
+	assert.ErrorIs(t, err, ErrMissingValue)
+	assert.False(t, ok)
+}
+
+func TestRedisCache_Subscribe_MissingChannel(t *testing.T) {
+	rdb, _ := redismock.NewClientMock()
+	cache := &Cache{client: rdb, cf: &Config{Timeout: 5 * time.Second}}
+	ctx := context.Background()
+	err := With[string](cache).Subscribe(ctx, func(string) {})
+	assert.ErrorIs(t, err, ErrMissingChannel)
 }
 
 func TestRedisCache_New_NilConfig(t *testing.T) {

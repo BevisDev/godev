@@ -34,7 +34,7 @@ func (m *MsgHandler) GetBody() []byte {
 
 // BodyAs decodes the message body (produced by utils.ToBytes) into type T.
 func BodyAs[T any](m *MsgHandler) (T, error) {
-	return utils.ToValue[T](m.d.Body)
+	return utils.ValueFromBytes[T](m.d.Body)
 }
 
 func (m *MsgHandler) Header(key string) any {

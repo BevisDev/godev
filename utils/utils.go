@@ -297,10 +297,10 @@ func ToBytes(value any) ([]byte, error) {
 	}
 }
 
-// ToValue decodes bytes into type T.
+// ValueFromBytes decodes bytes into type T.
 // It tries JSON unmarshal first; if that fails and T is string, the raw bytes are returned as the string.
 // Empty data: returns zero string for T string, empty slice for T []byte, error for other types.
-func ToValue[T any](data []byte) (T, error) {
+func ValueFromBytes[T any](data []byte) (T, error) {
 	var zero T
 	if len(data) == 0 {
 		if _, ok := any(zero).(string); ok {
@@ -329,4 +329,70 @@ func ToValue[T any](data []byte) (T, error) {
 		return any(string(data)).(T), nil
 	}
 	return zero, err
+}
+
+// ValueFromString converts a raw string to T.
+// For built-in string and []byte returns directly without JSON; other types use ValueFromBytes.
+func ValueFromString[T any](raw string) (T, error) {
+	var zero T
+	switch any(zero).(type) {
+	case string:
+		return any(raw).(T), nil
+	case []byte:
+		if raw == "" {
+			return any([]byte(nil)).(T), nil
+		}
+		return any([]byte(raw)).(T), nil
+	default:
+		return ValueFromBytes[T]([]byte(raw))
+	}
+}
+
+// ValueFromAny converts an interface{} to T.
+// Supported input:
+//   - nil           → return zero T
+//   - string        → direct for T=string, []byte; JSON decode otherwise
+//   - []byte        → direct for T=[]byte, string; JSON decode otherwise
+//   - other types   → JSON marshal → JSON unmarshal into T
+func ValueFromAny[T any](v any) (T, error) {
+	var zero T
+
+	if v == nil {
+		return zero, nil
+	}
+
+	switch val := v.(type) {
+
+	case T:
+		// already correct type
+		return val, nil
+
+	case string:
+		switch any(zero).(type) {
+		case string:
+			return any(val).(T), nil
+		case []byte:
+			return any([]byte(val)).(T), nil
+		default:
+			return ValueFromBytes[T]([]byte(val))
+		}
+
+	case []byte:
+		switch any(zero).(type) {
+		case []byte:
+			return any(val).(T), nil
+		case string:
+			return any(string(val)).(T), nil
+		default:
+			return ValueFromBytes[T](val)
+		}
+
+	default:
+		// fallback: marshal → unmarshal (ToBytes uses jsonx for complex types)
+		b, err := ToBytes(val)
+		if err != nil {
+			return zero, err
+		}
+		return ValueFromBytes[T](b)
+	}
 }

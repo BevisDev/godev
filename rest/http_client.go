@@ -297,7 +297,7 @@ func (r *HTTPRequest[T]) execute(request *http.Request) (HTTPResponse[T], error)
 		return resp, nil
 	}
 
-	result, err := utils.ToValue[T](raw)
+	result, err := utils.ValueFromBytes[T](raw)
 	if err != nil {
 		return resp, err
 	}

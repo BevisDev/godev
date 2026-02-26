@@ -141,8 +141,7 @@ func (c *listBuilder[T]) PopFront(ctx context.Context) (T, error) {
 		}
 		return zero, err
 	}
-
-	return utils.ToValue[T]([]byte(val))
+	return utils.ValueFromString[T](val)
 }
 
 // Pop retrieves and removes the last element (tail) of the list.
@@ -166,7 +165,7 @@ func (c *listBuilder[T]) Pop(ctx context.Context) (T, error) {
 		return zero, err
 	}
 
-	return utils.ToValue[T]([]byte(val))
+	return utils.ValueFromString[T](val)
 }
 
 // GetRange returns a slice of elements between the specified start and stop indexes.
@@ -192,7 +191,7 @@ func (c *listBuilder[T]) GetRange(ctx context.Context) ([]T, error) {
 
 	result := make([]T, 0, len(vals))
 	for _, v := range vals {
-		t, err := utils.ToValue[T]([]byte(v))
+		t, err := utils.ValueFromString[T](v)
 		if err != nil {
 			return nil, err
 		}
@@ -222,8 +221,7 @@ func (c *listBuilder[T]) Get(ctx context.Context, index int64) (T, error) {
 	if len(vals) == 0 {
 		return zero, nil
 	}
-
-	return utils.ToValue[T]([]byte(vals[0]))
+	return utils.ValueFromString[T](vals[0])
 }
 
 // Size returns the number of elements in the list.

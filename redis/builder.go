@@ -169,8 +169,7 @@ func (c *builder[T]) Get(ct context.Context) (T, error) {
 		}
 		return zero, err
 	}
-
-	return utils.ToValue[T]([]byte(val))
+	return utils.ValueFromString[T](val)
 }
 
 func (c *builder[T]) GetMany(ct context.Context) ([]T, error) {
@@ -187,30 +186,13 @@ func (c *builder[T]) GetMany(ct context.Context) ([]T, error) {
 		return nil, err
 	}
 
-	var zero T
 	result := make([]T, 0, len(vals))
 	for _, v := range vals {
-		if v == nil {
-			result = append(result, zero)
-			continue
+		t, err := utils.ValueFromAny[T](v)
+		if err != nil {
+			return nil, err
 		}
-
-		switch val := v.(type) {
-		case string:
-			t, err := utils.ToValue[T]([]byte(val))
-			if err != nil {
-				return nil, err
-			}
-			result = append(result, t)
-		case []byte:
-			t, err := utils.ToValue[T](val)
-			if err != nil {
-				return nil, err
-			}
-			result = append(result, t)
-		default:
-			result = append(result, zero)
-		}
+		result = append(result, t)
 	}
 
 	return result, nil
