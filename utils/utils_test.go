@@ -796,3 +796,80 @@ func TestValueFromAny(t *testing.T) {
 		assert.Error(t, err)
 	})
 }
+
+func TestValueFromPointer_String(t *testing.T) {
+	s := "hello"
+
+	result := ValueFromPointer(&s)
+
+	assert.Equal(t, "hello", result)
+}
+
+func TestValueFromPointer_StringNil(t *testing.T) {
+	var ptr *string
+
+	result := ValueFromPointer(ptr)
+
+	assert.Equal(t, "", result)
+}
+
+func TestValueFromPointer_Int(t *testing.T) {
+	i := 42
+
+	result := ValueFromPointer(&i)
+
+	assert.Equal(t, 42, result)
+}
+
+func TestValueFromPointer_IntNil(t *testing.T) {
+	var ptr *int
+
+	result := ValueFromPointer(ptr)
+
+	assert.Equal(t, 0, result)
+}
+
+func TestValueFromPointer_Bool(t *testing.T) {
+	b := true
+
+	result := ValueFromPointer(&b)
+
+	assert.Equal(t, true, result)
+}
+
+func TestValueFromPointer_BoolNil(t *testing.T) {
+	var ptr *bool
+
+	result := ValueFromPointer(ptr)
+
+	assert.Equal(t, false, result)
+}
+
+func TestValueFromPointer_Struct(t *testing.T) {
+	u := User{
+		Name: "Bevis",
+		Age:  30,
+	}
+
+	result := ValueFromPointer(&u)
+
+	assert.Equal(t, u, result)
+}
+
+func TestValueFromPointer_StructNil(t *testing.T) {
+	var ptr *User
+
+	result := ValueFromPointer(ptr)
+
+	assert.Equal(t, User{}, result)
+}
+
+func TestValueFromPointer_PointerType(t *testing.T) {
+	s := "hello"
+	ptr := &s
+
+	result := ValueFromPointer(&ptr)
+
+	assert.Equal(t, ptr, result)
+	assert.Equal(t, "hello", *result)
+}

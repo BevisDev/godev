@@ -265,6 +265,17 @@ func GetPointer[T any](v T) *T {
 	return &v
 }
 
+// ValueFromPointer returns the value pointed to by v.
+// If v is nil, it returns the zero value of type T.
+// Safe to use with any pointer type without causing panic.
+func ValueFromPointer[T any](v *T) T {
+	var zero T
+	if v == nil {
+		return zero
+	}
+	return *v
+}
+
 func ToBytes(value any) ([]byte, error) {
 	if value == nil {
 		return nil, errors.New("value is nil")
