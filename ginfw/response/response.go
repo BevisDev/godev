@@ -60,12 +60,11 @@ func NewFailure(ctx context.Context, code, message string) *Response {
 	}
 }
 
-func SuccessPagination(c *gin.Context, T any, total int64) *Response {
-	res := NewSuccess(c, &Pagination{
+func SuccessPage(c *gin.Context, T any, total int64) *Response {
+	return NewSuccess(c, &Pagination{
 		Items: T,
 		Total: total,
 	})
-	return res
 }
 
 // Error represents an error in the API response.
