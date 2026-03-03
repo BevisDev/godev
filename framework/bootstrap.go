@@ -24,6 +24,7 @@ import (
 	"github.com/BevisDev/godev/redis"
 	"github.com/BevisDev/godev/rest"
 	"github.com/BevisDev/godev/scheduler"
+	"github.com/BevisDev/godev/tgbot"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/sync/errgroup"
 )
@@ -42,6 +43,7 @@ type Bootstrap struct {
 	rabbitmq   *rabbitmq.MQ
 	keycloak   *keycloak.KC
 	kafka      *kafkax.Kafka
+	tgBot      *tgbot.TgBot
 	restClient *rest.Client
 	scheduler  *scheduler.Scheduler
 
@@ -318,6 +320,18 @@ func (b *Bootstrap) runServices(c context.Context) error {
 				return err
 			}
 			b.kafka = k
+			return nil
+		})
+	}
+
+	// Telegram Bot
+	if b.tgBotConf != nil && b.tgBot == nil {
+		g.Go(func() error {
+			bot, err := tgbot.New(b.tgBotConf, b.tgBotOpt...)
+			if err != nil {
+				return err
+			}
+			b.tgBot = bot
 			return nil
 		})
 	}
@@ -646,4 +660,8 @@ func (b *Bootstrap) Kafka() *kafkax.Kafka {
 
 func (b *Bootstrap) Mailer() *mailer.Mailer {
 	return b.mailer
+}
+
+func (b *Bootstrap) TgBot() *tgbot.TgBot {
+	return b.tgBot
 }

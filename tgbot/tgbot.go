@@ -3,6 +3,7 @@ package tgbot
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 // TgBot wraps a Telegram Bot API client with session expiry and logging.
 type TgBot struct {
 	*options
+	cfg           *Config
 	bot           *tgbotapi.BotAPI
 	logger        *console.Logger
 	mu            sync.RWMutex
@@ -20,18 +22,27 @@ type TgBot struct {
 }
 
 // New creates a TgBot with the given token and optional configuration.
-func New(token string, opts ...Option) (*TgBot, error) {
+func New(cfg *Config, opts ...Option) (*TgBot, error) {
+	if cfg == nil {
+		return nil, errors.New("config is nil")
+	}
+
+	if cfg.Token == "" {
+		return nil, errors.New("token is empty")
+	}
+
 	opt := withDefaults()
 	for _, o := range opts {
 		o(opt)
 	}
 
-	bot, err := tgbotapi.NewBotAPI(token)
+	bot, err := tgbotapi.NewBotAPI(cfg.Token)
 	if err != nil {
 		return nil, err
 	}
 
 	b := &TgBot{
+		cfg:           cfg,
 		options:       opt,
 		bot:           bot,
 		logger:        console.New("tgbot"),

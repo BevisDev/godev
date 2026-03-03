@@ -15,6 +15,7 @@ import (
 	"github.com/BevisDev/godev/redis"
 	"github.com/BevisDev/godev/rest"
 	"github.com/BevisDev/godev/scheduler"
+	"github.com/BevisDev/godev/tgbot"
 )
 
 // Option configures Bootstrap behavior (captures config to initialize later in Init).
@@ -37,9 +38,15 @@ type options struct {
 	keycloakConf  *keycloak.Config
 	redisConf     *redis.Config
 
+	// tgbot
+	tgBotConf *tgbot.Config
+	tgBotOpt  []tgbot.Option
+
+	// rabbitmq
 	rabbitConf *rabbitmq.Config
 	rabbitOpt  []rabbitmq.Option
 
+	// kafka
 	kafkaConf            *kafkax.Config
 	kafkaConsumerHandler kafkax.Handler
 	kafkaConsumerRetry   struct {
@@ -102,6 +109,14 @@ func WithRabbitMQ(cfg *rabbitmq.Config, opts ...rabbitmq.Option) Option {
 func WithMailer(cfg *mailer.Config) Option {
 	return func(o *options) {
 		o.mailerConf = cfg
+	}
+}
+
+// WithTgBot configures the Telegram bot client.
+func WithTgBot(cfg *tgbot.Config, opts ...tgbot.Option) Option {
+	return func(o *options) {
+		o.tgBotConf = cfg
+		o.tgBotOpt = append(o.tgBotOpt, opts...)
 	}
 }
 
