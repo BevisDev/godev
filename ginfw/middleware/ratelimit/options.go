@@ -17,17 +17,11 @@ type options struct {
 	onReject func(*gin.Context, error)
 }
 
-const (
-	defaultRPS     = 10
-	defaultBurst   = 20
-	defaultTimeout = 100 * time.Millisecond
-)
-
 func defaultOptions() *options {
 	return &options{
-		rps:     defaultRPS,
-		burst:   defaultBurst,
-		timeout: defaultTimeout,
+		rps:     10,
+		burst:   20,
+		timeout: 200 * time.Millisecond,
 	}
 }
 
