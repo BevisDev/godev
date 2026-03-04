@@ -58,6 +58,34 @@ func (t *TgBot) BotAPI() *tgbotapi.BotAPI {
 	return t.bot
 }
 
+func (t *TgBot) HandleUpdate(
+	update tgbotapi.Update,
+	handleCommand func(chatID int64, cmd, args string),
+) {
+	msg := update.Message
+	if msg == nil {
+		return
+	}
+	chatID := msg.Chat.ID
+	chatType := msg.Chat.Type
+
+	if msg.IsCommand() {
+		cmd := msg.Command()
+		t.logger.Info("chat=%d type=%s cmd=/%s", chatID, chatType, cmd)
+		handleCommand(chatID, cmd, msg.CommandArguments())
+		return
+	}
+
+	if !t.IsSessionActive(chatID) {
+		t.logger.Warn("chat=%d type=%s ignore: session is inactive.", chatID, chatType)
+		return
+	}
+	userText := msg.Text
+	if userText == "" {
+		return
+	}
+}
+
 // Send sends a text message to the given chat.
 func (t *TgBot) Send(chatID int64, text string) error {
 	msg := tgbotapi.NewMessage(chatID, text)
