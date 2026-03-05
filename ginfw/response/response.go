@@ -26,11 +26,18 @@ var Code = map[string]string{
 
 // Response represents a standardized API response structure.
 type Response struct {
-	RID        string `json:"rid,omitempty"`
-	Success    bool   `json:"success"`
-	Data       any    `json:"data,omitempty"`
-	ResponseAt string `json:"response_at,omitempty"`
-	Error      *Error `json:"error,omitempty"`
+	RID        string  `json:"rid,omitempty"`
+	Success    bool    `json:"success"`
+	Data       any     `json:"data,omitempty"`
+	ResponseAt string  `json:"response_at,omitempty"`
+	Error      *Error  `json:"error,omitempty"`
+	Errors     []Error `json:"errors,omitempty"`
+}
+
+// Error represents an error in the API response.
+type Error struct {
+	Code    string `json:"code,omitempty"`
+	Message string `json:"message,omitempty"`
 }
 
 // NewSuccess creates a successful response with the provided data.
@@ -41,10 +48,6 @@ func NewSuccess(ctx context.Context, data any) *Response {
 		Data:       data,
 		ResponseAt: responseAt(),
 	}
-}
-
-func responseAt() string {
-	return datetime.ToString(time.Now(), datetime.DateTimeLayout)
 }
 
 // NewFailure creates a failure response with error code and message.
@@ -60,6 +63,32 @@ func NewFailure(ctx context.Context, code, message string) *Response {
 	}
 }
 
+// NewFailures creates failures response multiple error code and message.
+func NewFailures(ctx context.Context, errs ...Error) *Response {
+	var errors []Error
+	errors = append(errors, errs...)
+	return &Response{
+		RID:        utils.GetRID(ctx),
+		Success:    false,
+		ResponseAt: responseAt(),
+		Errors:     errors,
+	}
+}
+
+// NewFailureData creates failures response with error code and message and data
+func NewFailureData(ctx context.Context, data any, code, message string) *Response {
+	return &Response{
+		RID:        utils.GetRID(ctx),
+		Success:    false,
+		ResponseAt: responseAt(),
+		Data:       data,
+		Error: &Error{
+			Code:    code,
+			Message: message,
+		},
+	}
+}
+
 func SuccessPage(c *gin.Context, T any, total int64) *Response {
 	return NewSuccess(c, &Pagination{
 		Items: T,
@@ -67,10 +96,8 @@ func SuccessPage(c *gin.Context, T any, total int64) *Response {
 	})
 }
 
-// Error represents an error in the API response.
-type Error struct {
-	Code    string `json:"code,omitempty"`
-	Message string `json:"message,omitempty"`
+func responseAt() string {
+	return datetime.ToString(time.Now(), datetime.DateTimeLayout)
 }
 
 func GetCode(
@@ -115,6 +142,13 @@ func NotModified(c *gin.Context) {
 func BadRequest(c *gin.Context, code, message string) {
 	code, message = GetCode(code, message, "400")
 	res := NewFailure(c.Request.Context(), code, message)
+	c.JSON(http.StatusBadRequest, res)
+}
+
+// BadRequestData sends a 400 Bad Request response with error code and message and data
+func BadRequestData(c *gin.Context, data any, code, message string) {
+	code, message = GetCode(code, message, "400")
+	res := NewFailureData(c.Request.Context(), data, code, message)
 	c.JSON(http.StatusBadRequest, res)
 }
 
