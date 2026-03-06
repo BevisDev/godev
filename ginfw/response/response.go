@@ -89,11 +89,12 @@ func NewFailureData(ctx context.Context, data any, code, message string) *Respon
 	}
 }
 
-func SuccessPage(c *gin.Context, T any, total int64) *Response {
-	return NewSuccess(c, &Pagination{
+func SuccessPage(c *gin.Context, T any, total int64) {
+	res := NewSuccess(c, &Pagination{
 		Items: T,
 		Total: total,
 	})
+	c.JSON(http.StatusOK, res)
 }
 
 func responseAt() string {

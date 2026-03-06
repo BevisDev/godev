@@ -58,6 +58,25 @@ func (t *TgBot) BotAPI() *tgbotapi.BotAPI {
 	return t.bot
 }
 
+func (t *TgBot) HandleCmdUpdate(
+	update tgbotapi.Update,
+	handleCmd func(chatID int64, cmd, args string),
+) {
+	msg := update.Message
+	if msg == nil {
+		return
+	}
+	chatID := msg.Chat.ID
+	chatType := msg.Chat.Type
+
+	if msg.IsCommand() {
+		cmd := msg.Command()
+		t.logger.Info("chat=%d type=%s cmd=/%s", chatID, chatType, cmd)
+		handleCmd(chatID, cmd, msg.CommandArguments())
+		return
+	}
+}
+
 func (t *TgBot) HandleUpdate(
 	update tgbotapi.Update,
 	handleCommand func(chatID int64, cmd, args string),
