@@ -243,7 +243,7 @@ func (r *HTTPRequest[T]) logRequest(body string) {
 	fmt.Fprintf(&sb, "%s: %s\n", consts.RID, r.rid)
 	fmt.Fprintf(&sb, "%s: %s\n", consts.Url, r.url)
 	fmt.Fprintf(&sb, "%s: %s\n", consts.Method, r.method)
-	fmt.Fprintf(&sb, "%s: %s\n", consts.Time,
+	fmt.Fprintf(&sb, "%s: %s\n", consts.RequestTime,
 		datetime.ToString(r.startTime, datetime.DateTimeLayoutMilli))
 	if !validate.IsNilOrEmpty(r.queryParams) {
 		fmt.Fprintf(&sb, "%s: %v\n", consts.Query, r.queryParams)

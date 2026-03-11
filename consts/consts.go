@@ -23,13 +23,13 @@ const (
 )
 
 const (
-	RID      = "rid"
-	Status   = "status"
-	Header   = "header"
-	Body     = "body"
-	Duration = "duration"
-	Time     = "time"
-	Method   = "method"
-	Url      = "url"
-	Query    = "query"
+	RID         = "rid"
+	Status      = "status"
+	Header      = "header"
+	Body        = "body"
+	Duration    = "duration"
+	RequestTime = "request_time"
+	Method      = "method"
+	Url         = "url"
+	Query       = "query"
 )

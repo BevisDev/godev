@@ -96,7 +96,7 @@ func (l *Logger) getEncoderLog() zapcore.Encoder {
 		// 1716714967.877995 -> 2024-12-19T20:04:31.255+0700
 		encodeConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 		// ts -> time
-		encodeConfig.TimeKey = "time"
+		encodeConfig.TimeKey = "timestamp"
 		// msg -> message
 		encodeConfig.MessageKey = "message"
 		// info -> INFO
@@ -109,7 +109,7 @@ func (l *Logger) getEncoderLog() zapcore.Encoder {
 	// for development
 	encodeConfig = zap.NewDevelopmentEncoderConfig()
 	encodeConfig.EncodeTime = zapcore.ISO8601TimeEncoder
-	encodeConfig.TimeKey = "time"
+	encodeConfig.TimeKey = "timestamp"
 	encodeConfig.LevelKey = "level"
 	encodeConfig.CallerKey = "caller"
 	encodeConfig.MessageKey = "message"
@@ -450,7 +450,7 @@ func (l *Logger) logRequest(req *RequestLogger, message string, callerSkip int) 
 	fields := []zap.Field{
 		zap.String(consts.RID, req.RID),
 		zap.String(consts.Url, req.URL),
-		zap.Time(consts.Time, req.Time),
+		zap.Time(consts.RequestTime, req.Time),
 		zap.String(consts.Method, req.Method),
 	}
 	if req.Header != nil {

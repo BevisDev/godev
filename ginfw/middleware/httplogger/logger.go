@@ -132,7 +132,7 @@ func (h *HTTPLogger) logRequestConsole(c *gin.Context, rid string, startTime tim
 	fmt.Fprintf(&sb, "%s: %s\n", consts.RID, rid)
 	fmt.Fprintf(&sb, "%s: %s\n", consts.Url, c.Request.URL.String())
 	fmt.Fprintf(&sb, "%s: %s\n", consts.Method, c.Request.Method)
-	fmt.Fprintf(&sb, "%s: %s\n", consts.Time,
+	fmt.Fprintf(&sb, "%s: %s\n", consts.RequestTime,
 		datetime.ToString(startTime, datetime.DateTimeLayoutMilli))
 	fmt.Fprintf(&sb, "%s: %v\n", consts.Query, c.Request.URL.RawQuery)
 	if !h.skipHeader {
