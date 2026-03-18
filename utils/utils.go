@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -375,7 +377,6 @@ func ValueFromAny[T any](v any) (T, error) {
 	switch val := v.(type) {
 
 	case T:
-		// already correct type
 		return val, nil
 
 	case string:
@@ -399,11 +400,180 @@ func ValueFromAny[T any](v any) (T, error) {
 		}
 
 	default:
-		// fallback: marshal → unmarshal (ToBytes uses jsonx for complex types)
 		b, err := ToBytes(val)
 		if err != nil {
 			return zero, err
 		}
 		return ValueFromBytes[T](b)
+	}
+}
+
+// ToFloat converts common numeric types (and numeric strings) into float64.
+// Returns an error for unsupported types or invalid strings.
+func ToFloat(v any) (float64, error) {
+	switch t := v.(type) {
+	case float32:
+		return float64(t), nil
+	case float64:
+		return t, nil
+	case int:
+		return float64(t), nil
+	case int8:
+		return float64(t), nil
+	case int16:
+		return float64(t), nil
+	case int32:
+		return float64(t), nil
+	case int64:
+		return float64(t), nil
+	case uint:
+		return float64(t), nil
+	case uint8:
+		return float64(t), nil
+	case uint16:
+		return float64(t), nil
+	case uint32:
+		return float64(t), nil
+	case uint64:
+		return float64(t), nil
+	case string:
+		return strconv.ParseFloat(t, 64)
+	default:
+		return 0, fmt.Errorf("cannot convert %T to float", v)
+	}
+}
+
+// ToInt64 converts common numeric types (and numeric strings) into int64.
+// Floats are truncated toward zero; uint64 values > MaxInt64 return an error.
+func ToInt64(v any) (int64, error) {
+	switch t := v.(type) {
+	case int:
+		return int64(t), nil
+	case int8:
+		return int64(t), nil
+	case int16:
+		return int64(t), nil
+	case int32:
+		return int64(t), nil
+	case int64:
+		return t, nil
+	case uint:
+		return int64(t), nil
+	case uint8:
+		return int64(t), nil
+	case uint16:
+		return int64(t), nil
+	case uint32:
+		return int64(t), nil
+	case uint64:
+		if t > math.MaxInt64 {
+			return 0, fmt.Errorf("overflow uint64 -> int64")
+		}
+		return int64(t), nil
+	case float32:
+		return int64(t), nil
+	case float64:
+		return int64(t), nil
+	case string:
+		i, err := strconv.ParseInt(t, 10, 64)
+		if err == nil {
+			return i, nil
+		}
+
+		f, err := strconv.ParseFloat(t, 64)
+		if err != nil {
+			return 0, err
+		}
+
+		return int64(f), nil
+
+	default:
+		return 0, fmt.Errorf("cannot convert %T to int64", v)
+	}
+}
+
+func ToInt(v any) (int, error) {
+	i64, err := ToInt64(v)
+	if err != nil {
+		return 0, err
+	}
+
+	if i64 > int64(math.MaxInt) || i64 < int64(math.MinInt) {
+		return 0, fmt.Errorf("overflow int")
+	}
+
+	return int(i64), nil
+}
+
+func ToBool(v any) (bool, error) {
+	switch t := v.(type) {
+	case bool:
+		return t, nil
+	case int:
+		return t != 0, nil
+	case int8:
+		return t != 0, nil
+	case int16:
+		return t != 0, nil
+	case int32:
+		return t != 0, nil
+	case int64:
+		return t != 0, nil
+	case uint:
+		return t != 0, nil
+	case uint64:
+		return t != 0, nil
+	case float32:
+		return t != 0, nil
+	case float64:
+		return t != 0, nil
+	case string:
+		b, err := strconv.ParseBool(t)
+		if err != nil {
+			return false, err
+		}
+		return b, nil
+	default:
+		return false, fmt.Errorf("cannot convert %T to bool", v)
+	}
+}
+
+// ToSlice converts a few common slice types into []any.
+// Non-slice inputs are wrapped as a single-element slice.
+func ToSlice(v any) []any {
+	switch t := v.(type) {
+	case []any:
+		return t
+
+	case []string:
+		out := make([]any, len(t))
+		for i, v := range t {
+			out[i] = v
+		}
+		return out
+
+	case []int:
+		out := make([]any, len(t))
+		for i, v := range t {
+			out[i] = v
+		}
+		return out
+
+	case []int64:
+		out := make([]any, len(t))
+		for i, v := range t {
+			out[i] = v
+		}
+		return out
+
+	case []float64:
+		out := make([]any, len(t))
+		for i, v := range t {
+			out[i] = v
+		}
+		return out
+
+	default:
+		return []any{v}
 	}
 }

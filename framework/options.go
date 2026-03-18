@@ -112,7 +112,7 @@ func WithMailer(cfg *mailer.Config) Option {
 	}
 }
 
-// WithTgBot configures the Telegram bot client.
+// WithTgBot configures the Telegram bot client to be initialized by Bootstrap.
 func WithTgBot(cfg *tgbot.Config, opts ...tgbot.Option) Option {
 	return func(o *options) {
 		o.tgBotConf = cfg

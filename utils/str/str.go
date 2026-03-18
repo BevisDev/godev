@@ -178,7 +178,7 @@ func ToUint[T types.SignedUint](s string) T {
 // ToFloat parses a string to float32 or float64.
 func ToFloat[T types.SignedFloat](str string) T {
 	var zero T
-	f64, err := strconv.ParseFloat(str, 64) // parse sang float64 luôn
+	f64, err := strconv.ParseFloat(str, 64)
 	if err != nil {
 		return zero
 	}

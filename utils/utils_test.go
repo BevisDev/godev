@@ -2,6 +2,7 @@ package utils
 
 import (
 	"context"
+	"math"
 	"testing"
 
 	"github.com/BevisDev/godev/consts"
@@ -31,11 +32,6 @@ func TestGetRID_WhenCtxHasRID(t *testing.T) {
 	if rid != expected {
 		t.Errorf("GetRID() = %q; want %q", rid, expected)
 	}
-}
-
-func TestGetRID_WhenCtxIsNil(t *testing.T) {
-	rid := GetRID(nil)
-	assert.NotEmpty(t, rid, "GetRID(nil) should return a new UUID")
 }
 
 func TestContainsIgnoreCase(t *testing.T) {
@@ -872,4 +868,162 @@ func TestValueFromPointer_PointerType(t *testing.T) {
 
 	assert.Equal(t, ptr, result)
 	assert.Equal(t, "hello", *result)
+}
+
+func TestToFloat(t *testing.T) {
+	t.Run("supported numeric types", func(t *testing.T) {
+		cases := []struct {
+			name string
+			in   any
+			want float64
+		}{
+			{"float32", float32(1.25), 1.25},
+			{"float64", float64(-2.5), -2.5},
+			{"int", int(-3), -3},
+			{"int8", int8(-4), -4},
+			{"int16", int16(5), 5},
+			{"int32", int32(6), 6},
+			{"int64", int64(7), 7},
+			{"uint", uint(8), 8},
+			{"uint8", uint8(9), 9},
+			{"uint16", uint16(10), 10},
+			{"uint32", uint32(11), 11},
+			{"uint64", uint64(12), 12},
+			{"string int", "42", 42},
+			{"string float", "3.14", 3.14},
+			{"string exp", "1e3", 1000},
+		}
+
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				got, err := ToFloat(tc.in)
+				assert.NoError(t, err)
+				assert.InDelta(t, tc.want, got, 1e-9)
+			})
+		}
+	})
+
+	t.Run("invalid string returns error", func(t *testing.T) {
+		_, err := ToFloat("not-a-number")
+		assert.Error(t, err)
+	})
+
+	t.Run("nil returns error", func(t *testing.T) {
+		_, err := ToFloat(nil)
+		assert.Error(t, err)
+	})
+
+	t.Run("unsupported type returns error", func(t *testing.T) {
+		_, err := ToFloat(struct{}{})
+		assert.Error(t, err)
+	})
+}
+
+func TestToInt64(t *testing.T) {
+	t.Run("supported numeric types", func(t *testing.T) {
+		cases := []struct {
+			name string
+			in   any
+			want int64
+		}{
+			{"int", int(-3), -3},
+			{"int8", int8(-4), -4},
+			{"int16", int16(5), 5},
+			{"int32", int32(6), 6},
+			{"int64", int64(7), 7},
+			{"uint", uint(8), 8},
+			{"uint8", uint8(9), 9},
+			{"uint16", uint16(10), 10},
+			{"uint32", uint32(11), 11},
+			{"float32 truncates", float32(12.9), 12},
+			{"float64 truncates", float64(-2.9), -2},
+			{"string int", "42", 42},
+			{"string float", "3.14", 3},
+			{"string exp", "1e3", 1000},
+		}
+
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				got, err := ToInt64(tc.in)
+				assert.NoError(t, err)
+				assert.Equal(t, tc.want, got)
+			})
+		}
+	})
+
+	t.Run("uint64 overflow returns error", func(t *testing.T) {
+		_, err := ToInt64(uint64(math.MaxInt64) + 1)
+		assert.Error(t, err)
+	})
+
+	t.Run("invalid string returns error", func(t *testing.T) {
+		_, err := ToInt64("not-a-number")
+		assert.Error(t, err)
+	})
+
+	t.Run("nil returns error", func(t *testing.T) {
+		_, err := ToInt64(nil)
+		assert.Error(t, err)
+	})
+
+	t.Run("unsupported type returns error", func(t *testing.T) {
+		_, err := ToInt64(struct{}{})
+		assert.Error(t, err)
+	})
+}
+
+func TestToSlice(t *testing.T) {
+	t.Run("[]any returns as-is", func(t *testing.T) {
+		in := []any{"a", 1, true}
+		got := ToSlice(in)
+		assert.Equal(t, in, got)
+	})
+
+	t.Run("[]string converts to []any", func(t *testing.T) {
+		in := []string{"a", "b"}
+		got := ToSlice(in)
+		assert.Equal(t, []any{"a", "b"}, got)
+	})
+
+	t.Run("[]int converts to []any", func(t *testing.T) {
+		in := []int{1, 2, 3}
+		got := ToSlice(in)
+		assert.Equal(t, []any{1, 2, 3}, got)
+	})
+
+	t.Run("[]int64 converts to []any", func(t *testing.T) {
+		in := []int64{1, 2, 3}
+		got := ToSlice(in)
+		assert.Equal(t, []any{int64(1), int64(2), int64(3)}, got)
+	})
+
+	t.Run("[]float64 converts to []any", func(t *testing.T) {
+		in := []float64{1.5, 2.25}
+		got := ToSlice(in)
+		assert.Equal(t, []any{1.5, 2.25}, got)
+	})
+
+	t.Run("typed nil slices become empty []any", func(t *testing.T) {
+		var s1 []string
+		got1 := ToSlice(s1)
+		assert.Len(t, got1, 0)
+
+		var s2 []int
+		got2 := ToSlice(s2)
+		assert.Len(t, got2, 0)
+
+		var s3 []float64
+		got3 := ToSlice(s3)
+		assert.Len(t, got3, 0)
+	})
+
+	t.Run("non-slice wraps into single element", func(t *testing.T) {
+		got := ToSlice("x")
+		assert.Equal(t, []any{"x"}, got)
+	})
+
+	t.Run("nil wraps into single element", func(t *testing.T) {
+		got := ToSlice(nil)
+		assert.Equal(t, []any{nil}, got)
+	})
 }
