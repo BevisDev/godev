@@ -936,7 +936,7 @@ func TestToInt64(t *testing.T) {
 			{"uint16", uint16(10), 10},
 			{"uint32", uint32(11), 11},
 			{"float32 truncates", float32(12.9), 12},
-			{"float64 truncates", float64(-2.9), -2},
+			{"float64 truncates", -2.9, -2},
 			{"string int", "42", 42},
 			{"string float", "3.14", 3},
 			{"string exp", "1e3", 1000},
@@ -972,58 +972,119 @@ func TestToInt64(t *testing.T) {
 	})
 }
 
+func TestToStringSlice(t *testing.T) {
+	t.Run("slice input", func(t *testing.T) {
+		got := ToStringSlice([]any{"a", 1, true})
+		assert.Equal(t, []string{"a", "1", "true"}, got)
+	})
+
+	t.Run("single value", func(t *testing.T) {
+		got := ToStringSlice(123)
+		assert.Equal(t, []string{"123"}, got)
+	})
+
+	t.Run("nil input", func(t *testing.T) {
+		got := ToStringSlice(nil)
+		assert.Nil(t, got)
+	})
+}
+
+func TestToIntSlice(t *testing.T) {
+	t.Run("slice input", func(t *testing.T) {
+		got := ToIntSlice([]any{1, "2", float64(3.9)})
+		assert.Equal(t, []int{1, 2, 3}, got)
+	})
+
+	t.Run("single value", func(t *testing.T) {
+		got := ToIntSlice("42")
+		assert.Equal(t, []int{42}, got)
+	})
+
+	t.Run("invalid element is skipped", func(t *testing.T) {
+		got := ToIntSlice([]any{1, "oops", 3})
+		assert.Equal(t, []int{1, 3}, got)
+	})
+}
+
+func TestToInt64Slice(t *testing.T) {
+	t.Run("slice input", func(t *testing.T) {
+		got := ToInt64Slice([]any{int64(1), "2", float64(3.9)})
+		assert.Equal(t, []int64{1, 2, 3}, got)
+	})
+
+	t.Run("single value", func(t *testing.T) {
+		got := ToInt64Slice("42")
+		assert.Equal(t, []int64{42}, got)
+	})
+
+	t.Run("invalid element is skipped", func(t *testing.T) {
+		got := ToInt64Slice([]any{1, struct{}{}, 3})
+		assert.Equal(t, []int64{1, 3}, got)
+	})
+}
+
+func TestToFloat64Slice(t *testing.T) {
+	t.Run("slice input", func(t *testing.T) {
+		got := ToFloat64Slice([]any{1, "2.5", float32(3.25)})
+		assert.Equal(t, []float64{1, 2.5, 3.25}, got)
+	})
+
+	t.Run("single value", func(t *testing.T) {
+		got := ToFloat64Slice("42.5")
+		assert.Equal(t, []float64{42.5}, got)
+	})
+
+	t.Run("invalid element is skipped", func(t *testing.T) {
+		got := ToFloat64Slice([]any{1, "bad", 3.5})
+		assert.Equal(t, []float64{1, 3.5}, got)
+	})
+
+	t.Run("nil pointer input returns nil", func(t *testing.T) {
+		var p *[]int
+		got := ToFloat64Slice(p)
+		assert.Nil(t, got)
+	})
+}
+
 func TestToSlice(t *testing.T) {
-	t.Run("[]any returns as-is", func(t *testing.T) {
+	t.Run("nil returns nil", func(t *testing.T) {
+		got := ToSlice(nil)
+		assert.Nil(t, got)
+	})
+
+	t.Run("[]any returns same content", func(t *testing.T) {
 		in := []any{"a", 1, true}
 		got := ToSlice(in)
 		assert.Equal(t, in, got)
 	})
 
-	t.Run("[]string converts to []any", func(t *testing.T) {
-		in := []string{"a", "b"}
-		got := ToSlice(in)
-		assert.Equal(t, []any{"a", "b"}, got)
+	t.Run("common concrete slices use conversion", func(t *testing.T) {
+		assert.Equal(t, []any{"x", "y"}, ToSlice([]string{"x", "y"}))
+		assert.Equal(t, []any{1, 2}, ToSlice([]int{1, 2}))
+		assert.Equal(t, []any{int64(1), int64(2)}, ToSlice([]int64{1, 2}))
+		assert.Equal(t, []any{1.5, 2.5}, ToSlice([]float64{1.5, 2.5}))
 	})
 
-	t.Run("[]int converts to []any", func(t *testing.T) {
-		in := []int{1, 2, 3}
-		got := ToSlice(in)
-		assert.Equal(t, []any{1, 2, 3}, got)
+	t.Run("pointer to nil slice returns nil", func(t *testing.T) {
+		var p *[]int
+		got := ToSlice(p)
+		assert.Nil(t, got)
 	})
 
-	t.Run("[]int64 converts to []any", func(t *testing.T) {
-		in := []int64{1, 2, 3}
-		got := ToSlice(in)
-		assert.Equal(t, []any{int64(1), int64(2), int64(3)}, got)
+	t.Run("pointer to slice returns elements", func(t *testing.T) {
+		src := []int{7, 8}
+		got := ToSlice(&src)
+		assert.Equal(t, []any{7, 8}, got)
 	})
 
-	t.Run("[]float64 converts to []any", func(t *testing.T) {
-		in := []float64{1.5, 2.25}
-		got := ToSlice(in)
-		assert.Equal(t, []any{1.5, 2.25}, got)
+	t.Run("array and pointer to array return elements", func(t *testing.T) {
+		arr := [2]string{"a", "b"}
+		assert.Equal(t, []any{"a", "b"}, ToSlice(arr))
+		assert.Equal(t, []any{"a", "b"}, ToSlice(&arr))
 	})
 
-	t.Run("typed nil slices become empty []any", func(t *testing.T) {
-		var s1 []string
-		got1 := ToSlice(s1)
-		assert.Len(t, got1, 0)
-
-		var s2 []int
-		got2 := ToSlice(s2)
-		assert.Len(t, got2, 0)
-
-		var s3 []float64
-		got3 := ToSlice(s3)
-		assert.Len(t, got3, 0)
-	})
-
-	t.Run("non-slice wraps into single element", func(t *testing.T) {
-		got := ToSlice("x")
-		assert.Equal(t, []any{"x"}, got)
-	})
-
-	t.Run("nil wraps into single element", func(t *testing.T) {
-		got := ToSlice(nil)
-		assert.Equal(t, []any{nil}, got)
+	t.Run("non-slice value becomes single-item slice", func(t *testing.T) {
+		got := ToSlice(123)
+		assert.Equal(t, []any{123}, got)
 	})
 }

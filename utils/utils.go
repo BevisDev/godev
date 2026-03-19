@@ -538,42 +538,134 @@ func ToBool(v any) (bool, error) {
 	}
 }
 
-// ToSlice converts a few common slice types into []any.
-// Non-slice inputs are wrapped as a single-element slice.
+// ToStringSlice converts v to []string.
+// - If v is a slice/array, each element is converted using str.ToString.
+// - If v is a single value, it is wrapped into a one-element result.
+// - nil returns nil.
+func ToStringSlice(v any) []string {
+	items := ToSlice(v)
+	if items == nil {
+		return nil
+	}
+
+	out := make([]string, len(items))
+	for i, item := range items {
+		out[i] = str.ToString(item)
+	}
+	return out
+}
+
+// ToIntSlice converts v to []int.
+// Invalid elements are skipped.
+func ToIntSlice(v any) []int {
+	items := ToSlice(v)
+	if items == nil {
+		return nil
+	}
+
+	out := make([]int, 0, len(items))
+	for _, item := range items {
+		num, err := ToInt(item)
+		if err != nil {
+			continue
+		}
+		out = append(out, num)
+	}
+	return out
+}
+
+// ToInt64Slice converts v to []int64.
+// Invalid elements are skipped.
+func ToInt64Slice(v any) []int64 {
+	items := ToSlice(v)
+	if items == nil {
+		return nil
+	}
+
+	out := make([]int64, 0, len(items))
+	for _, item := range items {
+		num, err := ToInt64(item)
+		if err != nil {
+			continue
+		}
+		out = append(out, num)
+	}
+	return out
+}
+
+// ToFloat64Slice converts v to []float64.
+// Invalid elements are skipped.
+func ToFloat64Slice(v any) []float64 {
+	items := ToSlice(v)
+	if items == nil {
+		return nil
+	}
+
+	out := make([]float64, 0, len(items))
+	for _, item := range items {
+		num, err := ToFloat(item)
+		if err != nil {
+			continue
+		}
+		out = append(out, num)
+	}
+	return out
+}
+
+// ToSlice normalizes input into a flat []any:
+// - nil / nil-pointer => nil
+// - slice/array       => its elements
+// - other values      => single-element slice
 func ToSlice(v any) []any {
+	if v == nil {
+		return nil
+	}
+
 	switch t := v.(type) {
 	case []any:
 		return t
-
 	case []string:
 		out := make([]any, len(t))
-		for i, v := range t {
-			out[i] = v
+		for i, item := range t {
+			out[i] = item
 		}
 		return out
-
 	case []int:
 		out := make([]any, len(t))
-		for i, v := range t {
-			out[i] = v
+		for i, item := range t {
+			out[i] = item
 		}
 		return out
-
 	case []int64:
 		out := make([]any, len(t))
-		for i, v := range t {
-			out[i] = v
+		for i, item := range t {
+			out[i] = item
 		}
 		return out
-
 	case []float64:
 		out := make([]any, len(t))
-		for i, v := range t {
-			out[i] = v
+		for i, item := range t {
+			out[i] = item
 		}
 		return out
+	}
 
-	default:
+	rv := reflect.ValueOf(v)
+	if rv.Kind() == reflect.Pointer {
+		if rv.IsNil() {
+			return nil
+		}
+		rv = rv.Elem()
+	}
+
+	kind := rv.Kind()
+	if kind != reflect.Slice && kind != reflect.Array {
 		return []any{v}
 	}
+
+	out := make([]any, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		out[i] = rv.Index(i).Interface()
+	}
+	return out
 }

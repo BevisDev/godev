@@ -13,6 +13,9 @@ type Config struct {
 	// When true, Gin will run in release mode with minimal logging.
 	IsProduction bool
 
+	// Debug enables for avoiding early socket hang ups.
+	Debug bool
+
 	// Port is the TCP port the HTTP server listens on.
 	// Example: "8080"
 	Port string
@@ -71,20 +74,24 @@ func (c *Config) clone() *Config {
 	if cc.Port == "" {
 		cc.Port = "8080"
 	}
-	if cc.ShutdownTimeout <= 0 {
-		cc.ShutdownTimeout = 15 * time.Second
+
+	if !cc.Debug {
+		if cc.ShutdownTimeout <= 0 {
+			cc.ShutdownTimeout = 15 * time.Second
+		}
+		if cc.ReadHeaderTimeout <= 0 {
+			cc.ReadHeaderTimeout = 5 * time.Second
+		}
+		if cc.ReadTimeout <= 0 {
+			cc.ReadTimeout = 10 * time.Second
+		}
+		if cc.WriteTimeout <= 0 {
+			cc.WriteTimeout = 15 * time.Second
+		}
+		if cc.IdleTimeout <= 0 {
+			cc.IdleTimeout = 60 * time.Second
+		}
 	}
-	if cc.ReadHeaderTimeout <= 0 {
-		cc.ReadHeaderTimeout = 5 * time.Second
-	}
-	if cc.ReadTimeout <= 0 {
-		cc.ReadTimeout = 10 * time.Second
-	}
-	if cc.WriteTimeout <= 0 {
-		cc.WriteTimeout = 15 * time.Second
-	}
-	if cc.IdleTimeout <= 0 {
-		cc.IdleTimeout = 60 * time.Second
-	}
+
 	return &cc
 }
