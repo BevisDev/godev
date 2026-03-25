@@ -12,6 +12,7 @@
 - 🐰 **RabbitMQ**: Message queue integration with publisher/consumer patterns
 - 🔐 **Keycloak**: Identity and access management integration
 - 🌐 **HTTP Server**: Gin-based HTTP server with middleware support
+- 📡 **gRPC Server**: gRPC server with lifecycle and graceful shutdown support
 - 📡 **REST Client**: Type-safe HTTP client with automatic JSON handling
 - ⏰ **Scheduler**: Cron job scheduler with timezone support
 - 🏗️ **Framework**: Application bootstrap with lifecycle management
@@ -44,6 +45,7 @@
 | Package | Description | README |
 |---------|-------------|--------|
 | **`ginfw/server`** | Gin HTTP server with graceful shutdown and lifecycle hooks | [📖 Read More](ginfw/server/README.md) |
+| **`grpcfw/server`** | gRPC server with graceful shutdown and lifecycle hooks | [📖 Read More](grpcfw/server/README.md) |
 | **`ginfw/middleware/httplogger`** | HTTP request/response logging middleware | [📖 Read More](ginfw/middleware/httplogger/README.md) |
 | **`ginfw/middleware/ratelimit`** | Rate limiting middleware with Allow/Wait modes | [📖 Read More](ginfw/middleware/ratelimit/README.md) |
 | **`ginfw/middleware/timeout`** | Request timeout middleware | [📖 Read More](ginfw/middleware/timeout/README.md) |
@@ -254,10 +256,13 @@ GoDev follows a modular architecture where each package is independent and can b
            │
            ├─── Logger ─── REST Client ─── Scheduler
            │
-           └─── HTTP Server (Gin)
-                    │
-                    ├─── Middleware: Logger, RateLimit, Timeout
-                    └─── Routes & Handlers
+           ├─── HTTP Server (Gin)
+           │        │
+           │        ├─── Middleware: Logger, RateLimit, Timeout
+           │        └─── Routes & Handlers
+           │
+           └─── gRPC Server
+                    └─── Service Registration & Interceptors
 ```
 
 ---
@@ -271,6 +276,7 @@ Each package includes comprehensive documentation with examples:
 - [Logger](logger/README.md) - Structured logging
 - [Redis](redis/README.md) - Redis client and operations
 - [HTTP Server](ginfw/server/README.md) - Gin server setup
+- [gRPC Server](grpcfw/server/README.md) - gRPC server setup
 - [REST Client](rest/README.md) - HTTP client utilities
 - [Config](config/README.md) - Configuration management
 - [Scheduler](scheduler/README.md) - Cron job scheduling

@@ -21,6 +21,7 @@ Bootstrap framework giúp khởi tạo và quản lý lifecycle của applicatio
 - **REST Client** (rest)
 - **Scheduler** (scheduler)
 - **Gin HTTP Server** (ginfw/server)
+- **gRPC Server** (grpcfw/server)
 
 ## Quick Start
 
@@ -353,6 +354,7 @@ func main() {
 - `WithRestClient(opts ...rest.OptionFunc)` - Configure REST client
 - `WithScheduler(opts ...scheduler.OptionFunc)` - Configure scheduler
 - `WithServer(cfg *server.Config)` - Configure HTTP server
+- `WithGRPCServer(cfg *grpcserver.Config)` - Configure gRPC server
 - `WithHealthChecker(name string, fn framework.HealthChecker)` - Register custom health checker (e.g. from other projects)
 
 ### Lifecycle Methods
