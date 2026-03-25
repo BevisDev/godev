@@ -16,7 +16,8 @@ import (
 	"github.com/BevisDev/godev/utils/console"
 
 	"github.com/BevisDev/godev/database"
-	"github.com/BevisDev/godev/ginfw/server"
+	httpserver "github.com/BevisDev/godev/ginfw/server"
+	grpcserver "github.com/BevisDev/godev/grpcfw/server"
 	"github.com/BevisDev/godev/keycloak"
 	"github.com/BevisDev/godev/logger"
 	"github.com/BevisDev/godev/migration"
@@ -27,6 +28,7 @@ import (
 	"github.com/BevisDev/godev/tgbot"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/grpc"
 )
 
 // Bootstrap manages application lifecycle and dependencies.
@@ -47,8 +49,9 @@ type Bootstrap struct {
 	restClient *rest.Client
 	scheduler  *scheduler.Scheduler
 
-	// server
-	httpApp *server.HTTPApp
+	// servers
+	httpApp *httpserver.HTTPApp
+	grpcApp *grpcserver.GRPCApp
 
 	// Lifecycle hooks
 	beforeInit  []func(ctx context.Context) error
@@ -167,7 +170,7 @@ func (b *Bootstrap) Init(ctx context.Context) error {
 
 	// 2. Setup server config EARLY (before parallel init)
 	if b.serverConf == nil {
-		b.serverConf = &server.Config{}
+		b.serverConf = &httpserver.Config{}
 	}
 
 	if b.serverConf.Shutdown == nil {
@@ -405,12 +408,20 @@ func (b *Bootstrap) Start(ctx context.Context) error {
 
 	// Start HTTP server if configured
 	if b.serverConf != nil {
-		b.httpApp = server.New(b.serverConf)
+		b.httpApp = httpserver.New(b.serverConf)
 		if err := b.httpApp.Start(); err != nil {
 			return fmt.Errorf("[bootstrap] failed to start HTTP server: %w", err)
 		}
 		// Server errors are handled internally by HTTPApp
 		// We don't need to monitor errCh separately since Start() is non-blocking
+	}
+
+	// Start gRPC server if configured
+	if b.grpcServerConf != nil {
+		b.grpcApp = grpcserver.New(b.grpcServerConf)
+		if err := b.grpcApp.Start(); err != nil {
+			return fmt.Errorf("[bootstrap] failed to start gRPC server: %w", err)
+		}
 	}
 
 	// Consume after start hooks
@@ -467,6 +478,13 @@ func (b *Bootstrap) Stop(ctx context.Context) error {
 	if b.httpApp != nil {
 		if err := b.httpApp.Stop(ctx); err != nil {
 			b.log.Info("HTTP server stop error: %v", err)
+		}
+	}
+
+	// Stop gRPC server if configured
+	if b.grpcApp != nil {
+		if err := b.grpcApp.Stop(ctx); err != nil {
+			b.log.Info("gRPC server stop error: %v", err)
 		}
 	}
 
@@ -607,7 +625,7 @@ func (b *Bootstrap) closeServices() {
 // Should be called in AfterInit hook or after Init() completes.
 func (b *Bootstrap) SetServerSetup(setup func(r *gin.Engine)) {
 	if b.serverConf == nil {
-		b.serverConf = &server.Config{}
+		b.serverConf = &httpserver.Config{}
 	}
 	b.serverConf.Setup = setup
 }
@@ -617,9 +635,25 @@ func (b *Bootstrap) SetServerSetup(setup func(r *gin.Engine)) {
 // Should be called in AfterInit hook or after Init() completes.
 func (b *Bootstrap) SetServerShutdown(shutdown func(ctx context.Context) error) {
 	if b.serverConf == nil {
-		b.serverConf = &server.Config{}
+		b.serverConf = &httpserver.Config{}
 	}
 	b.serverConf.Shutdown = shutdown
+}
+
+// SetGRPCServerSetup sets the gRPC server Setup function after services are initialized.
+func (b *Bootstrap) SetGRPCServerSetup(setup func(s *grpc.Server)) {
+	if b.grpcServerConf == nil {
+		b.grpcServerConf = &grpcserver.Config{}
+	}
+	b.grpcServerConf.Setup = setup
+}
+
+// SetGRPCServerShutdown sets the gRPC server Shutdown function after services are initialized.
+func (b *Bootstrap) SetGRPCServerShutdown(shutdown func(ctx context.Context) error) {
+	if b.grpcServerConf == nil {
+		b.grpcServerConf = &grpcserver.Config{}
+	}
+	b.grpcServerConf.Shutdown = shutdown
 }
 
 func (b *Bootstrap) RedisCache() *redis.Cache {

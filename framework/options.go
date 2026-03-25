@@ -5,7 +5,8 @@ import (
 	"time"
 
 	"github.com/BevisDev/godev/database"
-	"github.com/BevisDev/godev/ginfw/server"
+	httpserver "github.com/BevisDev/godev/ginfw/server"
+	grpcserver "github.com/BevisDev/godev/grpcfw/server"
 	"github.com/BevisDev/godev/kafkax"
 	"github.com/BevisDev/godev/keycloak"
 	"github.com/BevisDev/godev/logger"
@@ -63,7 +64,8 @@ type options struct {
 	schedulerOn  bool
 	schedulerOpt []scheduler.Option
 
-	serverConf *server.Config
+	serverConf     *httpserver.Config
+	grpcServerConf *grpcserver.Config
 
 	// custom health checkers (e.g. from other projects)
 	healthCheckers []healthChecker
@@ -144,9 +146,16 @@ func WithScheduler(opts ...scheduler.Option) Option {
 }
 
 // WithServer configures the Gin HTTP server.
-func WithServer(cfg *server.Config) Option {
+func WithServer(cfg *httpserver.Config) Option {
 	return func(o *options) {
 		o.serverConf = cfg
+	}
+}
+
+// WithGRPCServer configures the gRPC server.
+func WithGRPCServer(cfg *grpcserver.Config) Option {
+	return func(o *options) {
+		o.grpcServerConf = cfg
 	}
 }
 
