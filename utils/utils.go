@@ -19,21 +19,25 @@ import (
 	"golang.org/x/exp/constraints"
 )
 
+// NewCtxWithRequest creates a fresh context and keeps request ID from r.
 func NewCtxWithRequest(r context.Context) context.Context {
 	var rid = GetRID(r)
 	ctx := NewCtx()
 	return SetValueCtx(ctx, consts.RID, rid)
 }
 
+// NewCtx creates a background context with a generated request ID.
 func NewCtx() context.Context {
 	ctx := context.Background()
 	return context.WithValue(ctx, consts.RID, random.NewUUID())
 }
 
+// SetValueCtx stores key/value into context.
 func SetValueCtx(ctx context.Context, key string, value interface{}) context.Context {
 	return context.WithValue(ctx, key, value)
 }
 
+// GetRID returns request ID from context, or generates one when missing.
 func GetRID(ctx context.Context) string {
 	if ctx == nil {
 		return random.NewUUID()
@@ -47,14 +51,17 @@ func GetRID(ctx context.Context) string {
 	return rid
 }
 
+// NewCtxTimeout wraps ctx with timeout.
 func NewCtxTimeout(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
 	return context.WithTimeout(ctx, timeout)
 }
 
+// NewCtxCancel wraps ctx with cancel function.
 func NewCtxCancel(ctx context.Context) (context.Context, context.CancelFunc) {
 	return context.WithCancel(ctx)
 }
 
+// ContainsIgnoreCase reports whether s contains substr (case-insensitive).
 func ContainsIgnoreCase(s, substr string) bool {
 	return strings.Contains(
 		strings.ToLower(s),
@@ -62,6 +69,7 @@ func ContainsIgnoreCase(s, substr string) bool {
 	)
 }
 
+// MaskLeft replaces the first size characters with '*'.
 func MaskLeft(s string, size int) string {
 	if size <= 0 || size > len(s) {
 		size = len(s)
@@ -70,6 +78,7 @@ func MaskLeft(s string, size int) string {
 	return mask + s[size:]
 }
 
+// MaskRight replaces the last size characters with '*'.
 func MaskRight(s string, size int) string {
 	if size <= 0 || size > len(s) {
 		size = len(s)
@@ -78,6 +87,7 @@ func MaskRight(s string, size int) string {
 	return s[:len(s)-size] + mask
 }
 
+// MaskCenter replaces size characters in the middle with '*'.
 func MaskCenter(s string, size int) string {
 	n := len(s)
 	if size <= 0 || size >= n {
@@ -138,6 +148,7 @@ func MaskEmail(email string, sizeLocal, sizeDomain int) string {
 	return maskedLocal + "@" + maskedDomain
 }
 
+// SkipContentType reports whether contentType should skip payload logging/parsing.
 func SkipContentType(contentType string) bool {
 	switch {
 	case strings.HasPrefix(contentType, "image"),
@@ -158,6 +169,7 @@ func SkipContentType(contentType string) bool {
 	}
 }
 
+// Parse asserts obj to target type T.
 func Parse[T any](obj interface{}) (T, error) {
 	val, ok := obj.(T)
 	if !ok {
@@ -166,6 +178,7 @@ func Parse[T any](obj interface{}) (T, error) {
 	return val, nil
 }
 
+// ParseValueMap gets objMap[key] and asserts it to T.
 func ParseValueMap[T any](key string, objMap types.Object) (T, error) {
 	var zero T
 
@@ -182,10 +195,12 @@ func ParseValueMap[T any](key string, objMap types.Object) (T, error) {
 	return val, nil
 }
 
+// IsContains reports whether value exists in slice.
 func IsContains[T comparable](slice []T, value T) bool {
 	return slices.Contains(slice, value)
 }
 
+// IndexOf returns first index of value in slice, or -1 if not found.
 func IndexOf[T comparable](slice []T, value T) int {
 	return slices.Index(slice, value)
 }
@@ -278,6 +293,7 @@ func ValueFromPointer[T any](v *T) T {
 	return *v
 }
 
+// ToBytes converts value into bytes.
 func ToBytes(value any) ([]byte, error) {
 	if value == nil {
 		return nil, errors.New("value is nil")
@@ -492,6 +508,7 @@ func ToInt64(v any) (int64, error) {
 	}
 }
 
+// ToInt converts common numeric types (and numeric strings) into int.
 func ToInt(v any) (int, error) {
 	i64, err := ToInt64(v)
 	if err != nil {
@@ -505,6 +522,7 @@ func ToInt(v any) (int, error) {
 	return int(i64), nil
 }
 
+// ToBool converts common boolean-like values into bool.
 func ToBool(v any) (bool, error) {
 	switch t := v.(type) {
 	case bool:
