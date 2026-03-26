@@ -1,9 +1,10 @@
 package money
 
 import (
+	"testing"
+
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestFromFloat_ToFloat(t *testing.T) {
@@ -23,6 +24,32 @@ func TestFromInt_ToInt(t *testing.T) {
 
 	if i != val {
 		t.Errorf("Expected %d, got %d", val, i)
+	}
+}
+
+func TestFromString(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		expected  string
+		shouldErr bool
+	}{
+		{"valid integer", "100", "100", false},
+		{"valid decimal", "123.4500", "123.45", false},
+		{"invalid string", "abc", "0", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := FromString(tt.input)
+			if tt.shouldErr {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expected, got.String())
+		})
 	}
 }
 
@@ -155,6 +182,25 @@ func TestFormat(t *testing.T) {
 	}
 }
 
+func TestToString(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"integer", "100", "100"},
+		{"decimal", "123.4500", "123.45"},
+		{"negative", "-1.2300", "-1.23"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := newMoney(tt.input)
+			assert.Equal(t, tt.expected, ToString(m))
+		})
+	}
+}
+
 func TestIsDecimal(t *testing.T) {
 	d := decimal.NewFromFloat(1.23)
 	dPtr := &d
@@ -178,6 +224,52 @@ func TestIsDecimal(t *testing.T) {
 			if result != tt.expected {
 				t.Errorf("IsDecimal(%v) = %v; want %v", tt.input, result, tt.expected)
 			}
+		})
+	}
+}
+
+func TestToDecimal(t *testing.T) {
+	d := decimal.NewFromFloat(1.23)
+	dPtr := &d
+
+	tests := []struct {
+		name     string
+		input    interface{}
+		expected string
+	}{
+		{"decimal value", d, "1.23"},
+		{"decimal pointer", dPtr, "1.23"},
+		{"float64", 1.23, "1.23"},
+		{"float32", float32(1.25), "1.25"},
+		{"int", 42, "42"},
+		{"int64", int64(84), "84"},
+		{"string", "100.50", "100.5"},
+		{"nil", nil, "0"},
+		{"nil decimal pointer", (*decimal.Decimal)(nil), "0"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ToDecimal(tt.input)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expected, got.String())
+		})
+	}
+}
+
+func TestToDecimalErrors(t *testing.T) {
+	tests := []struct {
+		name  string
+		input interface{}
+	}{
+		{"invalid string", "abc"},
+		{"unsupported type", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ToDecimal(tt.input)
+			assert.Error(t, err)
 		})
 	}
 }
