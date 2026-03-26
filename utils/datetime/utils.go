@@ -26,6 +26,24 @@ func ToTime(str string, format string) (*time.Time, error) {
 	return &parsedTime, nil
 }
 
+// ToDate parses a date string into Date using the specified layout.
+//
+// Example:
+//
+//	d, err := ToDate("2024-01-02")
+func ToDate(str string) (*Date, error) {
+	parsedTime, err := ToTime(str, DateLayoutISO)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Date{
+		baseTime: baseTime{
+			Time: *parsedTime,
+		},
+	}, nil
+}
+
 // BeginDay returns a time.Time representing the start of the day (00:00:00) in the same location.
 func BeginDay(t time.Time) time.Time {
 	return time.Date(
@@ -44,58 +62,72 @@ func EndDay(t time.Time) time.Time {
 	)
 }
 
+// AddYears returns t plus n years.
 func AddYears(t time.Time, n int) time.Time {
 	return t.AddDate(n, 0, 0)
 }
 
+// SubYears returns t minus n years.
 func SubYears(t time.Time, n int) time.Time {
 	return t.AddDate(-n, 0, 0)
 }
 
+// AddMonths returns t plus n months.
 func AddMonths(t time.Time, n int) time.Time {
 	return t.AddDate(0, n, 0)
 }
 
+// SubMonths returns t minus n months.
 func SubMonths(t time.Time, n int) time.Time {
 	return t.AddDate(0, -n, 0)
 }
 
+// AddDays returns t plus n days.
 func AddDays(t time.Time, n int) time.Time {
 	return t.AddDate(0, 0, n)
 }
 
+// SubDays returns t minus n days.
 func SubDays(t time.Time, n int) time.Time {
 	return t.AddDate(0, 0, -n)
 }
 
+// AddHours returns t plus n hours.
 func AddHours(t time.Time, n int) time.Time {
 	return t.Add(time.Duration(n) * time.Hour)
 }
 
+// SubHours returns t minus n hours.
 func SubHours(t time.Time, n int) time.Time {
 	return t.Add(-time.Duration(n) * time.Hour)
 }
 
+// AddMinutes returns t plus n minutes.
 func AddMinutes(t time.Time, n int) time.Time {
 	return t.Add(time.Duration(n) * time.Minute)
 }
 
+// SubMinutes returns t minus n minutes.
 func SubMinutes(t time.Time, n int) time.Time {
 	return t.Add(-time.Duration(n) * time.Minute)
 }
 
+// AddSeconds returns t plus n seconds.
 func AddSeconds(t time.Time, n int) time.Time {
 	return t.Add(time.Duration(n) * time.Second)
 }
 
+// SubSeconds returns t minus n seconds.
 func SubSeconds(t time.Time, n int) time.Time {
 	return t.Add(-time.Duration(n) * time.Second)
 }
 
+// AddMilliseconds returns t plus n milliseconds.
 func AddMilliseconds(t time.Time, n int) time.Time {
 	return t.Add(time.Duration(n) * time.Millisecond)
 }
 
+// SubMilliseconds returns t minus n milliseconds.
 func SubMilliseconds(t time.Time, n int) time.Time {
 	return t.Add(-time.Duration(n) * time.Millisecond)
 }
@@ -107,7 +139,15 @@ func IsSameDate(t1, t2 time.Time) bool {
 		t1.Day() == t2.Day()
 }
 
-// WithinDaysAt returns true if the given time is within the past N days from t2.
+// WithinDaysAt reports whether t1 is within the past `days` days from t2.
+//
+// It compares against the start of day of (t2 - days), so values on that day are included.
+//
+// Example:
+//
+//	ref := time.Date(2025, 9, 9, 12, 0, 0, 0, time.UTC)
+//	t1 := time.Date(2025, 9, 6, 8, 0, 0, 0, time.UTC)
+//	ok := WithinDaysAt(t1, ref, 3) // true
 func WithinDaysAt(t1, t2 time.Time, days int) bool {
 	start := SubDays(
 		BeginDay(t2),
@@ -116,13 +156,25 @@ func WithinDaysAt(t1, t2 time.Time, days int) bool {
 	return !t1.Before(start)
 }
 
-// WithinHoursAt returns true if t1 is within the past N hours from t2.
-// The comparison is duration-based (exact hours).
+// WithinHoursAt reports whether t1 is within the past `hours` hours from t2.
+// The check is exact by duration (not rounded to day boundaries).
+//
+// Example:
+//
+//	ref := time.Date(2025, 9, 9, 12, 0, 0, 0, time.UTC)
+//	t1 := ref.Add(-47 * time.Hour)
+//	ok := WithinHoursAt(t1, ref, 48) // true
 func WithinHoursAt(t1, t2 time.Time, hours int) bool {
 	return t2.Sub(t1) <= time.Duration(hours)*time.Hour
 }
 
-// DaysBetween returns the absolute number of full days between two dates.
+// DaysBetween returns the absolute number of full 24-hour days between t1 and t2.
+//
+// Example:
+//
+//	a := time.Date(2025, 5, 10, 0, 0, 0, 0, time.UTC)
+//	b := time.Date(2025, 5, 12, 0, 0, 0, 0, time.UTC)
+//	n := DaysBetween(a, b) // 2
 func DaysBetween(t1, t2 time.Time) int {
 	diff := t1.Sub(t2)
 	if diff < 0 {

@@ -40,6 +40,25 @@ func TestStringToTime_InvalidFormat(t *testing.T) {
 	}
 }
 
+func TestToDate(t *testing.T) {
+	d, err := ToDate("2024-04-10")
+	if err != nil {
+		t.Fatalf("ToDate returned unexpected error: %v", err)
+	}
+
+	expected := time.Date(2024, 4, 10, 0, 0, 0, 0, time.UTC)
+	if !d.Time.Equal(expected) {
+		t.Errorf("ToDate failed, expected %v, got %v", expected, d.Time)
+	}
+}
+
+func TestToDate_InvalidFormat(t *testing.T) {
+	_, err := ToDate("10/04/2024")
+	if err == nil {
+		t.Error("expected error for invalid date string, got nil")
+	}
+}
+
 func TestBeginDay(t *testing.T) {
 	date := time.Date(2024, 4, 10, 14, 30, 45, 999999999, time.UTC)
 	begin := BeginDay(date)
