@@ -469,6 +469,53 @@ func TestIsValidJSON(t *testing.T) {
 	}
 }
 
+func TestIsString(t *testing.T) {
+	tests := []struct {
+		name  string
+		input interface{}
+		want  bool
+	}{
+		{"string", "hello", true},
+		{"empty string", "", true},
+		{"int", 1, false},
+		{"bool", true, false},
+		{"nil", nil, false},
+		{"string pointer", func() interface{} { s := "x"; return &s }(), false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsString(tt.input); got != tt.want {
+				t.Fatalf("IsString(%v) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsStringSlice(t *testing.T) {
+	tests := []struct {
+		name  string
+		input interface{}
+		want  bool
+	}{
+		{"[]string", []string{"a", "b"}, true},
+		{"empty []string", []string{}, true},
+		{"[]any all string", []interface{}{"a", "b", ""}, true},
+		{"[]any mixed", []interface{}{"a", 1}, false},
+		{"[]int", []int{1, 2}, false},
+		{"single string", "abc", false},
+		{"nil", nil, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsStringSlice(tt.input); got != tt.want {
+				t.Fatalf("IsStringSlice(%v) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestIsNumber(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -492,6 +539,32 @@ func TestIsNumber(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := IsNumber(tt.input); got != tt.want {
 				t.Fatalf("IsNumber(%v) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsNumberSlice(t *testing.T) {
+	tests := []struct {
+		name  string
+		input interface{}
+		want  bool
+	}{
+		{"[]int", []int{1, 2, 3}, true},
+		{"[]float64", []float64{1.1, 2.2}, true},
+		{"[]uint", []uint{1, 2}, true},
+		{"empty []int", []int{}, true},
+		{"[]any all number", []interface{}{1, int64(2), 3.5}, true},
+		{"[]any mixed", []interface{}{1, "2"}, false},
+		{"[]string", []string{"1", "2"}, false},
+		{"single number", 123, false},
+		{"nil", nil, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsNumberSlice(tt.input); got != tt.want {
+				t.Fatalf("IsNumberSlice(%v) = %v, want %v", tt.input, got, tt.want)
 			}
 		})
 	}

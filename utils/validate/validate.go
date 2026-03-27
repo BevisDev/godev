@@ -308,11 +308,50 @@ func IsValidJSON(v any) bool {
 	return true
 }
 
+func IsString(v any) bool {
+	_, ok := v.(string)
+	return ok
+}
+
+func IsStringSlice(v any) bool {
+	switch val := v.(type) {
+	case []string:
+		return true
+	case []interface{}:
+		for _, item := range val {
+			if !IsString(item) {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
+	}
+}
+
 func IsNumber(v any) bool {
 	switch v.(type) {
 	case int, int8, int16, int32, int64,
 		uint, uint8, uint16, uint32, uint64,
 		float32, float64:
+		return true
+	default:
+		return false
+	}
+}
+
+func IsNumberSlice(v any) bool {
+	switch val := v.(type) {
+	case []int, []int8, []int16, []int32, []int64,
+		[]uint, []uint8, []uint16, []uint32, []uint64,
+		[]float32, []float64:
+		return true
+	case []interface{}:
+		for _, item := range val {
+			if !IsNumber(item) {
+				return false
+			}
+		}
 		return true
 	default:
 		return false
