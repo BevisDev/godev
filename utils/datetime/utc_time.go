@@ -9,6 +9,33 @@ type UTCTime struct {
 	baseTime
 }
 
+// NewUTCTime returns current datetime in UTC.
+func NewUTCTime() *UTCTime {
+	return &UTCTime{
+		baseTime: baseTime{
+			Time: time.Now().UTC(),
+		},
+	}
+}
+
+// ToUTCTime parses a datetime string into UTCTime using the UTC layout.
+//
+// Example:
+//
+//	d, err := ToUTCTime("2024-01-02T15:04:05Z")
+func ToUTCTime(str string) (*UTCTime, error) {
+	parsedTime, err := ToTime(str, DateTimeLayoutUTC)
+	if err != nil {
+		return nil, err
+	}
+
+	return &UTCTime{
+		baseTime: baseTime{
+			Time: *parsedTime,
+		},
+	}, nil
+}
+
 func (d *UTCTime) IsZero() bool {
 	return d.isZero()
 }

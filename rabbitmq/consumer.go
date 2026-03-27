@@ -21,26 +21,52 @@ type Handler interface {
 }
 
 type Consumer struct {
-	IsOn    bool   // enable / disable consumer
-	Queue   string // queue name
+	IsOn bool // enable / disable consumer
+
+	Queue string // queue name
+
 	Handler Handler
+
+	// PrefetchCount sets the AMQP QoS prefetch count (messages) per queue/consumer.
+	// If <= 0, it falls back to the MQ default (WithPrefetchCount).
+	PrefetchCount int
+
+	// WorkerPool is number of concurrent workers for this consumer.
+	// If <= 0, it falls back to 10
+	WorkerPool int
+
+	// MaxConsecutiveErrors caps the number of consecutive consume errors before stopping this consumer.
+	// If <= 0, it falls back to 10.
+	MaxConsecutiveErrors int
+
+	// RetryDelay is the delay between retries after a consume error.
+	// If <= 0, it falls back to 5 seconds.
+	RetryDelay time.Duration
 }
 
 // ConsumerManager manages multiple consumers with auto-reconnect and error handling.
 type ConsumerManager struct {
-	mq        *MQ
-	consumers map[string]*Consumer
-	mu        sync.Mutex
-	wg        sync.WaitGroup
-	log       *console.Logger
+	mq                   *MQ
+	consumers            map[string]*Consumer
+	mu                   sync.Mutex
+	wg                   sync.WaitGroup
+	log                  *console.Logger
+	maxConsecutiveErrors int
+	retryDelay           time.Duration
+	prefetchCount        int
+	workerPool           int
 }
 
 // newConsumer creates a new ConsumerManager for the given MQ instance.
 func newConsumer(r *MQ) *ConsumerManager {
 	return &ConsumerManager{
-		mq:        r,
-		consumers: make(map[string]*Consumer),
-		log:       console.New("consumer"),
+		mq:                   r,
+		consumers:            make(map[string]*Consumer),
+		log:                  console.New("consumer"),
+		maxConsecutiveErrors: 10,
+		retryDelay:           5 * time.Second,
+		prefetchCount:        1,
+		workerPool:           10,
 	}
 }
 
@@ -115,26 +141,33 @@ func (m *ConsumerManager) Start(ctx context.Context) {
 }
 
 // run runs a single consumer with auto error handling and reconnection.
-func (m *ConsumerManager) run(ctx context.Context, consumer *Consumer) {
+func (m *ConsumerManager) run(ctx context.Context, c *Consumer) {
 	defer m.wg.Done()
 
-	queueName := consumer.Queue
-	consecutiveErrors := 0
-	const maxConsecutiveErrors = 10
-	const retryDelay = 5 * time.Second
+	maxConsecutiveErrors := m.maxConsecutiveErrors
+	if c.MaxConsecutiveErrors > 0 {
+		maxConsecutiveErrors = c.MaxConsecutiveErrors
+	}
 
+	retryDelay := m.retryDelay
+	if c.RetryDelay > 0 {
+		retryDelay = c.RetryDelay
+	}
+
+	queueName := c.Queue
+	errs := 0
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
-			err := m.consume(ctx, consumer)
+			err := m.consume(ctx, c)
 			if err != nil {
-				consecutiveErrors++
+				errs++
 				m.log.Error("[%s] error: %v (consecutive errors: %d)",
-					queueName, err, consecutiveErrors)
+					queueName, err, errs)
 
-				if consecutiveErrors >= maxConsecutiveErrors {
+				if errs >= maxConsecutiveErrors {
 					m.log.Error("[%s] exceeded max consecutive errors (%d), stopping",
 						queueName, maxConsecutiveErrors)
 					return
@@ -150,27 +183,38 @@ func (m *ConsumerManager) run(ctx context.Context, consumer *Consumer) {
 				}
 				time.Sleep(retryDelay)
 			} else {
-				consecutiveErrors = 0
+				errs = 0
 			}
 		}
 	}
 }
 
 // consume sets up the consumer and processes messages from the queue.
-func (m *ConsumerManager) consume(ctx context.Context, consumer *Consumer) error {
-	queueName := consumer.Queue
+func (m *ConsumerManager) consume(ctx context.Context, c *Consumer) error {
+	queueName := c.Queue
 
 	ch, err := m.mq.GetChannel()
 	if err != nil {
 		return err
 	}
 	defer ch.Close()
+
 	if err := m.mq.queue.CreateQueues(queueName); err != nil {
 		return err
 	}
 
-	if err := ch.Qos(m.mq.prefetchCount, 0, false); err != nil {
+	prefetch := m.prefetchCount
+	if c.PrefetchCount > 0 {
+		prefetch = c.PrefetchCount
+	}
+
+	if err := ch.Qos(prefetch, 0, false); err != nil {
 		return err
+	}
+
+	workerCount := m.workerPool
+	if c.WorkerPool > 0 {
+		workerCount = c.WorkerPool
 	}
 
 	msgs, err := ch.ConsumeWithContext(
@@ -187,35 +231,65 @@ func (m *ConsumerManager) consume(ctx context.Context, consumer *Consumer) error
 		return err
 	}
 
+	jobs := make(chan amqp.Delivery, workerCount)
+
+	var workerWG sync.WaitGroup
+	for i := 0; i < workerCount; i++ {
+		workerWG.Add(1)
+		go func() {
+			defer workerWG.Done()
+			for d := range jobs {
+				m.processMsg(queueName, c.Handler, d)
+			}
+		}()
+	}
+
+	defer func() {
+		close(jobs)
+		workerWG.Wait()
+	}()
+
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
+
 		case d, ok := <-msgs:
 			if !ok {
 				return errors.New("message channel closed")
 			}
-
-			msg := &MsgHandler{
-				queueName: queueName,
-				d:         d,
-			}
-			msgCtx := m.NewMsgCtx(msg)
-
-			if err := m.handleMsg(msgCtx, queueName, consumer.Handler, msg); err != nil {
-				m.log.Info("[%s] error: %v", queueName, err)
-				if !m.mq.autoCommit {
-					msg.Requeue()
-				}
-				continue
-			}
-
-			if m.mq.autoCommit {
-				m.log.Info("[%s] committed correlationID: %s",
-					queueName, msg.CorrelationID())
-				msg.Commit()
+			select {
+			case <-ctx.Done():
+				return nil
+			case jobs <- d:
 			}
 		}
+	}
+}
+
+func (m *ConsumerManager) processMsg(
+	queueName string,
+	h Handler,
+	d amqp.Delivery,
+) {
+	msg := &MsgHandler{
+		queueName: queueName,
+		d:         d,
+	}
+	msgCtx := m.newMsgCtx(msg)
+
+	if err := m.handleMsg(msgCtx, queueName, h, msg); err != nil {
+		m.log.Info("[%s] error: %v", queueName, err)
+		if !m.mq.autoCommit {
+			msg.Requeue()
+		}
+		return
+	}
+
+	if m.mq.autoCommit {
+		m.log.Info("[%s] committed correlationID: %s",
+			queueName, msg.CorrelationID())
+		msg.Commit()
 	}
 }
 
@@ -235,8 +309,8 @@ func (m *ConsumerManager) handleMsg(
 	return h.Handle(ctx, msg)
 }
 
-// NewMsgCtx creates a new context with correlation from msg
-func (m *ConsumerManager) NewMsgCtx(msg *MsgHandler) context.Context {
+// newMsgCtx creates a new context with correlation from msg
+func (m *ConsumerManager) newMsgCtx(msg *MsgHandler) context.Context {
 	newCtx := utils.NewCtx()
 	newCtx = utils.SetValueCtx(newCtx,
 		consts.RID,

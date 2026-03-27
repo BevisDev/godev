@@ -210,7 +210,7 @@ func (r *MQ) reconnect() error {
 		return ErrClientClosed
 	}
 
-	maxRetries := 10
+	maxRetries := r.options.reconnectMaxRetries
 	baseDelay := time.Second
 
 	for attempt := 1; attempt <= maxRetries; attempt++ {
@@ -223,10 +223,7 @@ func (r *MQ) reconnect() error {
 		r.log.Info("attempting %d to reconnect...", attempt)
 
 		if err := r.connect(); err != nil {
-			delay := baseDelay * time.Duration(1<<uint(attempt-1))
-			if delay > 30*time.Second {
-				delay = 30 * time.Second
-			}
+			delay := min(baseDelay*time.Duration(1<<uint(attempt-1)), 30*time.Second)
 
 			r.log.Info("reconnect failed: err=%v, retry after %v", err, delay)
 
@@ -300,34 +297,6 @@ func (r *MQ) GetChannel() (*amqp.Channel, error) {
 	}
 
 	return conn.Channel()
-}
-
-// GetConsumerChannel returns a channel WITH QoS configured for consuming
-// Use this specifically for consumers
-func (r *MQ) GetConsumerChannel() (*amqp.Channel, error) {
-	conn, err := r.GetConnection()
-	if err != nil {
-		return nil, fmt.Errorf("get connection: %w", err)
-	}
-
-	ch, err := conn.Channel()
-	if err != nil {
-		return nil, fmt.Errorf("create channel: %w", err)
-	}
-
-	// Set QoS for consumer
-	if r.options.prefetchCount > 0 {
-		if err := ch.Qos(
-			r.options.prefetchCount, // prefetch count
-			0,                       // prefetch size (0 = no limit)
-			false,                   // global (false = per consumer)
-		); err != nil {
-			ch.Close()
-			return nil, fmt.Errorf("set qos: %w", err)
-		}
-	}
-
-	return ch, nil
 }
 
 func (r *MQ) WithChannel(fn ChannelHandler) error {

@@ -9,6 +9,33 @@ type DBTime struct {
 	baseTime
 }
 
+// NewDBTime returns current datetime.
+func NewDBTime() *DBTime {
+	return &DBTime{
+		baseTime: baseTime{
+			Time: time.Now(),
+		},
+	}
+}
+
+// ToDBTime parses a datetime string into DBTime using the DB layout.
+//
+// Example:
+//
+//	d, err := ToDBTime("2024-01-02 15:04:05.000")
+func ToDBTime(str string) (*DBTime, error) {
+	parsedTime, err := ToTime(str, DateTimeLayoutMilli)
+	if err != nil {
+		return nil, err
+	}
+
+	return &DBTime{
+		baseTime: baseTime{
+			Time: *parsedTime,
+		},
+	}, nil
+}
+
 func (d *DBTime) IsZero() bool {
 	return d.isZero()
 }

@@ -201,6 +201,68 @@ func TestToString(t *testing.T) {
 	}
 }
 
+func TestInSlice(t *testing.T) {
+	list := []Money{
+		newMoney("1"),
+		newMoney("2.50"),
+		newMoney("100.00"),
+	}
+
+	assert.True(t, InSlice(newMoney("1.0"), list))
+	assert.True(t, InSlice(newMoney("2.5"), list))
+	assert.False(t, InSlice(newMoney("3"), list))
+	assert.False(t, InSlice(newMoney("0"), nil))
+}
+
+func TestToMoneySlice(t *testing.T) {
+	t.Run("convert from []any", func(t *testing.T) {
+		got, err := ToMoneySlice([]any{1, "2.5", float64(3)})
+		assert.NoError(t, err)
+		assert.Len(t, got, 3)
+		assert.True(t, got[0].Equal(newMoney("1")))
+		assert.True(t, got[1].Equal(newMoney("2.5")))
+		assert.True(t, got[2].Equal(newMoney("3")))
+	})
+
+	t.Run("convert from []decimal.Decimal", func(t *testing.T) {
+		input := []decimal.Decimal{
+			decimal.NewFromInt(10),
+			decimal.NewFromFloat(20.5),
+		}
+		got, err := ToMoneySlice(input)
+		assert.NoError(t, err)
+		assert.Len(t, got, 2)
+		assert.True(t, got[0].Equal(newMoney("10")))
+		assert.True(t, got[1].Equal(newMoney("20.5")))
+	})
+
+	t.Run("convert from pointer to slice", func(t *testing.T) {
+		input := []string{"1", "2", "3.5"}
+		got, err := ToMoneySlice(&input)
+		assert.NoError(t, err)
+		assert.Len(t, got, 3)
+		assert.True(t, got[2].Equal(newMoney("3.5")))
+	})
+
+	t.Run("nil input returns nil", func(t *testing.T) {
+		got, err := ToMoneySlice(nil)
+		assert.NoError(t, err)
+		assert.Nil(t, got)
+	})
+}
+
+func TestToMoneySliceErrors(t *testing.T) {
+	t.Run("non-slice input", func(t *testing.T) {
+		_, err := ToMoneySlice(123)
+		assert.Error(t, err)
+	})
+
+	t.Run("invalid element in slice", func(t *testing.T) {
+		_, err := ToMoneySlice([]any{"1", true})
+		assert.Error(t, err)
+	})
+}
+
 func TestIsDecimal(t *testing.T) {
 	d := decimal.NewFromFloat(1.23)
 	dPtr := &d
@@ -264,6 +326,7 @@ func TestToDecimalErrors(t *testing.T) {
 	}{
 		{"invalid string", "abc"},
 		{"unsupported type", true},
+		{"uint64 overflow", uint64(^uint64(0))},
 	}
 
 	for _, tt := range tests {

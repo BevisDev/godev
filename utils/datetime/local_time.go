@@ -11,6 +11,33 @@ type LocalTime struct {
 	baseTime
 }
 
+// NewLocalTime returns current local datetime.
+func NewLocalTime() *LocalTime {
+	return &LocalTime{
+		baseTime: baseTime{
+			Time: time.Now(),
+		},
+	}
+}
+
+// ToLocalTime parses a datetime string into LocalTime using the local datetime layout.
+//
+// Example:
+//
+//	d, err := ToLocalTime("2024-01-02T15:04:05")
+func ToLocalTime(str string) (*LocalTime, error) {
+	parsedTime, err := ToTime(str, DateTimeLayoutLocal)
+	if err != nil {
+		return nil, err
+	}
+
+	return &LocalTime{
+		baseTime: baseTime{
+			Time: *parsedTime,
+		},
+	}, nil
+}
+
 func (d *LocalTime) IsZero() bool {
 	return d.isZero()
 }

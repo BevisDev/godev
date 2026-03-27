@@ -40,6 +40,45 @@ func TestStringToTime_InvalidFormat(t *testing.T) {
 	}
 }
 
+func TestFromAny_WithTime(t *testing.T) {
+	input := time.Date(2024, 4, 10, 12, 30, 45, 0, time.UTC)
+	got, err := FromAny(input, DateTimeLayout)
+	assert.NoError(t, err)
+	assert.True(t, got.Equal(input))
+}
+
+func TestFromAny_WithString(t *testing.T) {
+	got, err := FromAny("2024-04-10 12:30:45", DateTimeLayout)
+	assert.NoError(t, err)
+
+	expected := time.Date(2024, 4, 10, 12, 30, 45, 0, time.UTC)
+	assert.True(t, got.Equal(expected))
+}
+
+func TestFromAny_WithBytes(t *testing.T) {
+	got, err := FromAny([]byte("2024-04-10 12:30:45"), DateTimeLayout)
+	assert.NoError(t, err)
+
+	expected := time.Date(2024, 4, 10, 12, 30, 45, 0, time.UTC)
+	assert.True(t, got.Equal(expected))
+}
+
+func TestFromAny_WithNil(t *testing.T) {
+	got, err := FromAny(nil, DateTimeLayout)
+	assert.NoError(t, err)
+	assert.True(t, got.IsZero())
+}
+
+func TestFromAny_InvalidFormat(t *testing.T) {
+	_, err := FromAny("10/04/2024 12:30:45", DateTimeLayout)
+	assert.Error(t, err)
+}
+
+func TestFromAny_UnsupportedType(t *testing.T) {
+	_, err := FromAny(123, DateTimeLayout)
+	assert.Error(t, err)
+}
+
 func TestToDate(t *testing.T) {
 	d, err := ToDate("2024-04-10")
 	if err != nil {
@@ -57,6 +96,100 @@ func TestToDate_InvalidFormat(t *testing.T) {
 	if err == nil {
 		t.Error("expected error for invalid date string, got nil")
 	}
+}
+
+func TestNewDate(t *testing.T) {
+	before := time.Now()
+	d := NewDate()
+	after := time.Now()
+	assert.NotNil(t, d)
+	assert.False(t, d.Time.Before(before))
+	assert.False(t, d.Time.After(after))
+}
+
+func TestToDBTime(t *testing.T) {
+	d, err := ToDBTime("2024-04-10 12:30:45.123")
+	if err != nil {
+		t.Fatalf("ToDBTime returned unexpected error: %v", err)
+	}
+
+	expected := time.Date(2024, 4, 10, 12, 30, 45, 123000000, time.UTC)
+	if !d.Time.Equal(expected) {
+		t.Errorf("ToDBTime failed, expected %v, got %v", expected, d.Time)
+	}
+}
+
+func TestToDBTime_InvalidFormat(t *testing.T) {
+	_, err := ToDBTime("2024-04-10 12:30:45")
+	if err == nil {
+		t.Error("expected error for invalid db time string, got nil")
+	}
+}
+
+func TestNewDBTime(t *testing.T) {
+	before := time.Now()
+	d := NewDBTime()
+	after := time.Now()
+	assert.NotNil(t, d)
+	assert.False(t, d.Time.Before(before))
+	assert.False(t, d.Time.After(after))
+}
+
+func TestToLocalTime(t *testing.T) {
+	d, err := ToLocalTime("2024-04-10T12:30:45")
+	if err != nil {
+		t.Fatalf("ToLocalTime returned unexpected error: %v", err)
+	}
+
+	expected := time.Date(2024, 4, 10, 12, 30, 45, 0, time.UTC)
+	if !d.Time.Equal(expected) {
+		t.Errorf("ToLocalTime failed, expected %v, got %v", expected, d.Time)
+	}
+}
+
+func TestToLocalTime_InvalidFormat(t *testing.T) {
+	_, err := ToLocalTime("2024-04-10 12:30:45")
+	if err == nil {
+		t.Error("expected error for invalid local time string, got nil")
+	}
+}
+
+func TestNewLocalTime(t *testing.T) {
+	before := time.Now()
+	d := NewLocalTime()
+	after := time.Now()
+	assert.NotNil(t, d)
+	assert.False(t, d.Time.Before(before))
+	assert.False(t, d.Time.After(after))
+}
+
+func TestToUTCTime(t *testing.T) {
+	d, err := ToUTCTime("2024-04-10T12:30:45Z")
+	if err != nil {
+		t.Fatalf("ToUTCTime returned unexpected error: %v", err)
+	}
+
+	expected := time.Date(2024, 4, 10, 12, 30, 45, 0, time.UTC)
+	if !d.Time.Equal(expected) {
+		t.Errorf("ToUTCTime failed, expected %v, got %v", expected, d.Time)
+	}
+}
+
+func TestToUTCTime_InvalidFormat(t *testing.T) {
+	_, err := ToUTCTime("2024-04-10T12:30:45+07:00")
+	if err == nil {
+		t.Error("expected error for invalid utc time string, got nil")
+	}
+}
+
+func TestNewUTCTime(t *testing.T) {
+	before := time.Now().UTC()
+	d := NewUTCTime()
+	after := time.Now().UTC()
+	assert.NotNil(t, d)
+	assert.Equal(t, time.UTC, d.Time.Location())
+	assert.False(t, d.Time.Before(before))
+	assert.False(t, d.Time.After(after))
 }
 
 func TestBeginDay(t *testing.T) {

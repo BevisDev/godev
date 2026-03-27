@@ -6,9 +6,6 @@ type Option func(*options)
 
 // options defines configuration for RabbitMQ publisher and consumer.
 type options struct {
-	// prefetchCount limits the number of unacknowledged messages per consumer.
-	prefetchCount int
-
 	// autoCommit enables automatic message acknowledgment.
 	autoCommit bool
 
@@ -18,17 +15,20 @@ type options struct {
 	// consumeTimeout sets the timeout for consuming messages.
 	consumeTimeout time.Duration
 
+	// reconnectMaxRetries sets max attempts for reconnect.
+	reconnectMaxRetries int
+
 	publisherOn bool
 	consumerOn  bool
 }
 
 func withDefaults() *options {
 	return &options{
-		prefetchCount:  10,
-		publishTimeout: 5 * time.Second,
-		consumeTimeout: 30 * time.Second,
-		publisherOn:    true,
-		consumerOn:     true,
+		publishTimeout:      5 * time.Second,
+		consumeTimeout:      30 * time.Second,
+		reconnectMaxRetries: 10,
+		publisherOn:         true,
+		consumerOn:          true,
 	}
 }
 
@@ -43,14 +43,6 @@ func WithConsumerOnly() Option {
 	return func(o *options) {
 		o.consumerOn = true
 		o.publisherOn = false
-	}
-}
-
-func WithPrefetchCount(count int) Option {
-	return func(o *options) {
-		if count > 0 {
-			o.prefetchCount = count
-		}
 	}
 }
 
@@ -72,6 +64,15 @@ func WithConsumeTimeout(timeout time.Duration) Option {
 	return func(o *options) {
 		if timeout > 0 {
 			o.consumeTimeout = timeout
+		}
+	}
+}
+
+// WithReconnectMaxRetries sets max retry attempts when reconnecting.
+func WithReconnectMaxRetries(maxRetries int) Option {
+	return func(o *options) {
+		if maxRetries > 0 {
+			o.reconnectMaxRetries = maxRetries
 		}
 	}
 }

@@ -9,6 +9,33 @@ type Date struct {
 	baseTime
 }
 
+// NewDate returns current date time.
+func NewDate() *Date {
+	return &Date{
+		baseTime: baseTime{
+			Time: time.Now(),
+		},
+	}
+}
+
+// ToDate parses a date string into Date using the specified layout.
+//
+// Example:
+//
+//	d, err := ToDate("2024-01-02")
+func ToDate(str string) (*Date, error) {
+	parsedTime, err := ToTime(str, DateLayoutISO)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Date{
+		baseTime: baseTime{
+			Time: *parsedTime,
+		},
+	}, nil
+}
+
 func (d *Date) IsZero() bool {
 	return d.isZero()
 }

@@ -1,6 +1,7 @@
 package datetime
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -26,22 +27,36 @@ func ToTime(str string, format string) (*time.Time, error) {
 	return &parsedTime, nil
 }
 
-// ToDate parses a date string into Date using the specified layout.
+// FromAny parses arg into time.Time using the specified layout.
 //
-// Example:
-//
-//	d, err := ToDate("2024-01-02")
-func ToDate(str string) (*Date, error) {
-	parsedTime, err := ToTime(str, DateLayoutISO)
-	if err != nil {
-		return nil, err
+// Supported arg types:
+//   - time.Time
+//   - string
+//   - []byte
+//   - nil (returns zero time and nil error)
+func FromAny(arg interface{}, layout string) (time.Time, error) {
+	if arg == nil {
+		return time.Time{}, nil
 	}
 
-	return &Date{
-		baseTime: baseTime{
-			Time: *parsedTime,
-		},
-	}, nil
+	switch v := arg.(type) {
+	case time.Time:
+		return v, nil
+	case string:
+		t, err := ToTime(v, layout)
+		if err != nil {
+			return time.Time{}, err
+		}
+		return *t, nil
+	case []byte:
+		t, err := ToTime(string(v), layout)
+		if err != nil {
+			return time.Time{}, err
+		}
+		return *t, nil
+	default:
+		return time.Time{}, fmt.Errorf("unsupported type for time parse: %T", v)
+	}
 }
 
 // BeginDay returns a time.Time representing the start of the day (00:00:00) in the same location.

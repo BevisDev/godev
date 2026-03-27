@@ -2,6 +2,8 @@ package money
 
 import (
 	"fmt"
+	"math"
+	"reflect"
 
 	"github.com/shopspring/decimal"
 )
@@ -21,6 +23,10 @@ func ToFloat(m Money) float64 {
 
 // FromString creates Money from a decimal string.
 func FromString(s string) (Money, error) {
+	if s == "" {
+		return decimal.Zero, nil
+	}
+
 	d, err := decimal.NewFromString(s)
 	if err != nil {
 		return decimal.Zero, fmt.Errorf("invalid decimal string: %s", s)
@@ -31,6 +37,10 @@ func FromString(s string) (Money, error) {
 // ToDecimal converts common numeric/string inputs to Money.
 // It returns decimal.Zero for nil and an error for unsupported values.
 func ToDecimal(val interface{}) (Money, error) {
+	if val == nil {
+		return decimal.Zero, nil
+	}
+
 	switch v := val.(type) {
 	case decimal.Decimal:
 		return v, nil
@@ -47,10 +57,20 @@ func ToDecimal(val interface{}) (Money, error) {
 		return FromInt(v), nil
 	case int64:
 		return FromInt64(v), nil
+	case int32:
+		return FromInt64(int64(v)), nil
+	case uint:
+		if uint64(v) > math.MaxInt64 {
+			return decimal.Zero, fmt.Errorf("overflow uint -> int64")
+		}
+		return FromInt64(int64(v)), nil
+	case uint64:
+		if v > math.MaxInt64 {
+			return decimal.Zero, fmt.Errorf("overflow uint64 -> int64")
+		}
+		return FromInt64(int64(v)), nil
 	case string:
 		return FromString(v)
-	case nil:
-		return decimal.Zero, nil
 	default:
 		return decimal.Zero, fmt.Errorf("unsupported type: %T", v)
 	}
@@ -109,6 +129,53 @@ func ToInt64(m Money) int64 {
 // ToString returns the canonical string form of Money.
 func ToString(m Money) string {
 	return m.String()
+}
+
+// InSlice reports whether target exists in list.
+func InSlice(target Money, list []Money) bool {
+	for _, item := range list {
+		if item.Equal(target) {
+			return true
+		}
+	}
+	return false
+}
+
+// ToMoneySlice converts an interface value to []Money.
+// It accepts slices/arrays (including pointers) whose elements are supported by ToDecimal.
+func ToMoneySlice(val interface{}) ([]Money, error) {
+	if val == nil {
+		return nil, nil
+	}
+
+	rv := reflect.ValueOf(val)
+	for rv.Kind() == reflect.Pointer {
+		if rv.IsNil() {
+			return nil, nil
+		}
+		rv = rv.Elem()
+	}
+
+	if rv.Kind() != reflect.Slice && rv.Kind() != reflect.Array {
+		return nil, fmt.Errorf("unsupported type: %T", val)
+	}
+
+	n := rv.Len()
+	if n == 0 {
+		return []Money{}, nil
+	}
+
+	out := make([]Money, n)
+	for i := range out {
+		item := rv.Index(i).Interface()
+		m, err := ToDecimal(item)
+		if err != nil {
+			return nil, fmt.Errorf("invalid element at index %d: %w", i, err)
+		}
+		out[i] = m
+	}
+
+	return out, nil
 }
 
 // GreaterThanInt reports whether m is greater than i.
