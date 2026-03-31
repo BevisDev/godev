@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"sync"
@@ -28,6 +29,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"golang.org/x/sync/errgroup"
 )
+
+// DefaultShutdownTimeout is the graceful shutdown budget for Bootstrap when neither
+// WithShutdownTimeout nor server.Config.ShutdownTimeout is set.
+const DefaultShutdownTimeout = 15 * time.Second
 
 // Bootstrap manages application lifecycle and dependencies.
 type Bootstrap struct {
@@ -142,6 +147,14 @@ func (b *Bootstrap) Init(ctx context.Context) error {
 	}
 	b.mu.Unlock()
 
+	// Roll back partial init (logger + runServices + hooks) unless we mark initOK at the end.
+	initOK := false
+	defer func() {
+		if !initOK {
+			b.closeServices()
+		}
+	}()
+
 	// Consume before init hooks
 	for _, fn := range b.beforeInit {
 		if err := fn(ctx); err != nil {
@@ -177,12 +190,10 @@ func (b *Bootstrap) Init(ctx context.Context) error {
 		}
 	}
 
-	// run services
 	if err := b.runServices(ctx); err != nil {
 		return err
 	}
 
-	// Consume after init hooks (services are now available, can set Setup/Shutdown here)
 	for _, fn := range b.afterInit {
 		if err := fn(ctx); err != nil {
 			return fmt.Errorf("[bootstrap] after init hook failed: %w", err)
@@ -192,6 +203,7 @@ func (b *Bootstrap) Init(ctx context.Context) error {
 	b.mu.Lock()
 	b.initialized = true
 	b.mu.Unlock()
+	initOK = true
 
 	b.log.Info("initialization completed")
 	return nil
@@ -200,6 +212,7 @@ func (b *Bootstrap) Init(ctx context.Context) error {
 func (b *Bootstrap) runServices(c context.Context) error {
 	// Init services in parallel
 	g, ctx := errgroup.WithContext(c)
+	var initMu sync.Mutex
 
 	for _, f := range b.services {
 		fn := f
@@ -216,14 +229,18 @@ func (b *Bootstrap) runServices(c context.Context) error {
 			if err != nil {
 				return err
 			}
+			initMu.Lock()
 			b.database = db
-
 			b.migrationConf.DB = db.GetDB().DB
+			initMu.Unlock()
+
 			m, err := migration.New(b.migrationConf)
 			if err != nil {
 				return err
 			}
+			initMu.Lock()
 			b.migration = m
+			initMu.Unlock()
 			return nil
 		})
 	} else if b.dbConf != nil && b.database == nil {
@@ -232,7 +249,9 @@ func (b *Bootstrap) runServices(c context.Context) error {
 			if err != nil {
 				return err
 			}
+			initMu.Lock()
 			b.database = db
+			initMu.Unlock()
 			return nil
 		})
 	}
@@ -243,7 +262,9 @@ func (b *Bootstrap) runServices(c context.Context) error {
 			if err != nil {
 				return err
 			}
+			initMu.Lock()
 			b.migration = m
+			initMu.Unlock()
 			return nil
 		})
 	}
@@ -255,7 +276,9 @@ func (b *Bootstrap) runServices(c context.Context) error {
 			if err != nil {
 				return fmt.Errorf("[redis] %w", err)
 			}
+			initMu.Lock()
 			b.redisCache = cache
+			initMu.Unlock()
 			return nil
 		})
 	}
@@ -267,19 +290,9 @@ func (b *Bootstrap) runServices(c context.Context) error {
 			if err != nil {
 				return fmt.Errorf("[rabbitmq] %w", err)
 			}
+			initMu.Lock()
 			b.rabbitmq = mq
-			return nil
-		})
-	}
-
-	// Mailer
-	if b.mailerConf != nil && b.rabbitmq == nil {
-		g.Go(func() error {
-			mq, err := rabbitmq.New(b.rabbitConf, b.rabbitOpt...)
-			if err != nil {
-				return fmt.Errorf("[rabbitmq] %w", err)
-			}
-			b.rabbitmq = mq
+			initMu.Unlock()
 			return nil
 		})
 	}
@@ -287,7 +300,9 @@ func (b *Bootstrap) runServices(c context.Context) error {
 	// Keycloak
 	if b.keycloakConf != nil && b.keycloak == nil {
 		g.Go(func() error {
+			initMu.Lock()
 			b.keycloak = keycloak.New(b.keycloakConf)
+			initMu.Unlock()
 			return nil
 		})
 	}
@@ -295,7 +310,9 @@ func (b *Bootstrap) runServices(c context.Context) error {
 	// Scheduler
 	if b.schedulerOn && b.scheduler == nil {
 		g.Go(func() error {
+			initMu.Lock()
 			b.scheduler = scheduler.New(b.schedulerOpt...)
+			initMu.Unlock()
 			return nil
 		})
 	}
@@ -307,7 +324,9 @@ func (b *Bootstrap) runServices(c context.Context) error {
 			if b.logger != nil {
 				opts = append(opts, rest.WithLogger(b.logger))
 			}
+			initMu.Lock()
 			b.restClient = rest.New(opts...)
+			initMu.Unlock()
 			return nil
 		})
 	}
@@ -319,7 +338,9 @@ func (b *Bootstrap) runServices(c context.Context) error {
 			if err != nil {
 				return err
 			}
+			initMu.Lock()
 			b.kafka = k
+			initMu.Unlock()
 			return nil
 		})
 	}
@@ -331,7 +352,9 @@ func (b *Bootstrap) runServices(c context.Context) error {
 			if err != nil {
 				return err
 			}
+			initMu.Lock()
 			b.tgBot = bot
+			initMu.Unlock()
 			return nil
 		})
 	}
@@ -343,7 +366,9 @@ func (b *Bootstrap) runServices(c context.Context) error {
 			if err != nil {
 				return err
 			}
+			initMu.Lock()
 			b.mailer = mailer
+			initMu.Unlock()
 			return nil
 		})
 	}
@@ -356,7 +381,7 @@ func (b *Bootstrap) runServices(c context.Context) error {
 }
 
 // Start starts all services and blocks until shutdown signal.
-func (b *Bootstrap) Start(ctx context.Context) error {
+func (b *Bootstrap) Start(ctx context.Context) (err error) {
 	b.mu.Lock()
 	if !b.initialized {
 		b.mu.Unlock()
@@ -368,46 +393,55 @@ func (b *Bootstrap) Start(ctx context.Context) error {
 	}
 	b.mu.Unlock()
 
+	defer func() {
+		if err == nil {
+			return
+		}
+		b.mu.RLock()
+		ok := b.started
+		b.mu.RUnlock()
+		if !ok {
+			b.failStartCleanup(context.Background())
+		}
+	}()
+
 	// Consume before start hooks
 	for _, fn := range b.beforeStart {
-		if err := fn(ctx); err != nil {
-			return fmt.Errorf("[bootstrap] before start hook failed: %w", err)
+		if e := fn(ctx); e != nil {
+			err = fmt.Errorf("[bootstrap] before start hook failed: %w", e)
+			return
 		}
 	}
 
 	b.log.Info("starting services...")
 
-	// Start scheduler if configured
+	// Long-running background work uses b.ctx so b.cancel() from Stop / failStartCleanup stops them.
 	if b.scheduler != nil {
-		b.scheduler.Start(ctx)
+		b.scheduler.Start(b.ctx)
 	}
 
 	if b.rabbitmq != nil && b.rabbitmq.Consumer() != nil {
-		go b.rabbitmq.Consumer().Start(ctx)
+		go b.rabbitmq.Consumer().Start(b.ctx)
 	}
 
-	// Start Kafka consumer if configured (handler registered and consumer initialized)
+	// Start Kafka consumer if configured (handler registered and consumer initialized).
+	// Retries: kafka config Consumer.MaxHandlerRetries / HandlerRetryDelay.
 	if b.kafka != nil && b.kafka.HasConsumer() && b.kafkaConsumerHandler != nil {
 		handler := b.kafkaConsumerHandler
-		if b.kafkaConsumerRetry.enabled {
-			maxRetries := b.kafkaConsumerRetry.maxRetries
-			retryDelay := b.kafkaConsumerRetry.retryDelay
-			go func() {
-				_ = b.kafka.ConsumeWithRetry(b.ctx, handler, maxRetries, retryDelay)
-			}()
-		} else {
-			go func() {
-				_ = b.kafka.Consume(b.ctx, handler)
-			}()
-		}
+		go func() {
+			if e := b.kafka.Consume(b.ctx, handler); e != nil && !errors.Is(e, context.Canceled) {
+				b.log.Error("Kafka consumer exited: %v", e)
+			}
+		}()
 		b.log.Info("Kafka consumer started")
 	}
 
 	// Start HTTP server if configured
 	if b.serverConf != nil {
 		b.httpApp = server.New(b.serverConf)
-		if err := b.httpApp.Start(); err != nil {
-			return fmt.Errorf("[bootstrap] failed to start HTTP server: %w", err)
+		if e := b.httpApp.Start(); e != nil {
+			err = fmt.Errorf("[bootstrap] failed to start HTTP server: %w", e)
+			return
 		}
 		// Server errors are handled internally by HTTPApp
 		// We don't need to monitor errCh separately since Start() is non-blocking
@@ -415,8 +449,9 @@ func (b *Bootstrap) Start(ctx context.Context) error {
 
 	// Consume after start hooks
 	for _, fn := range b.afterStart {
-		if err := fn(ctx); err != nil {
-			return fmt.Errorf("after start hook failed: %w", err)
+		if e := fn(ctx); e != nil {
+			err = fmt.Errorf("[bootstrap] after start hook failed: %w", e)
+			return
 		}
 	}
 
@@ -439,7 +474,7 @@ func (b *Bootstrap) Start(ctx context.Context) error {
 		b.log.Info("received signal: %v", s)
 	}
 
-	return nil
+	return
 }
 
 // Stop gracefully stops all services.
@@ -496,14 +531,12 @@ func (b *Bootstrap) Run(ctx context.Context) error {
 		return fmt.Errorf("initialization failed: %w", err)
 	}
 
-	// Start and wait
+	// Start and wait (Start cleans up on error via defer)
 	if err := b.Start(ctx); err != nil {
-		_ = b.Stop(ctx)
 		return fmt.Errorf("start failed: %w", err)
 	}
 
-	// Graceful shutdown
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), b.shutdownGracePeriod())
 	defer cancel()
 
 	return b.Stop(shutdownCtx)
@@ -570,7 +603,65 @@ func (b *Bootstrap) Shutdown() {
 	b.cancel()
 }
 
+// applyShutdownTimeout sets server.Config.ShutdownTimeout once for the whole process.
+// WithShutdownTimeout takes precedence over an unset or zero server value.
+func (b *Bootstrap) applyShutdownTimeout() {
+	if b.shutdownTimeout > 0 {
+		b.serverConf.ShutdownTimeout = b.shutdownTimeout
+		return
+	}
+	if b.serverConf.ShutdownTimeout <= 0 {
+		b.serverConf.ShutdownTimeout = DefaultShutdownTimeout
+	}
+}
+
+// shutdownGracePeriod is the deadline for Bootstrap.Run → Stop; matches HTTP shutdown after Init.
+func (b *Bootstrap) shutdownGracePeriod() time.Duration {
+	if b.serverConf != nil && b.serverConf.ShutdownTimeout > 0 {
+		return b.serverConf.ShutdownTimeout
+	}
+	if b.shutdownTimeout > 0 {
+		return b.shutdownTimeout
+	}
+	return DefaultShutdownTimeout
+}
+
+// failStartCleanup releases resources after Start fails partway (e.g. afterStart hook or HTTP bind).
+func (b *Bootstrap) failStartCleanup(ctx context.Context) {
+	b.cancel()
+	if b.httpApp != nil {
+		if err := b.httpApp.Stop(ctx); err != nil {
+			b.log.Info("failStartCleanup: HTTP server stop error: %v", err)
+		}
+	}
+	b.closeServices()
+}
+
 func (b *Bootstrap) closeServices() {
+	if b.restClient != nil {
+		if hc := b.restClient.GetClient(); hc != nil {
+			if tr, ok := hc.Transport.(*http.Transport); ok {
+				tr.CloseIdleConnections()
+			}
+		}
+		b.restClient = nil
+	}
+	if b.mailer != nil {
+		b.mailer = nil
+	}
+	if b.tgBot != nil {
+		b.tgBot = nil
+	}
+	if b.keycloak != nil {
+		b.keycloak = nil
+	}
+	if b.scheduler != nil {
+		b.scheduler = nil
+	}
+	if b.migration != nil {
+		b.migration = nil
+	}
+
 	// Close Logger
 	if b.logger != nil {
 		b.logger.Sync()

@@ -235,13 +235,11 @@ func (m *ConsumerManager) consume(ctx context.Context, c *Consumer) error {
 
 	var workerWG sync.WaitGroup
 	for i := 0; i < workerCount; i++ {
-		workerWG.Add(1)
-		go func() {
-			defer workerWG.Done()
+		workerWG.Go(func() {
 			for d := range jobs {
 				m.processMsg(queueName, c.Handler, d)
 			}
-		}()
+		})
 	}
 
 	defer func() {

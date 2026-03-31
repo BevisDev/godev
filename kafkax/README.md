@@ -12,10 +12,10 @@ Package `kafkax` is a wrapper around `github.com/segmentio/kafka-go` with sensib
 |------|---------|
 | **Config** | `Validate()`, `DefaultConfig()`, and config is cloned in `New()` so caller mutations do not affect the client |
 | **Producer** | Send, SendBatch, SendJSON, SendWithHeaders, Produce (RID), ProduceBatch; mutex and closed checks; Stats, Close, IsClosed |
-| **Consumer** | Consume, ConsumeWithRetry, ReadMessage, CommitMessage; manual/auto commit; Lag, Stats, SetOffset; RID from header → context |
+| **Consumer** | Consume (handler retries via `ConsumerConfig.MaxHandlerRetries`), ReadMessage, CommitMessage; manual/auto commit; Lag, Stats, SetOffset; RID from header → context |
 | **Errors** | Clear sentinel errors (ErrNoBrokers, ErrProducerClosed, ErrConsumerNotInitialized, etc.) |
 | **Graceful** | Consumer exits on `ctx.Done()`; `Close()` shuts down both producer and consumer and logs close errors |
-| **Poison message** | ConsumeWithRetry: after retries are exhausted the message is **committed (skipped)** and logged, so the partition is not blocked forever |
+| **Poison message** | With `MaxHandlerRetries` > 0, after retries are exhausted the message is **committed (skipped)** and logged so the partition is not blocked forever |
 
 ---
 
@@ -30,7 +30,7 @@ Package `kafkax` is a wrapper around `github.com/segmentio/kafka-go` with sensib
    - `Produce` / `ProduceBatch`: added lock, closed and nil writer checks, topic validation; ProduceBatch preserves each message’s headers and adds RID.
 
 3. **consumer.go**
-   - `ConsumeWithRetry`: when retries are exhausted, the message is committed (skipped) and logged to avoid an infinite loop on a single failing message.
+   - `Consume` applies retry/poison-skip when `ConsumerConfig.MaxHandlerRetries` > 0.
 
 4. **config.go**
    - Documented that `Idempotent` is not yet applied to the kafka-go Writer (reserved for when the driver supports it).
@@ -73,5 +73,5 @@ Package `kafkax` is a wrapper around `github.com/segmentio/kafka-go` with sensib
 
 ## Conclusion
 
-- **Suitable for production** after the changes in this review: correct producer init, thread-safe Produce/ProduceBatch, poison-message handling in ConsumeWithRetry, and safe Close with config clone.
+- **Suitable for production** after the changes in this review: correct producer init, thread-safe Produce/ProduceBatch, optional handler retries / poison-skip via consumer config, and safe Close with config clone.
 - **Recommended next steps**: inject a logger, monitor Stats/Lag, add tests, and (when needed) clarify or refactor the SetOffset API and enable Idempotent once the driver supports it.

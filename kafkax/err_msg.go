@@ -5,7 +5,9 @@ import (
 )
 
 var (
+	ErrNilConfig              = errors.New("[kafkax] config is nil")
 	ErrNoBrokers              = errors.New("[kafkax] no brokers")
+	ErrBothDisabled           = errors.New("[kafkax] producer and consumer both disabled")
 	ErrClientClosed           = errors.New("[kafkax] client closed")
 	ErrProducerClosed         = errors.New("[kafkax-producer] producer closed")
 	ErrProducerNotInitialized = errors.New("[kafkax-producer] not initialized")

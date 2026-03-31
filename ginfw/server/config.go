@@ -24,8 +24,9 @@ type Config struct {
 	// If empty, no trusted proxies are configured.
 	Proxies []string
 
-	// ShutdownTimeout is the maximum duration the server waits
-	// for ongoing requests to finish during graceful shutdown.
+	// ShutdownTimeout caps graceful shutdown when Stop is called with a context that has
+	// no deadline (e.g. HTTPApp.Run). If the context already has a deadline, that deadline
+	// is used instead so timeouts are not stacked.
 	ShutdownTimeout time.Duration
 
 	// ReadHeaderTimeout limits the time to read HTTP request headers.
@@ -62,7 +63,8 @@ type Config struct {
 	// to release resources such as database connections, message consumers,
 	// or background workers.
 	//
-	// The provided context is canceled when the shutdown timeout is reached.
+	// The context matches HTTPApp.Stop: it is bounded by ShutdownTimeout only when the
+	// parent context has no deadline.
 	Shutdown func(ctx context.Context) error
 
 	// Recovery is an optional custom panic recovery middleware.

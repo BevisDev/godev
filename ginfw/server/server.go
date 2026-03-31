@@ -7,8 +7,8 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
-	"github.com/BevisDev/godev/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
 )
@@ -76,6 +76,19 @@ func (h *HTTPApp) Start() error {
 	return nil
 }
 
+// shutdownContext derives the context used for Shutdown hook and http.Server.Shutdown.
+// When parent already has a deadline (e.g. from framework/bootstrap Run), that deadline
+// is kept so callers do not stack two independent timeouts on the same shutdown.
+func shutdownContext(parent context.Context, maxWait time.Duration) (context.Context, context.CancelFunc) {
+	if maxWait <= 0 {
+		return parent, func() {}
+	}
+	if _, ok := parent.Deadline(); ok {
+		return parent, func() {}
+	}
+	return context.WithTimeout(parent, maxWait)
+}
+
 func newHTTPServer(handler http.Handler, cfg *Config) *http.Server {
 	return &http.Server{
 		Addr:              ":" + cfg.Port,
@@ -91,7 +104,7 @@ func newHTTPServer(handler http.Handler, cfg *Config) *http.Server {
 // It calls the Shutdown hook (if configured) and then shuts down the HTTP server.
 // The context is used to control the shutdown timeout.
 func (h *HTTPApp) Stop(ctx context.Context) error {
-	shutdownCtx, cancel := utils.NewCtxTimeout(ctx, h.cf.ShutdownTimeout)
+	shutdownCtx, cancel := shutdownContext(ctx, h.cf.ShutdownTimeout)
 	defer cancel()
 
 	// Call custom shutdown hook if provided

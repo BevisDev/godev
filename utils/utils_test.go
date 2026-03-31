@@ -3,7 +3,10 @@ package utils
 import (
 	"context"
 	"math"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/BevisDev/godev/consts"
 	"github.com/BevisDev/godev/types"
@@ -1087,4 +1090,69 @@ func TestToSlice(t *testing.T) {
 		got := ToSlice(123)
 		assert.Equal(t, []any{123}, got)
 	})
+}
+
+func TestSpawn_ProcessAllItems(t *testing.T) {
+	items := []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+	got := make([]int, 0, len(items))
+	var mu sync.Mutex
+
+	Spawn(context.Background(), 3, items, func(_ context.Context, item int) {
+		mu.Lock()
+		got = append(got, item)
+		mu.Unlock()
+	})
+
+	assert.Len(t, got, len(items))
+	assert.ElementsMatch(t, items, got)
+}
+
+func TestSpawn_DefaultWorkerCount(t *testing.T) {
+	items := []string{"a", "b", "c"}
+	got := make([]string, 0, len(items))
+	var mu sync.Mutex
+
+	Spawn(context.Background(), 0, items, func(_ context.Context, item string) {
+		mu.Lock()
+		got = append(got, item)
+		mu.Unlock()
+	})
+
+	assert.ElementsMatch(t, items, got)
+}
+
+func TestSpawn_EmptyInputOrNilFn(t *testing.T) {
+	called := false
+	Spawn[int](context.Background(), 2, nil, func(_ context.Context, _ int) {
+		called = true
+	})
+	assert.False(t, called)
+
+	Spawn[int](context.Background(), 2, []int{1, 2, 3}, nil)
+	assert.False(t, called)
+}
+
+func TestSpawn_ConcurrentWorkers(t *testing.T) {
+	items := make([]int, 50)
+	for i := range items {
+		items[i] = i + 1
+	}
+
+	var current int32
+	var maxConcurrent int32
+
+	Spawn(context.Background(), 5, items, func(_ context.Context, _ int) {
+		n := atomic.AddInt32(&current, 1)
+		for {
+			m := atomic.LoadInt32(&maxConcurrent)
+			if n <= m || atomic.CompareAndSwapInt32(&maxConcurrent, m, n) {
+				break
+			}
+		}
+
+		time.Sleep(5 * time.Millisecond)
+		atomic.AddInt32(&current, -1)
+	})
+
+	assert.GreaterOrEqual(t, maxConcurrent, int32(2))
 }

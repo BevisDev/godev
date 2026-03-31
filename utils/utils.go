@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/BevisDev/godev/consts"
@@ -686,4 +687,43 @@ func ToSlice(v any) []any {
 		out[i] = rv.Index(i).Interface()
 	}
 	return out
+}
+
+// Spawn runs a worker-pool over items.
+//
+// - workerCount <= 0 falls back to 1.
+// - fn is executed concurrently for each item.
+// - if ctx is canceled, new jobs stop dispatching.
+func Spawn[T any](ctx context.Context, workerCount int, items []T, fn func(context.Context, T)) {
+	if fn == nil || len(items) == 0 {
+		return
+	}
+
+	if workerCount <= 0 {
+		workerCount = 1
+	}
+
+	jobs := make(chan T, workerCount)
+	var wg sync.WaitGroup
+
+	for i := 0; i < workerCount; i++ {
+		wg.Go(func() {
+			for item := range jobs {
+				fn(ctx, item)
+			}
+		})
+	}
+
+	for _, item := range items {
+		select {
+		case <-ctx.Done():
+			close(jobs)
+			wg.Wait()
+			return
+		case jobs <- item:
+		}
+	}
+
+	close(jobs)
+	wg.Wait()
 }

@@ -4,18 +4,26 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
 	"github.com/BevisDev/godev/consts"
 	"github.com/BevisDev/godev/utils"
+	"github.com/BevisDev/godev/utils/console"
 	"github.com/segmentio/kafka-go"
+)
+
+const (
+	defaultFetchRetryDelay           = 300 * time.Millisecond
+	defaultHandlerRetryDelay         = 500 * time.Millisecond
+	defaultMaxConsecutiveFetchErrors = 20
+	defaultWorkerPool                = 10
 )
 
 type Consumer struct {
 	reader *kafka.Reader
 	config *ConsumerConfig
+	log    *console.Logger
 	mu     sync.RWMutex
 	closed bool
 }
@@ -30,6 +38,7 @@ func newConsumer(cfg *Config) (*Consumer, error) {
 		return nil, ErrNoTopics
 	}
 
+	lg := console.New("kafkax-consumer")
 	reader := kafka.NewReader(kafka.ReaderConfig{
 		Brokers:                cfg.Brokers,
 		GroupID:                cfg.Consumer.GroupID,
@@ -45,18 +54,36 @@ func newConsumer(cfg *Config) (*Consumer, error) {
 		HeartbeatInterval:      cfg.Consumer.HeartbeatInterval,
 		IsolationLevel:         cfg.Consumer.IsolationLevel,
 		ErrorLogger: kafka.LoggerFunc(func(msg string, args ...interface{}) {
-			fmt.Printf("[kafkax-consumer] err: "+msg+"\n", args...)
+			lg.Error(msg, args...)
 		}),
 	})
 
 	return &Consumer{
 		reader: reader,
 		config: &cfg.Consumer,
+		log:    lg,
 		closed: false,
 	}, nil
 }
 
-// Consume starts consuming messages and calls the handler for each message
+// NewConsumer builds a consumer from brokers and consumer settings.
+// Brokers must be non-empty; ConsumerConfig must pass the same validation as Config.Consumer.
+func NewConsumer(brokers []string, cc ConsumerConfig) (*Consumer, error) {
+	if len(brokers) == 0 {
+		return nil, ErrNoBrokers
+	}
+	cfg := &Config{
+		Brokers:  brokers,
+		Consumer: cc,
+	}
+	if err := cfg.validateConsumerConfig(); err != nil {
+		return nil, err
+	}
+	return newConsumer(cfg)
+}
+
+// Consume starts consuming messages and calls the handler for each message.
+// If ConsumerConfig.MaxHandlerRetries > 0, handler failures are retried before poison handling.
 func (c *Consumer) Consume(ctx context.Context, handler Handler) error {
 	c.mu.RLock()
 	if c.closed {
@@ -65,6 +92,28 @@ func (c *Consumer) Consume(ctx context.Context, handler Handler) error {
 	}
 	c.mu.RUnlock()
 
+	handler = c.wrapHandlerWithRetries(handler)
+
+	workerCount := c.config.WorkerPool
+	if workerCount <= 0 {
+		workerCount = defaultWorkerPool
+	}
+
+	jobs := make(chan kafka.Message, workerCount)
+	var workerWG sync.WaitGroup
+	for i := 0; i < workerCount; i++ {
+		workerWG.Go(func() {
+			for msg := range jobs {
+				c.processMsg(ctx, handler, msg)
+			}
+		})
+	}
+	defer func() {
+		close(jobs)
+		workerWG.Wait()
+	}()
+
+	consecutiveFetchErrors := 0
 	for {
 		select {
 		case <-ctx.Done():
@@ -75,32 +124,74 @@ func (c *Consumer) Consume(ctx context.Context, handler Handler) error {
 				if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 					return err
 				}
-				log.Printf("[kafkax-consumer] fetching message error: %v\n", err)
+
+				consecutiveFetchErrors++
+				c.log.Error(
+					"fetching message error: %v (consecutive=%d)",
+					err, consecutiveFetchErrors,
+				)
+				if consecutiveFetchErrors >= defaultMaxConsecutiveFetchErrors {
+					return fmt.Errorf(
+						"[kafkax-consumer] exceeded max consecutive fetch errors (%d): %w",
+						defaultMaxConsecutiveFetchErrors, err,
+					)
+				}
+
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-time.After(defaultFetchRetryDelay):
+				}
 				continue
 			}
-
-			var rid string
-			for _, h := range msg.Headers {
-				if consts.XRequestID == h.Key {
-					rid = string(h.Value)
-					break
-				}
-			}
-
-			ctxNew := utils.SetValueCtx(ctx, consts.RID, rid)
-			consumed := c.convertMessage(msg)
-			err = handler(ctxNew, consumed)
-
-			// Manual commit only after successful processing
-			if err != nil {
-				log.Printf("[kafkax-consumer] handler error: %v", err)
-			} else if !c.config.AutoCommit {
-				if err := c.reader.CommitMessages(ctx, msg); err != nil {
-					log.Printf("[kafkax-consumer] error committing message: %v", err)
-				}
+			consecutiveFetchErrors = 0
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case jobs <- msg:
 			}
 		}
 	}
+}
+
+func (c *Consumer) processMsg(ctx context.Context, handler Handler, msg kafka.Message) {
+	msgCtx := c.newMsgCtx(ctx, msg)
+	consumed := c.convertMessage(msg)
+
+	if err := c.handleMsg(msgCtx, handler, consumed); err != nil {
+		c.log.Error("handler error: %v", err)
+		return
+	}
+
+	if !c.config.AutoCommit {
+		if err := c.reader.CommitMessages(ctx, msg); err != nil {
+			c.log.Error("error committing message: %v", err)
+		}
+	}
+}
+
+func (c *Consumer) handleMsg(
+	ctx context.Context,
+	handler Handler,
+	msg *ConsumedMessage,
+) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("[kafkax-consumer] recovered panic: %v", r)
+		}
+	}()
+	return handler(ctx, msg)
+}
+
+func (c *Consumer) newMsgCtx(ctx context.Context, msg kafka.Message) context.Context {
+	rid := utils.GetRID(ctx)
+	for _, h := range msg.Headers {
+		if consts.XRequestID == h.Key {
+			rid = string(h.Value)
+			break
+		}
+	}
+	return utils.SetValueCtx(ctx, consts.RID, rid)
 }
 
 // Stats returns consumer statistics
@@ -182,40 +273,38 @@ func (c *Consumer) CommitMessage(ctx context.Context, msg *ConsumedMessage) erro
 	return msg.Commit(ctx)
 }
 
-// ConsumeWithRetry wraps Consume with retry logic on handler error.
-// When all retries are exhausted, the message is committed (skipped) to avoid
-// blocking the partition on a poison message; the final error is logged.
-func (c *Consumer) ConsumeWithRetry(
-	ctx context.Context,
-	handler Handler,
-	maxRetries int,
-	retryDelay time.Duration,
-) error {
-	wrapped := func(ctx context.Context, msg *ConsumedMessage) error {
+func (c *Consumer) wrapHandlerWithRetries(handler Handler) Handler {
+	maxR := c.config.MaxHandlerRetries
+	if maxR <= 0 {
+		return handler
+	}
+	delay := c.config.HandlerRetryDelay
+	if delay <= 0 {
+		delay = defaultHandlerRetryDelay
+	}
+	return func(ctx context.Context, msg *ConsumedMessage) error {
 		var err error
-		for attempt := 0; attempt <= maxRetries; attempt++ {
+		for attempt := 0; attempt <= maxR; attempt++ {
 			err = handler(ctx, msg)
 			if err == nil {
 				return nil
 			}
-
-			if attempt < maxRetries {
-				log.Printf("[kafkax-consumer] handler error: %v, retrying (%d/%d)", err, attempt+1, maxRetries)
+			if attempt < maxR {
+				c.log.Warn("handler error: %v, retrying (%d/%d)", err, attempt+1, maxR)
 				select {
 				case <-ctx.Done():
 					return ctx.Err()
-				case <-time.After(retryDelay):
+				case <-time.After(delay):
 				}
 			}
 		}
-		// Commit (skip) poison message so consumer does not block forever on this partition
-		log.Printf("[kafkax-consumer] retries exhausted for topic=%s partition=%d offset=%d: %v (message committed/skipped)",
+		c.log.Error("retries exhausted for topic=%s partition=%d offset=%d: %v (message committed/skipped)",
 			msg.Topic, msg.Partition, msg.Offset, err)
-		_ = msg.Commit(ctx)
+		if !c.config.AutoCommit {
+			_ = msg.Commit(ctx)
+		}
 		return nil
 	}
-
-	return c.Consume(ctx, wrapped)
 }
 
 // convertMessage converts kafka.Message to ConsumedMessage

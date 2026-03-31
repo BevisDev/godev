@@ -9,17 +9,20 @@ import (
 
 	"github.com/BevisDev/godev/consts"
 	"github.com/BevisDev/godev/utils"
+	"github.com/BevisDev/godev/utils/console"
 	"github.com/segmentio/kafka-go"
 )
 
 type Producer struct {
 	writer *kafka.Writer
 	config *ProducerConfig
+	log    *console.Logger
 	mu     sync.RWMutex
 	closed bool
 }
 
 func newProducer(cfg *Config) (*Producer, error) {
+	lg := console.New("kafkax-producer")
 	writer := &kafka.Writer{
 		Addr:         kafka.TCP(cfg.Brokers...),
 		Balancer:     cfg.Producer.Balancer,
@@ -30,13 +33,14 @@ func newProducer(cfg *Config) (*Producer, error) {
 		RequiredAcks: kafka.RequiredAcks(cfg.Producer.RequiredAcks),
 		Async:        cfg.Producer.Async,
 		ErrorLogger: kafka.LoggerFunc(func(msg string, args ...interface{}) {
-			fmt.Printf("[kafkax-producer] err: "+msg+"\n", args...)
+			lg.Error(msg, args...)
 		}),
 	}
 
 	return &Producer{
 		writer: writer,
 		config: &cfg.Producer,
+		log:    lg,
 		closed: false,
 	}, nil
 }

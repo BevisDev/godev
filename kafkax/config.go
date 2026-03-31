@@ -54,9 +54,16 @@ type ConsumerConfig struct {
 	MaxWait        time.Duration // Max wait for messages (default: 500ms)
 	MinBytes       int           // Min bytes to fetch (default: 1)
 	MaxBytes       int           // Max bytes to fetch (default: 10MB)
+	WorkerPool     int           // Concurrent message handlers (default: 10)
 
 	// Commit strategy
 	AutoCommit bool // Auto vs manual commit (default: false)
+
+	// Handler retries (application-level). MaxHandlerRetries > 0 wraps the handler: on each
+	// failure it retries up to that many extra attempts before treating the message as poison
+	// (commit/skip when AutoCommit is false so the partition is not blocked).
+	MaxHandlerRetries int
+	HandlerRetryDelay time.Duration // delay between attempts; zero uses consumer default
 
 	// Rebalancing
 	PartitionWatchInterval time.Duration // (default: 5s)
@@ -68,11 +75,17 @@ type ConsumerConfig struct {
 	IsolationLevel kafka.IsolationLevel // ReadCommitted or ReadUncommitted
 }
 
-// Validate validates the configuration
-func (c *Config) Validate() error {
-	// Validate brokers
+func (c *Config) validateBrokers() error {
 	if len(c.Brokers) == 0 {
 		return ErrNoBrokers
+	}
+	return nil
+}
+
+// Validate validates the configuration
+func (c *Config) Validate() error {
+	if err := c.validateBrokers(); err != nil {
+		return err
 	}
 
 	// Validate producer config
@@ -123,6 +136,10 @@ func (c *Config) validateConsumerConfig() error {
 		return fmt.Errorf("max bytes must be >= min bytes")
 	}
 
+	if c.Consumer.MaxHandlerRetries < 0 {
+		return fmt.Errorf("max handler retries must be >= 0")
+	}
+
 	return nil
 }
 
@@ -161,6 +178,7 @@ func DefaultConfig(brokers []string) *Config {
 			MaxWait:                500 * time.Millisecond,
 			MinBytes:               1,
 			MaxBytes:               10 * 1024 * 1024,
+			WorkerPool:             10,
 			AutoCommit:             false,
 			PartitionWatchInterval: 5 * time.Second,
 			SessionTimeout:         10 * time.Second,

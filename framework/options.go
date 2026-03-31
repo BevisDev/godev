@@ -49,11 +49,6 @@ type options struct {
 	// kafka
 	kafkaConf            *kafkax.Config
 	kafkaConsumerHandler kafkax.Handler
-	kafkaConsumerRetry   struct {
-		enabled    bool
-		maxRetries int
-		retryDelay time.Duration
-	}
 
 	restOn   bool
 	restOpts []rest.Option
@@ -64,6 +59,9 @@ type options struct {
 	schedulerOpt []scheduler.Option
 
 	serverConf *server.Config
+
+	// graceful shutdown for Run/Stop (also applied to server.Config.ShutdownTimeout when unset)
+	shutdownTimeout time.Duration
 
 	// custom health checkers (e.g. from other projects)
 	healthCheckers []healthChecker
@@ -150,6 +148,15 @@ func WithServer(cfg *server.Config) Option {
 	}
 }
 
+// WithShutdownTimeout sets the maximum duration for graceful shutdown (Bootstrap.Run / Stop,
+// HTTP Shutdown hook, and http.Server.Shutdown). When > 0 it overrides server.Config.ShutdownTimeout
+// during Init. Otherwise Bootstrap keeps your server timeout or applies a 15s default.
+func WithShutdownTimeout(d time.Duration) Option {
+	return func(o *options) {
+		o.shutdownTimeout = d
+	}
+}
+
 // WithKafka configures the Kafka connection.
 func WithKafka(cfg *kafkax.Config) Option {
 	return func(o *options) {
@@ -159,20 +166,10 @@ func WithKafka(cfg *kafkax.Config) Option {
 
 // WithKafkaConsumer registers a handler to consume Kafka messages. The consumer loop is started
 // automatically in Bootstrap.Start() when Kafka is configured with Consumer.GroupID and Consumer.Topics.
+// Retries are configured on cfg.Consumer (MaxHandlerRetries, HandlerRetryDelay), not on this option.
 func WithKafkaConsumer(handler kafkax.Handler) Option {
 	return func(o *options) {
 		o.kafkaConsumerHandler = handler
-	}
-}
-
-// WithKafkaConsumerRetry registers a handler with retry logic. The consumer loop is started
-// automatically in Bootstrap.Start(). Failed messages are retried up to maxRetries with retryDelay between attempts.
-func WithKafkaConsumerRetry(handler kafkax.Handler, maxRetries int, retryDelay time.Duration) Option {
-	return func(o *options) {
-		o.kafkaConsumerHandler = handler
-		o.kafkaConsumerRetry.enabled = true
-		o.kafkaConsumerRetry.maxRetries = maxRetries
-		o.kafkaConsumerRetry.retryDelay = retryDelay
 	}
 }
 

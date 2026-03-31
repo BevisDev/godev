@@ -3,49 +3,78 @@ package kafkax
 import (
 	"context"
 	"fmt"
-	"log"
 	"sync"
-	"time"
+
+	"github.com/BevisDev/godev/utils/console"
 )
 
 type Kafka struct {
-	cfg      *Config
-	producer *Producer
-	consumer *Consumer
-	mu       sync.RWMutex
-	closed   bool
+	*options
+	cfg         *Config
+	producer    *Producer
+	consumer    *Consumer
+	consumerMgr *ConsumerManager
+	log         *console.Logger
+	mu          sync.RWMutex
+	closed      bool
 }
 
 // New creates a new Kafka client.
-// It initializes Producer and/or Consumer based on the config.
+// Use options like WithProducerOnly / WithConsumerOnly / WithAutoCommit (same idea as rabbitmq.New).
 // Config is cloned so later changes to cfg do not affect the client.
-func New(cfg *Config) (*Kafka, error) {
+func New(cfg *Config, opts ...Option) (*Kafka, error) {
 	if cfg == nil {
-		return nil, fmt.Errorf("config is nil")
+		return nil, ErrNilConfig
 	}
-	cfg = cfg.clone()
 
-	if err := cfg.Validate(); err != nil {
-		return nil, fmt.Errorf("invalid config: %w", err)
+	opt := withDefaults()
+	for _, f := range opts {
+		f(opt)
+	}
+	if !opt.producerOn && !opt.consumerOn {
+		return nil, ErrBothDisabled
+	}
+
+	cfg = cfg.clone()
+	if opt.autoCommit {
+		cfg.Consumer.AutoCommit = true
+	}
+
+	if err := cfg.validateBrokers(); err != nil {
+		return nil, err
+	}
+	if opt.producerOn {
+		if err := cfg.validateProducerConfig(); err != nil {
+			return nil, fmt.Errorf("invalid producer config: %w", err)
+		}
+	}
+	if opt.consumerOn {
+		if err := cfg.validateConsumerConfig(); err != nil {
+			return nil, fmt.Errorf("invalid consumer config: %w", err)
+		}
 	}
 
 	k := &Kafka{
-		cfg:    cfg,
-		closed: false,
+		options: opt,
+		cfg:     cfg,
+		log:     console.New("kafkax"),
+		closed:  false,
 	}
 
-	producer, err := newProducer(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create producer: %w", err)
+	if opt.producerOn {
+		producer, err := newProducer(cfg)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create producer: %w", err)
+		}
+		k.producer = producer
 	}
-	k.producer = producer
 
-	// Initialize consumer only if GroupID and Topics are set
-	if cfg.Consumer.GroupID != "" && len(cfg.Consumer.Topics) > 0 {
+	if opt.consumerOn {
 		consumer, err := newConsumer(cfg)
 		if err != nil {
-			// Close producer if consumer init fails
-			k.producer.Close()
+			if k.producer != nil {
+				k.producer.Close()
+			}
 			return nil, fmt.Errorf("failed to create consumer: %w", err)
 		}
 		k.consumer = consumer
@@ -86,6 +115,23 @@ func (k *Kafka) Consumer() (*Consumer, error) {
 	return k.consumer, nil
 }
 
+// ConsumerManager returns the multi-consumer manager (lazy, same Brokers as this client).
+// Use Register / Start to run several consumer groups in one process.
+func (k *Kafka) ConsumerManager() (*ConsumerManager, error) {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+
+	if k.closed {
+		return nil, ErrClientClosed
+	}
+	if k.consumerMgr == nil {
+		bp := make([]string, len(k.cfg.Brokers))
+		copy(bp, k.cfg.Brokers)
+		k.consumerMgr = NewConsumerManager(bp)
+	}
+	return k.consumerMgr, nil
+}
+
 // Send is a convenience method to send a message using the producer
 func (k *Kafka) Send(ctx context.Context, msg *Message) error {
 	producer, err := k.Producer()
@@ -115,27 +161,14 @@ func (k *Kafka) SendBatch(ctx context.Context, messages []*Message) error {
 	return producer.SendBatch(ctx, messages)
 }
 
-// Consume is a convenience method to consume messages
+// Consume is a convenience method to consume messages.
+// Retry behavior follows cfg.Consumer.MaxHandlerRetries / HandlerRetryDelay.
 func (k *Kafka) Consume(ctx context.Context, handler Handler) error {
 	consumer, err := k.Consumer()
 	if err != nil {
 		return err
 	}
 	return consumer.Consume(ctx, handler)
-}
-
-// ConsumeWithRetry is a convenience method to consume with retry logic
-func (k *Kafka) ConsumeWithRetry(ctx context.Context,
-	handler Handler,
-	maxRetries int,
-	retryDelay time.Duration,
-) error {
-	consumer, err := k.Consumer()
-	if err != nil {
-		return err
-	}
-
-	return consumer.ConsumeWithRetry(ctx, handler, maxRetries, retryDelay)
 }
 
 // Close closes both producer and consumer.
@@ -152,16 +185,21 @@ func (k *Kafka) Close() {
 
 	if k.producer != nil {
 		if err := k.producer.Close(); err != nil {
-			log.Printf("[kafkax] producer close error: %v", err)
+			k.log.Error("producer close error: %v", err)
 		}
 		k.producer = nil
 	}
 
 	if k.consumer != nil {
 		if err := k.consumer.Close(); err != nil {
-			log.Printf("[kafkax] consumer close error: %v", err)
+			k.log.Error("consumer close error: %v", err)
 		}
 		k.consumer = nil
+	}
+
+	if k.consumerMgr != nil {
+		k.consumerMgr.Close()
+		k.consumerMgr = nil
 	}
 }
 
