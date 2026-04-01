@@ -206,7 +206,7 @@ func TestIgnoreContentTypeLog(t *testing.T) {
 
 func TestParse_Success(t *testing.T) {
 	obj := 123
-	val, err := Parse[int](obj)
+	val, err := As[int](obj)
 
 	assert.NoError(t, err)
 	assert.Equal(t, 123, val)
@@ -214,7 +214,7 @@ func TestParse_Success(t *testing.T) {
 
 func TestParse_Fail(t *testing.T) {
 	obj := "abc"
-	val, err := Parse[int](obj)
+	val, err := As[int](obj)
 
 	assert.Error(t, err)
 	assert.Equal(t, 0, val)
@@ -223,7 +223,7 @@ func TestParse_Fail(t *testing.T) {
 func TestParse_WithStruct(t *testing.T) {
 	obj := User{Name: "Alice", Age: 30}
 
-	val, err := Parse[User](obj)
+	val, err := As[User](obj)
 
 	assert.NoError(t, err)
 	assert.Equal(t, "Alice", val.Name)
@@ -233,7 +233,7 @@ func TestParse_WithStruct(t *testing.T) {
 func TestParse_WithPointer(t *testing.T) {
 	obj := &User{Name: "Bob", Age: 25}
 
-	val, err := Parse[*User](obj)
+	val, err := As[*User](obj)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, val)
@@ -243,7 +243,7 @@ func TestParse_WithPointer(t *testing.T) {
 
 func TestParse_Struct_CastFail(t *testing.T) {
 	var obj interface{} = "not a User"
-	val, err := Parse[User](obj)
+	val, err := As[User](obj)
 
 	assert.Error(t, err)
 	assert.Equal(t, User{}, val) // zero value
@@ -251,7 +251,7 @@ func TestParse_Struct_CastFail(t *testing.T) {
 
 func TestParse_Pointer_CastFail(t *testing.T) {
 	var obj interface{} = "not a *User"
-	val, err := Parse[*User](obj)
+	val, err := As[*User](obj)
 
 	assert.Error(t, err)
 	assert.Nil(t, val)

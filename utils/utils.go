@@ -169,11 +169,11 @@ func SkipContentType(contentType string) bool {
 	}
 }
 
-// Parse asserts obj to target type T.
-func Parse[T any](obj interface{}) (T, error) {
+// As asserts obj to target type T.
+func As[T any](obj interface{}) (T, error) {
 	val, ok := obj.(T)
 	if !ok {
-		return val, fmt.Errorf("cannot cast %T to target type", obj)
+		return val, fmt.Errorf("entry %T to as type", obj)
 	}
 	return val, nil
 }
