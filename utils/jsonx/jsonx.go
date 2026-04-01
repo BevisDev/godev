@@ -49,6 +49,14 @@ func ObjectToMap(i interface{}) map[string]interface{} {
 	return out
 }
 
+func StringToMap(s string) (map[string]interface{}, error) {
+	return FromJSON[map[string]interface{}](s)
+}
+
+func BytesToMap(b []byte) (map[string]interface{}, error) {
+	return FromJSONBytes[map[string]interface{}](b)
+}
+
 // Clone clones any struct or map via JSON marshal/unmarshal.
 // Note: Won't work if the struct has unexported fields.
 func Clone[T any](src T) (T, error) {
