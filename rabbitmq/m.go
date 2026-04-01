@@ -214,8 +214,7 @@ func (m *M) Consume(ctx context.Context, c *Consumer) error {
 			for d := range jobs {
 				m.processMsg(queueName, c.Handler, d)
 			}
-		}
-
+		})
 	}
 
 	defer func() {
@@ -268,7 +267,7 @@ func (m *M) processMsg(
 }
 
 // handleMsg runs Handler.Handle and recovers from panic.
-func (m *M) handleMsg(ctx context.Context, queueName string, h Handler, msg *MsgHandler) error {	
+func (m *M) handleMsg(ctx context.Context, queueName string, h Handler, msg *MsgHandler) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("[RECOVER][%s] err: %v", queueName, r)
