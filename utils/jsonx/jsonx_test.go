@@ -80,6 +80,42 @@ func TestJSONToMap(t *testing.T) {
 	assert.Equal(t, float64(20), m["age"])
 }
 
+func TestJSONStringToMap(t *testing.T) {
+	jsonStr := `{
+		"age": 20,
+		"name": "Alice",
+		"email": "alice@example.com"
+	}`
+
+	m, err := JSONStringToMap(jsonStr)
+	assert.NoError(t, err)
+	assert.Equal(t, "Alice", m["name"])
+	assert.Equal(t, float64(20), m["age"])
+}
+
+func TestJSONStringToMap_InvalidJSON(t *testing.T) {
+	_, err := JSONStringToMap(`{"name":"Alice"`)
+	assert.Error(t, err)
+}
+
+func TestJSONBytesToMap(t *testing.T) {
+	jsonBytes := []byte(`{
+		"age": 22,
+		"name": "Bob",
+		"email": "bob@example.com"
+	}`)
+
+	m, err := JSONBytesToMap(jsonBytes)
+	assert.NoError(t, err)
+	assert.Equal(t, "Bob", m["name"])
+	assert.Equal(t, float64(22), m["age"])
+}
+
+func TestJSONBytesToMap_InvalidJSON(t *testing.T) {
+	_, err := JSONBytesToMap([]byte(`{"name":"Bob"`))
+	assert.Error(t, err)
+}
+
 func TestFromJSON_ObjectToStruct(t *testing.T) {
 	jsonStr := `{
 		"age": 20,

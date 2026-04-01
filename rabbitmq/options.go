@@ -4,7 +4,7 @@ import "time"
 
 type Option func(*options)
 
-// options defines configuration for RabbitMQ publisher and consumer.
+// options defines configuration for RabbitMQ producer and consumer.
 type options struct {
 	// autoCommit enables automatic message acknowledgment.
 	autoCommit bool
@@ -18,8 +18,8 @@ type options struct {
 	// reconnectMaxRetries sets max attempts for reconnect.
 	reconnectMaxRetries int
 
-	publisherOn bool
-	consumerOn  bool
+	producerOn bool
+	consumerOn bool
 }
 
 func withDefaults() *options {
@@ -27,14 +27,14 @@ func withDefaults() *options {
 		publishTimeout:      5 * time.Second,
 		consumeTimeout:      30 * time.Second,
 		reconnectMaxRetries: 10,
-		publisherOn:         true,
+		producerOn:          true,
 		consumerOn:          true,
 	}
 }
 
-func WithPublisherOnly() Option {
+func WithProducerOnly() Option {
 	return func(o *options) {
-		o.publisherOn = true
+		o.producerOn = true
 		o.consumerOn = false
 	}
 }
@@ -42,7 +42,7 @@ func WithPublisherOnly() Option {
 func WithConsumerOnly() Option {
 	return func(o *options) {
 		o.consumerOn = true
-		o.publisherOn = false
+		o.producerOn = false
 	}
 }
 

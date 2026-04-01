@@ -14,7 +14,7 @@ import (
 )
 
 type HTTPApp struct {
-	cf     *Config
+	config *Config
 	engine *gin.Engine
 	server *http.Server
 	errCh  chan error
@@ -22,17 +22,17 @@ type HTTPApp struct {
 
 // New creates a new HTTPApp instance with the provided configuration.
 // It initializes the Gin engine, applies configuration, and sets up the HTTP server.
-func New(cf *Config) *HTTPApp {
-	cfg := cf.clone()
+func New(cfg *Config) *HTTPApp {
+	config := cfg.clone()
 
 	// Initialize Gin engine based on production mode
 	var r *gin.Engine
-	if cfg.IsProduction {
+	if config.IsProduction {
 		gin.SetMode(gin.ReleaseMode)
 		r = gin.New()
 
-		if cfg.Recovery != nil {
-			r.Use(gin.CustomRecovery(cfg.Recovery))
+		if config.Recovery != nil {
+			r.Use(gin.CustomRecovery(config.Recovery))
 		} else {
 			r.Use(gin.Recovery())
 		}
@@ -43,19 +43,19 @@ func New(cf *Config) *HTTPApp {
 	}
 
 	// Apply setup hook if provided
-	if cfg.Setup != nil {
-		cfg.Setup(r)
+	if config.Setup != nil {
+		config.Setup(r)
 	}
 
 	// Configure trusted proxies
-	if len(cfg.Proxies) > 0 {
-		_ = r.SetTrustedProxies(cfg.Proxies)
+	if len(config.Proxies) > 0 {
+		_ = r.SetTrustedProxies(config.Proxies)
 	}
 
-	srv := newHTTPServer(r, cfg)
+	srv := newHTTPServer(r, config)
 
 	return &HTTPApp{
-		cf:     cfg,
+		config: config,
 		engine: r,
 		server: srv,
 		errCh:  make(chan error, 1),
@@ -67,7 +67,7 @@ func New(cf *Config) *HTTPApp {
 // Use Run() to start and wait for shutdown signals.
 func (h *HTTPApp) Start() error {
 	go func() {
-		log.Printf("[server] listening on :%s", h.cf.Port)
+		log.Printf("[server] listening on :%s", h.config.Port)
 		if err := h.server.ListenAndServe(); err != nil &&
 			!errors.Is(err, http.ErrServerClosed) {
 			h.errCh <- err
@@ -76,14 +76,14 @@ func (h *HTTPApp) Start() error {
 	return nil
 }
 
-func newHTTPServer(handler http.Handler, cfg *Config) *http.Server {
+func newHTTPServer(handler http.Handler, config *Config) *http.Server {
 	return &http.Server{
-		Addr:              ":" + cfg.Port,
+		Addr:              ":" + config.Port,
 		Handler:           handler,
-		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
-		ReadTimeout:       cfg.ReadTimeout,
-		WriteTimeout:      cfg.WriteTimeout,
-		IdleTimeout:       cfg.IdleTimeout,
+		ReadHeaderTimeout: config.ReadHeaderTimeout,
+		ReadTimeout:       config.ReadTimeout,
+		WriteTimeout:      config.WriteTimeout,
+		IdleTimeout:       config.IdleTimeout,
 	}
 }
 
@@ -91,12 +91,12 @@ func newHTTPServer(handler http.Handler, cfg *Config) *http.Server {
 // It calls the Shutdown hook (if configured) and then shuts down the HTTP server.
 // The context is used to control the shutdown timeout.
 func (h *HTTPApp) Stop(ctx context.Context) error {
-	shutdownCtx, cancel := utils.NewCtxTimeout(ctx, h.cf.ShutdownTimeout)
+	shutdownCtx, cancel := utils.NewCtxTimeout(ctx, h.config.ShutdownTimeout)
 	defer cancel()
 
 	// Call custom shutdown hook if provided
-	if h.cf.Shutdown != nil {
-		if err := h.cf.Shutdown(shutdownCtx); err != nil {
+	if h.config.Shutdown != nil {
+		if err := h.config.Shutdown(shutdownCtx); err != nil {
 			log.Printf("[server] shutdown hook error: %v", err)
 		}
 	}

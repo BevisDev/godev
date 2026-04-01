@@ -22,9 +22,9 @@ type MQ struct {
 	connection *amqp.Connection
 	connMu     sync.RWMutex
 
-	queue     *Queue
-	publisher *Publisher
-	consumer  *ConsumerManager
+	queue    *Queue
+	producer *Producer
+	consumer *M
 
 	// Connection lifecycle management
 	closeNotify chan *amqp.Error
@@ -77,12 +77,12 @@ func New(cfg *Config, opts ...Option) (*MQ, error) {
 
 	// Initialize components
 	r.queue = newQueue(r)
-	if r.publisherOn {
-		r.publisher = newPublisher(r)
+	if r.producerOn {
+		r.producer = newProducer(r)
 	}
 
 	if r.consumerOn {
-		r.consumer = newConsumer(r)
+		r.consumer = newM(r)
 	}
 
 	// Start connection monitor
@@ -309,13 +309,13 @@ func (r *MQ) WithChannel(fn ChannelHandler) error {
 	return fn(ch)
 }
 
-// Publisher returns the publisher instance
-func (r *MQ) Publisher() *Publisher {
-	return r.publisher
+// Producer returns the message producer instance.
+func (r *MQ) Producer() *Producer {
+	return r.producer
 }
 
 // Consumer returns the consumer instance
-func (r *MQ) Consumer() *ConsumerManager {
+func (r *MQ) Consumer() *M {
 	return r.consumer
 }
 

@@ -48,7 +48,7 @@ func (r *RateLimiter) AllowHandler() gin.HandlerFunc {
 // 408 (Request Timeout) or 429 respectively.
 func (r *RateLimiter) WaitHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx, cancel := utils.NewCtxTimeout(c.Request.Context(), r.timeout)
+		ctx, cancel := utils.NewCtxTimeout(c.Request.Context(), r.waitTimeout)
 		defer cancel()
 
 		if err := r.limiter.Wait(ctx); err != nil {

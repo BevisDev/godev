@@ -3,10 +3,11 @@ package utils
 import (
 	"context"
 	"math"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/BevisDev/godev/consts"
-	"github.com/BevisDev/godev/types"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/exp/constraints"
 )
@@ -40,6 +41,41 @@ func TestContainsIgnoreCase(t *testing.T) {
 	assert.True(t, ContainsIgnoreCase("ABC", "abc"))
 	assert.False(t, ContainsIgnoreCase("ABC", "xyz"))
 	assert.False(t, ContainsIgnoreCase("hello", "world"))
+}
+
+func TestCountUTF8(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected int
+	}{
+		{
+			name:     "Vietnamese with accents",
+			input:    "Đặng Thị Ánh",
+			expected: 12,
+		},
+		{
+			name:     "ASCII",
+			input:    "hello",
+			expected: 5,
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			expected: 0,
+		},
+		{
+			name:     "emoji is counted as one rune",
+			input:    "á😀",
+			expected: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, CountUTF8(tt.input))
+		})
+	}
 }
 
 func TestMaskLeft(t *testing.T) {
@@ -204,7 +240,7 @@ func TestIgnoreContentTypeLog(t *testing.T) {
 	}
 }
 
-func TestParse_Success(t *testing.T) {
+func TestAs_Success(t *testing.T) {
 	obj := 123
 	val, err := As[int](obj)
 
@@ -212,7 +248,7 @@ func TestParse_Success(t *testing.T) {
 	assert.Equal(t, 123, val)
 }
 
-func TestParse_Fail(t *testing.T) {
+func TestAs_Fail(t *testing.T) {
 	obj := "abc"
 	val, err := As[int](obj)
 
@@ -220,7 +256,7 @@ func TestParse_Fail(t *testing.T) {
 	assert.Equal(t, 0, val)
 }
 
-func TestParse_WithStruct(t *testing.T) {
+func TestAs_WithStruct(t *testing.T) {
 	obj := User{Name: "Alice", Age: 30}
 
 	val, err := As[User](obj)
@@ -230,7 +266,7 @@ func TestParse_WithStruct(t *testing.T) {
 	assert.Equal(t, 30, val.Age)
 }
 
-func TestParse_WithPointer(t *testing.T) {
+func TestAs_WithPointer(t *testing.T) {
 	obj := &User{Name: "Bob", Age: 25}
 
 	val, err := As[*User](obj)
@@ -241,7 +277,7 @@ func TestParse_WithPointer(t *testing.T) {
 	assert.Equal(t, 25, val.Age)
 }
 
-func TestParse_Struct_CastFail(t *testing.T) {
+func TestAs_Struct_CastFail(t *testing.T) {
 	var obj interface{} = "not a User"
 	val, err := As[User](obj)
 
@@ -249,7 +285,7 @@ func TestParse_Struct_CastFail(t *testing.T) {
 	assert.Equal(t, User{}, val) // zero value
 }
 
-func TestParse_Pointer_CastFail(t *testing.T) {
+func TestAs_Pointer_CastFail(t *testing.T) {
 	var obj interface{} = "not a *User"
 	val, err := As[*User](obj)
 
@@ -257,33 +293,33 @@ func TestParse_Pointer_CastFail(t *testing.T) {
 	assert.Nil(t, val)
 }
 
-func TestParseMap_Success(t *testing.T) {
-	m := types.Object{
+func TestAsValueMap_Success(t *testing.T) {
+	m := map[string]interface{}{
 		"user": User{Name: "Alice", Age: 30},
 	}
 
-	val, err := ParseValueMap[User]("user", m)
+	val, err := AsValueMap[User]("user", m)
 
 	assert.NoError(t, err)
 	assert.Equal(t, "Alice", val.Name)
 	assert.Equal(t, 30, val.Age)
 }
 
-func TestParseValueMap_MissingKey(t *testing.T) {
-	m := types.Object{}
+func TestAsValueMap_MissingKey(t *testing.T) {
+	m := map[string]interface{}{}
 
-	val, err := ParseValueMap[int]("notfound", m)
+	val, err := AsValueMap[int]("notfound", m)
 
 	assert.Error(t, err)
 	assert.Equal(t, 0, val)
 }
 
-func TestParseValueMap_TypeMismatch(t *testing.T) {
-	m := types.Object{
+func TestAsValueMap_TypeMismatch(t *testing.T) {
+	m := map[string]interface{}{
 		"age": "not-an-int",
 	}
 
-	val, err := ParseValueMap[int]("age", m)
+	val, err := AsValueMap[int]("age", m)
 
 	assert.Error(t, err)
 	assert.Equal(t, 0, val)
@@ -1086,5 +1122,53 @@ func TestToSlice(t *testing.T) {
 	t.Run("non-slice value becomes single-item slice", func(t *testing.T) {
 		got := ToSlice(123)
 		assert.Equal(t, []any{123}, got)
+	})
+}
+
+func TestSpawn(t *testing.T) {
+	t.Run("processes all jobs then returns", func(t *testing.T) {
+		ctx := context.Background()
+		jobs := make(chan int, 20)
+		for i := range 10 {
+			jobs <- i
+		}
+		close(jobs)
+
+		var n atomic.Int64
+		Spawn(ctx, 3, jobs, func(ctx context.Context, v int) {
+			n.Add(1)
+		})
+		assert.Equal(t, int64(10), n.Load())
+	})
+
+	t.Run("workerCount below 1 uses one worker", func(t *testing.T) {
+		ctx := context.Background()
+		jobs := make(chan int, 2)
+		jobs <- 1
+		close(jobs)
+
+		var n atomic.Int64
+		Spawn(ctx, 0, jobs, func(ctx context.Context, v int) {
+			n.Add(int64(v))
+		})
+		assert.Equal(t, int64(1), n.Load())
+	})
+
+	t.Run("returns after context cancel", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		jobs := make(chan int)
+
+		done := make(chan struct{})
+		go func() {
+			Spawn(ctx, 2, jobs, func(ctx context.Context, v int) {})
+			close(done)
+		}()
+
+		cancel()
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+			t.Fatal("Spawn did not return after context cancel")
+		}
 	})
 }

@@ -469,29 +469,6 @@ func TestIsValidJSON(t *testing.T) {
 	}
 }
 
-func TestIsString(t *testing.T) {
-	tests := []struct {
-		name  string
-		input interface{}
-		want  bool
-	}{
-		{"string", "hello", true},
-		{"empty string", "", true},
-		{"int", 1, false},
-		{"bool", true, false},
-		{"nil", nil, false},
-		{"string pointer", func() interface{} { s := "x"; return &s }(), false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := IsString(tt.input); got != tt.want {
-				t.Fatalf("IsString(%v) = %v, want %v", tt.input, got, tt.want)
-			}
-		})
-	}
-}
-
 func TestIsStringSlice(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -570,25 +547,41 @@ func TestIsNumberSlice(t *testing.T) {
 	}
 }
 
-func TestIsBoolean(t *testing.T) {
+func TestIs(t *testing.T) {
+	i := 42
 	tests := []struct {
 		name  string
-		input interface{}
+		input any
+		ok    func(any) bool
 		want  bool
 	}{
-		{"true", true, true},
-		{"false", false, true},
-
-		{"string true", "true", false},
-		{"number", 1, false},
-		{"nil", nil, false},
-		{"struct", struct{}{}, false},
+		{"int from int value", 7, func(v any) bool { return Is[int](v) }, true},
+		{"int from string", "7", func(v any) bool { return Is[int](v) }, false},
+		{"string hello", "hello", func(v any) bool { return Is[string](v) }, true},
+		{"string empty", "", func(v any) bool { return Is[string](v) }, true},
+		{"string from int", 1, func(v any) bool { return Is[string](v) }, false},
+		{"string from bool", true, func(v any) bool { return Is[string](v) }, false},
+		{"string nil interface", nil, func(v any) bool { return Is[string](v) }, false},
+		{
+			"string pointer not string",
+			func() any { s := "x"; return &s }(),
+			func(v any) bool { return Is[string](v) },
+			false,
+		},
+		{"bool true", true, func(v any) bool { return Is[bool](v) }, true},
+		{"bool false", false, func(v any) bool { return Is[bool](v) }, true},
+		{"bool from string", "true", func(v any) bool { return Is[bool](v) }, false},
+		{"bool from number", 1, func(v any) bool { return Is[bool](v) }, false},
+		{"bool nil", nil, func(v any) bool { return Is[bool](v) }, false},
+		{"bool from struct", struct{}{}, func(v any) bool { return Is[bool](v) }, false},
+		{"*int pointer", &i, func(v any) bool { return Is[*int](v) }, true},
+		{"nil interface not int", nil, func(v any) bool { return Is[int](v) }, false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := IsBoolean(tt.input); got != tt.want {
-				t.Fatalf("IsBoolean(%v) = %v, want %v", tt.input, got, tt.want)
+			if got := tt.ok(tt.input); got != tt.want {
+				t.Errorf("Is: got %v, want %v for input %#v", got, tt.want, tt.input)
 			}
 		})
 	}

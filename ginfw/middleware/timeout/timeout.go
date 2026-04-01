@@ -10,7 +10,7 @@ type Timeout struct {
 }
 
 func New(opts ...Option) *Timeout {
-	o := withDefaults()
+	o := defaultOptions()
 	for _, opt := range opts {
 		opt(o)
 	}
@@ -22,7 +22,7 @@ func New(opts ...Option) *Timeout {
 
 func (t *Timeout) Handler() gin.HandlerFunc {
 	return timeout.New(
-		timeout.WithTimeout(t.duration),
-		timeout.WithResponse(t.response),
+		timeout.WithTimeout(t.requestTimeout),
+		timeout.WithResponse(t.onTimeout),
 	)
 }

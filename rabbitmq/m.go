@@ -3,35 +3,45 @@ package rabbitmq
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
+	"github.com/BevisDev/godev/consts"
+	"github.com/BevisDev/godev/utils"
 	"github.com/BevisDev/godev/utils/console"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
+const (
+	defaultMaxConsecutiveErrors = 10
+	defaultPrefetchCount        = 1
+	defaultWorkerPool           = 10
+	defaultRetryDelay           = 5 * time.Second
+	defaultConsumerLogName      = "consumer"
+)
+
 type M struct {
 	mq                   *MQ
+	consumers            map[string]*Consumer
 	mu                   sync.Mutex
 	wg                   sync.WaitGroup
 	log                  *console.Logger
 	maxConsecutiveErrors int
 	retryDelay           time.Duration
-	consumers            map[string]*Consumer
 	prefetchCount        int
 	workerPool           int
 }
 
-// newM creates a new ConsumerManager for the given MQ instance.
 func newM(r *MQ) *M {
 	return &M{
 		mq:                   r,
 		consumers:            make(map[string]*Consumer),
-		log:                  console.New("consumer"),
-		maxConsecutiveErrors: 10,
-		retryDelay:           5 * time.Second,
-		prefetchCount:        1,
-		workerPool:           10,
+		log:                  console.New(defaultConsumerLogName),
+		maxConsecutiveErrors: defaultMaxConsecutiveErrors,
+		retryDelay:           defaultRetryDelay,
+		prefetchCount:        defaultPrefetchCount,
+		workerPool:           defaultWorkerPool,
 	}
 }
 
@@ -80,21 +90,21 @@ func (m *M) Close() {
 }
 
 // Start starts all registered consumers in separate goroutines until context is canceled.
-func (m *M) Start(ctx context.Context) error {
+func (m *M) Start(ctx context.Context) {
 	if len(m.consumers) == 0 {
 		m.log.Info("no consumer registered")
-		return nil
+		return
 	}
 
 	m.log.Info("consumer(s) %d are starting", len(m.consumers))
-	for _, consumer := range m.consumers {
-		if !consumer.IsOn {
-			m.log.Info("consumer %s is off", consumer.Queue)
+	for _, c := range m.consumers {
+		if !c.IsOn {
+			m.log.Info("consumer %s is off", c.Queue)
 			continue
 		}
 
 		m.wg.Add(1)
-		go m.run(ctx, consumer)
+		go m.Run(ctx, c)
 	}
 
 	m.log.Info("all consumers started successfully")
@@ -103,11 +113,10 @@ func (m *M) Start(ctx context.Context) error {
 	m.log.Info("shutting down all consumers...")
 	m.wg.Wait()
 	m.log.Info("all consumers stopped")
-	return nil
 }
 
 // Run runs a single consumer with auto error handling and reconnection.
-func (m *ConsumerManager) Run(ctx context.Context, c *Consumer) {
+func (m *M) Run(ctx context.Context, c *Consumer) {
 	defer m.wg.Done()
 
 	maxConsecutiveErrors := m.maxConsecutiveErrors
@@ -127,7 +136,7 @@ func (m *ConsumerManager) Run(ctx context.Context, c *Consumer) {
 		case <-ctx.Done():
 			return
 		default:
-			err := m.consume(ctx, c)
+			err := m.Consume(ctx, c)
 			if err != nil {
 				errs++
 				m.log.Error("[%s] error: %v (consecutive errors: %d)",
@@ -155,8 +164,8 @@ func (m *ConsumerManager) Run(ctx context.Context, c *Consumer) {
 	}
 }
 
-// consume sets up the consumer and processes messages from the queue.
-func (m *ConsumerManager) consume(ctx context.Context, c *Consumer) error {
+// Consume sets up the consumer and processes messages from the queue.
+func (m *M) Consume(ctx context.Context, c *Consumer) error {
 	queueName := c.Queue
 
 	ch, err := m.mq.GetChannel()
@@ -201,13 +210,12 @@ func (m *ConsumerManager) consume(ctx context.Context, c *Consumer) error {
 
 	var workerWG sync.WaitGroup
 	for i := 0; i < workerCount; i++ {
-		workerWG.Add(1)
-		go func() {
-			defer workerWG.Done()
+		workerWG.Go(func() {
 			for d := range jobs {
 				m.processMsg(queueName, c.Handler, d)
 			}
-		}()
+		}
+
 	}
 
 	defer func() {
@@ -231,4 +239,52 @@ func (m *ConsumerManager) consume(ctx context.Context, c *Consumer) error {
 			}
 		}
 	}
+}
+
+func (m *M) processMsg(
+	queueName string,
+	h Handler,
+	d amqp.Delivery,
+) {
+	msg := &MsgHandler{
+		queueName: queueName,
+		d:         d,
+	}
+	msgCtx := m.newMsgCtx(msg)
+
+	if err := m.handleMsg(msgCtx, queueName, h, msg); err != nil {
+		m.log.Info("[%s] error: %v", queueName, err)
+		if !m.mq.autoCommit {
+			msg.Requeue()
+		}
+		return
+	}
+
+	if m.mq.autoCommit {
+		m.log.Info("[%s] committed correlationID: %s",
+			queueName, msg.CorrelationID())
+		msg.Commit()
+	}
+}
+
+// handleMsg runs Handler.Handle and recovers from panic.
+func (m *M) handleMsg(ctx context.Context, queueName string, h Handler, msg *MsgHandler) error {	
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("[RECOVER][%s] err: %v", queueName, r)
+			msg.Reject()
+		}
+	}()
+	return h.Handle(ctx, msg)
+}
+
+// newMsgCtx creates a new context with correlation from msg
+func (m *M) newMsgCtx(msg *MsgHandler) context.Context {
+	newCtx := utils.NewCtx()
+	newCtx = utils.SetValueCtx(newCtx,
+		consts.RID,
+		msg.CorrelationID(),
+	)
+
+	return newCtx
 }

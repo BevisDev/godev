@@ -7,6 +7,15 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+const (
+	defaultHTTPPort          = "8080"
+	defaultShutdownTimeout   = 15 * time.Second
+	defaultReadHeaderTimeout = 5 * time.Second
+	defaultReadTimeout       = 10 * time.Second
+	defaultWriteTimeout      = 15 * time.Second
+	defaultIdleTimeout       = 60 * time.Second
+)
+
 // Config defines the configuration for running a Gin HTTP server.
 type Config struct {
 	// IsProduction indicates whether the server is running in production mode.
@@ -72,24 +81,24 @@ type Config struct {
 func (c *Config) clone() *Config {
 	cc := *c
 	if cc.Port == "" {
-		cc.Port = "8080"
+		cc.Port = defaultHTTPPort
 	}
 
 	if !cc.Debug {
 		if cc.ShutdownTimeout <= 0 {
-			cc.ShutdownTimeout = 15 * time.Second
+			cc.ShutdownTimeout = defaultShutdownTimeout
 		}
 		if cc.ReadHeaderTimeout <= 0 {
-			cc.ReadHeaderTimeout = 5 * time.Second
+			cc.ReadHeaderTimeout = defaultReadHeaderTimeout
 		}
 		if cc.ReadTimeout <= 0 {
-			cc.ReadTimeout = 10 * time.Second
+			cc.ReadTimeout = defaultReadTimeout
 		}
 		if cc.WriteTimeout <= 0 {
-			cc.WriteTimeout = 15 * time.Second
+			cc.WriteTimeout = defaultWriteTimeout
 		}
 		if cc.IdleTimeout <= 0 {
-			cc.IdleTimeout = 60 * time.Second
+			cc.IdleTimeout = defaultIdleTimeout
 		}
 	}
 

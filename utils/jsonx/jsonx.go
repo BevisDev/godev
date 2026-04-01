@@ -6,6 +6,7 @@ import (
 	"github.com/BevisDev/godev/utils/validate"
 )
 
+// ToJSONBytes marshals a value into JSON bytes.
 func ToJSONBytes(v any) ([]byte, error) {
 	jsonBytes, err := json.Marshal(v)
 	if err != nil {
@@ -14,16 +15,19 @@ func ToJSONBytes(v any) ([]byte, error) {
 	return jsonBytes, nil
 }
 
+// FromJSONBytes unmarshals JSON bytes into type T.
 func FromJSONBytes[T any](raw []byte) (T, error) {
 	var t T
 	err := json.Unmarshal(raw, &t)
 	return t, err
 }
 
+// FromJSON unmarshals a JSON string into type T.
 func FromJSON[T any](str string) (T, error) {
 	return FromJSONBytes[T]([]byte(str))
 }
 
+// ToJSON marshals a value into a JSON string.
 func ToJSON(v any) string {
 	jsonBytes, err := ToJSONBytes(v)
 	if err != nil {
@@ -32,6 +36,7 @@ func ToJSON(v any) string {
 	return string(jsonBytes)
 }
 
+// ObjectToMap converts a struct value into a map.
 func ObjectToMap(i interface{}) map[string]interface{} {
 	if !validate.IsStruct(i) {
 		return nil
@@ -49,16 +54,17 @@ func ObjectToMap(i interface{}) map[string]interface{} {
 	return out
 }
 
-func StringToMap(s string) (map[string]interface{}, error) {
+// JSONStringToMap converts a JSON string into a map.
+func JSONStringToMap(s string) (map[string]interface{}, error) {
 	return FromJSON[map[string]interface{}](s)
 }
 
-func BytesToMap(b []byte) (map[string]interface{}, error) {
+// JSONBytesToMap converts JSON bytes into a map.
+func JSONBytesToMap(b []byte) (map[string]interface{}, error) {
 	return FromJSONBytes[map[string]interface{}](b)
 }
 
-// Clone clones any struct or map via JSON marshal/unmarshal.
-// Note: Won't work if the struct has unexported fields.
+// Clone deep-copies a value via JSON marshal/unmarshal.
 func Clone[T any](src T) (T, error) {
 	var dst T
 	b, err := ToJSONBytes(src)
@@ -68,6 +74,7 @@ func Clone[T any](src T) (T, error) {
 	return FromJSONBytes[T](b)
 }
 
+// Pretty returns an indented JSON string for a value.
 func Pretty(v any) string {
 	b, err := json.MarshalIndent(v, "", "\t")
 	if err != nil {

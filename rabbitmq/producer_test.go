@@ -10,7 +10,7 @@ import (
 )
 
 func TestBuildMessage_StringJSON(t *testing.T) {
-	p := &Publisher{}
+	p := &Producer{}
 	ct, body, err := p.buildMessage(`{"a":1}`)
 	require.NoError(t, err)
 	assert.Equal(t, consts.ApplicationJSON, ct)
@@ -18,7 +18,7 @@ func TestBuildMessage_StringJSON(t *testing.T) {
 }
 
 func TestBuildMessage_StringPlain(t *testing.T) {
-	p := &Publisher{}
+	p := &Producer{}
 	ct, body, err := p.buildMessage("hello")
 	require.NoError(t, err)
 	assert.Equal(t, consts.TextPlain, ct)
@@ -26,7 +26,7 @@ func TestBuildMessage_StringPlain(t *testing.T) {
 }
 
 func TestBuildMessage_Number(t *testing.T) {
-	p := &Publisher{}
+	p := &Producer{}
 	ct, body, err := p.buildMessage(123)
 	require.NoError(t, err)
 	// "123" is valid JSON, so content type is application/json
@@ -35,7 +35,7 @@ func TestBuildMessage_Number(t *testing.T) {
 }
 
 func TestBuildMessage_Struct(t *testing.T) {
-	p := &Publisher{}
+	p := &Producer{}
 	type payload struct {
 		ID int `json:"id"`
 	}
@@ -46,7 +46,7 @@ func TestBuildMessage_Struct(t *testing.T) {
 }
 
 func TestBuildMessage_Map(t *testing.T) {
-	p := &Publisher{}
+	p := &Producer{}
 	ct, body, err := p.buildMessage(map[string]int{"a": 1, "b": 2})
 	require.NoError(t, err)
 	assert.Equal(t, consts.ApplicationJSON, ct)
@@ -54,7 +54,7 @@ func TestBuildMessage_Map(t *testing.T) {
 }
 
 func TestBuildMessage_Slice(t *testing.T) {
-	p := &Publisher{}
+	p := &Producer{}
 	ct, body, err := p.buildMessage([]string{"x", "y", "z"})
 	require.NoError(t, err)
 	assert.Equal(t, consts.ApplicationJSON, ct)
@@ -62,7 +62,7 @@ func TestBuildMessage_Slice(t *testing.T) {
 }
 
 func TestBuildMessage_TooLarge(t *testing.T) {
-	p := &Publisher{}
+	p := &Producer{}
 	large := make([]byte, maxMessageSize+1)
 	_, _, err := p.buildMessage(large)
 	require.Error(t, err)

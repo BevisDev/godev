@@ -10,30 +10,30 @@ import (
 type Option func(*options)
 
 type options struct {
-	duration time.Duration
-	response func(*gin.Context)
+	requestTimeout time.Duration
+	onTimeout      func(*gin.Context)
 }
 
-func WithTimeout(d time.Duration) Option {
+func WithTimeout(duration time.Duration) Option {
 	return func(o *options) {
-		if d > 0 {
-			o.duration = d
+		if duration > 0 {
+			o.requestTimeout = duration
 		}
 	}
 }
 
-func WithResponse(fn func(*gin.Context)) Option {
+func WithResponse(onTimeout func(*gin.Context)) Option {
 	return func(o *options) {
-		if fn != nil {
-			o.response = fn
+		if onTimeout != nil {
+			o.onTimeout = onTimeout
 		}
 	}
 }
 
-func withDefaults() *options {
+func defaultOptions() *options {
 	return &options{
-		duration: 1 * time.Minute,
-		response: func(c *gin.Context) {
+		requestTimeout: 1 * time.Minute,
+		onTimeout: func(c *gin.Context) {
 			c.AbortWithStatus(http.StatusGatewayTimeout)
 		},
 	}

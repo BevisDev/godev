@@ -5,22 +5,21 @@ import "github.com/BevisDev/godev/logger"
 type Option func(*options)
 
 type options struct {
-	// logger instance for logging
 	logger *logger.Logger
 
-	// useLog is the flag use logger
-	useLog bool
+	// useStructuredLogger routes logs through logger.Logger instead of the std log package.
+	useStructuredLogger bool
 
-	// skipHeader Skip logging HTTP headers if true
+	// skipHeader omits HTTP headers from log output when true.
 	skipHeader bool
 
-	// skipDefaultContentTypeCheck disables the default content-type based body logging checks.
+	// skipDefaultContentTypeCheck disables content-type based body logging rules from utils.SkipContentType.
 	skipDefaultContentTypeCheck bool
 }
 
-func withDefaults() *options {
+func defaultOptions() *options {
 	return &options{
-		useLog:                      false,
+		useStructuredLogger:         false,
 		skipHeader:                  false,
 		skipDefaultContentTypeCheck: false,
 	}
@@ -30,7 +29,7 @@ func WithLogger(l *logger.Logger) Option {
 	return func(o *options) {
 		if l != nil {
 			o.logger = l
-			o.useLog = true
+			o.useStructuredLogger = true
 		}
 	}
 }

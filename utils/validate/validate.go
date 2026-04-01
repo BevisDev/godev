@@ -308,25 +308,26 @@ func IsValidJSON(v any) bool {
 	return true
 }
 
-func IsString(v any) bool {
-	_, ok := v.(string)
+// Is reports whether v can be asserted to T (same as the comma-ok form of a type switch).
+func Is[T any](v any) bool {
+	_, ok := v.(T)
 	return ok
 }
 
 func IsStringSlice(v any) bool {
-	switch val := v.(type) {
-	case []string:
+	if Is[[]string](v) {
 		return true
-	case []interface{}:
-		for _, item := range val {
-			if !IsString(item) {
-				return false
-			}
-		}
-		return true
-	default:
+	}
+	val, ok := v.([]any)
+	if !ok {
 		return false
 	}
+	for _, item := range val {
+		if !Is[string](item) {
+			return false
+		}
+	}
+	return true
 }
 
 func IsNumber(v any) bool {
@@ -356,11 +357,6 @@ func IsNumberSlice(v any) bool {
 	default:
 		return false
 	}
-}
-
-func IsBoolean(v any) bool {
-	_, ok := v.(bool)
-	return ok
 }
 
 func IsSlice(v any) bool {

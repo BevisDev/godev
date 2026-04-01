@@ -32,7 +32,7 @@ func (w *responseWrapper) Write(b []byte) (int, error) {
 }
 
 func New(opts ...Option) *HTTPLogger {
-	o := withDefaults()
+	o := defaultOptions()
 	for _, opt := range opts {
 		opt(o)
 	}
@@ -104,7 +104,7 @@ func (h *HTTPLogger) readResponseBody(buf *bytes.Buffer, contentType string) str
 }
 
 func (h *HTTPLogger) logRequest(c *gin.Context, rid string, startTime time.Time, reqBody string) {
-	if h.useLog {
+	if h.useStructuredLogger {
 		h.logRequestWithLogger(c, rid, startTime, reqBody)
 	} else {
 		h.logRequestConsole(c, rid, startTime, reqBody)
@@ -144,7 +144,7 @@ func (h *HTTPLogger) logRequestConsole(c *gin.Context, rid string, startTime tim
 }
 
 func (h *HTTPLogger) logResponse(c *gin.Context, rid string, duration time.Duration, resBody string) {
-	if h.useLog {
+	if h.useStructuredLogger {
 		h.logResponseWithLogger(c, rid, duration, resBody)
 	} else {
 		h.logResponseConsole(c, rid, duration, resBody)

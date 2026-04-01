@@ -16,20 +16,20 @@ import (
 
 const maxMessageSize = 50000 // max size of message body in bytes
 
-type Publisher struct {
+type Producer struct {
 	mq  *MQ
 	log *console.Logger
 }
 
-func newPublisher(mq *MQ) *Publisher {
-	return &Publisher{
+func newProducer(mq *MQ) *Producer {
+	return &Producer{
 		mq:  mq,
-		log: console.New("publisher"),
+		log: console.New("producer"),
 	}
 }
 
 // Send sends a message directly to a single queue (point-to-point).
-func (p *Publisher) Send(
+func (p *Producer) Send(
 	ctx context.Context,
 	queueName string,
 	message any,
@@ -39,7 +39,7 @@ func (p *Publisher) Send(
 }
 
 // PublishEvent publishes an event to a topic exchange using a routing key.
-func (p *Publisher) PublishEvent(
+func (p *Producer) PublishEvent(
 	ctx context.Context,
 	exchange string,
 	routingKey string,
@@ -50,7 +50,7 @@ func (p *Publisher) PublishEvent(
 }
 
 // BroadcastEvent publishes an event to all consumers using a fanout exchange.
-func (p *Publisher) BroadcastEvent(
+func (p *Producer) BroadcastEvent(
 	ctx context.Context,
 	exchange string,
 	message any,
@@ -59,10 +59,10 @@ func (p *Publisher) BroadcastEvent(
 	return p.publish(ctx, exchange, "", message, props...)
 }
 
-// publish is the shared internal publish logic for all publisher APIs.
+// publish is the shared internal publish logic for all producer APIs.
 // It sends a message to the specified exchange and routing key.
 // If ctx has no deadline, publishTimeout from MQ options is applied.
-func (p *Publisher) publish(
+func (p *Producer) publish(
 	c context.Context,
 	exchange string,
 	routingKey string,
@@ -91,7 +91,7 @@ func (p *Publisher) publish(
 	})
 }
 
-func (p *Publisher) buildPublishing(
+func (p *Producer) buildPublishing(
 	ctx context.Context,
 	message any,
 	props ...MsgProperties,
@@ -159,7 +159,7 @@ func (p *Publisher) buildPublishing(
 	return publishing, nil
 }
 
-func (p *Publisher) buildMessage(message any) (string, []byte, error) {
+func (p *Producer) buildMessage(message any) (string, []byte, error) {
 	body, err := utils.ToBytes(message)
 	if err != nil {
 		return "", nil, err

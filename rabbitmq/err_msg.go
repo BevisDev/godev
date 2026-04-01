@@ -16,7 +16,7 @@ var (
 	ErrInvalidExchangeType = errors.New("[queue] invalid exchange type")
 	ErrEmptyBindingQueue   = errors.New("[queue] binding queue name cannot be empty")
 
-	// publisher
-	ErrMessageTooLarge = errors.New("[publisher] message exceeds maximum size limit")
-	ErrInvalidMessage  = errors.New("[publisher] invalid message format")
+	// producer
+	ErrMessageTooLarge = errors.New("[producer] message exceeds maximum size limit")
+	ErrInvalidMessage  = errors.New("[producer] invalid message format")
 )

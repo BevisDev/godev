@@ -11,17 +11,17 @@ import (
 type Option func(*options)
 
 type options struct {
-	rps      rate.Limit
-	burst    int
-	timeout  time.Duration
-	onReject func(*gin.Context, error)
+	rps         rate.Limit
+	burst       int
+	waitTimeout time.Duration
+	onReject    func(*gin.Context, error)
 }
 
 func defaultOptions() *options {
 	return &options{
-		rps:     10,
-		burst:   20,
-		timeout: 200 * time.Millisecond,
+		rps:         10,
+		burst:       20,
+		waitTimeout: 200 * time.Millisecond,
 	}
 }
 
@@ -43,11 +43,11 @@ func WithBurst(burst int) Option {
 	}
 }
 
-// WithTimeout sets the max wait duration for WaitMiddleware. Must be > 0.
-func WithTimeout(d time.Duration) Option {
+// WithTimeout sets the max wait duration for WaitHandler. Must be > 0.
+func WithTimeout(waitTimeout time.Duration) Option {
 	return func(o *options) {
-		if d > 0 {
-			o.timeout = d
+		if waitTimeout > 0 {
+			o.waitTimeout = waitTimeout
 		}
 	}
 }

@@ -89,9 +89,9 @@ func NewFailureData(ctx context.Context, data any, code, message string) *Respon
 	}
 }
 
-func SuccessPage(c *gin.Context, T any, total int64) {
-	res := NewSuccess(c, &Pagination{
-		Items: T,
+func SuccessPage(c *gin.Context, items any, total int64) {
+	res := NewSuccess(c.Request.Context(), &Pagination{
+		Items: items,
 		Total: total,
 	})
 	c.JSON(http.StatusOK, res)
@@ -101,13 +101,9 @@ func responseAt() string {
 	return datetime.ToString(time.Now(), datetime.DateTimeLayout)
 }
 
-func GetCode(
-	code string,
-	message string,
-	defCode string,
-) (string, string) {
+func GetCode(code string, message string, defaultCode string) (string, string) {
 	if code == "" {
-		code = defCode
+		code = defaultCode
 	}
 	if message == "" {
 		message = Code[code]

@@ -1,5 +1,11 @@
 package request
 
+const (
+	defaultPaginationPage = 1
+	defaultPaginationSize = 10
+	maxPaginationSize     = 100
+)
+
 type Pagination struct {
 	Page int `json:"page" form:"page"`
 	Size int `json:"size" form:"size"`
@@ -7,15 +13,15 @@ type Pagination struct {
 
 func (p *Pagination) Normalize() {
 	if p.Page < 1 {
-		p.Page = 1
+		p.Page = defaultPaginationPage
 	}
 
 	if p.Size <= 0 {
-		p.Size = 10
+		p.Size = defaultPaginationSize
 	}
 
-	if p.Size > 100 {
-		p.Size = 100
+	if p.Size > maxPaginationSize {
+		p.Size = maxPaginationSize
 	}
 }
 

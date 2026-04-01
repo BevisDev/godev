@@ -9,7 +9,9 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/BevisDev/godev/consts"
 	"github.com/BevisDev/godev/types"
@@ -67,6 +69,11 @@ func ContainsIgnoreCase(s, substr string) bool {
 		strings.ToLower(s),
 		strings.ToLower(substr),
 	)
+}
+
+// CountUTF8 returns rune length after removing diacritics.
+func CountUTF8(s string) int {
+	return utf8.RuneCountInString(s)
 }
 
 // MaskLeft replaces the first size characters with '*'.
@@ -178,17 +185,17 @@ func As[T any](obj interface{}) (T, error) {
 	return val, nil
 }
 
-// ParseValueMap gets objMap[key] and asserts it to T.
-func ParseValueMap[T any](key string, objMap types.Object) (T, error) {
+// AsValueMap gets objMap[key] and asserts it to T.
+func AsValueMap[T any](key string, objMap types.Object) (T, error) {
 	var zero T
 
 	raw, ok := objMap[key]
 	if !ok {
-		return zero, fmt.Errorf("key %q not found in map", key)
+		return zero, fmt.Errorf("key %q not found", key)
 	}
 
-	val, ok := raw.(T)
-	if !ok {
+	val, err := As[T](raw)
+	if err != nil {
 		return zero, fmt.Errorf("cannot cast value of key %q (type %T) to target type", key, raw)
 	}
 
@@ -686,4 +693,35 @@ func ToSlice(v any) []any {
 		out[i] = rv.Index(i).Interface()
 	}
 	return out
+}
+
+// Spawn starts workerCount goroutines that read jobs from jobs until jobs is closed or ctx is canceled.
+// For each job, fn is called with ctx and the value. Spawn blocks until all workers have exited.
+//
+// The producer must close jobs when no more work will be sent; otherwise workers never finish.
+// If workerCount < 1, it is treated as 1.
+func Spawn[T any](ctx context.Context, workerCount int, jobs <-chan T, fn func(context.Context, T)) {
+	if workerCount < 1 {
+		workerCount = 1
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(workerCount)
+	for i := 0; i < workerCount; i++ {
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case job, ok := <-jobs:
+					if !ok {
+						return
+					}
+					fn(ctx, job)
+				}
+			}
+		}()
+	}
+	wg.Wait()
 }
