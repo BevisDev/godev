@@ -10,14 +10,15 @@ type Handler interface {
 	// Handle processes a single message. Returns nil to ack, error to requeue.
 	// When autoCommit is false, handler must call msg.Commit() on success.
 	Handle(ctx context.Context, msg *MsgHandler) error
+
+	// QueueName returns the AMQP queue this handler consumes from.
+	QueueName() string
 }
 
 type Consumer struct {
-	IsOn bool // enable / disable consumer
-
-	Queue string // queue name
-
 	Handler Handler
+
+	IsOn bool // enable / disable consumer
 
 	// PrefetchCount sets the AMQP QoS prefetch count (messages) per queue/consumer.
 	// If <= 0, CM uses its default (prefetch 1).

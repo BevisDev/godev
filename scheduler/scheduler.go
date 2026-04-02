@@ -45,15 +45,20 @@ func (s *Scheduler) Register(jobs ...*Job) {
 	defer s.mu.Unlock()
 
 	for _, job := range jobs {
-		if job == nil || job.Name == "" || job.Cron == "" || job.Handler == nil {
+		if job == nil || job.Cron == "" || job.Handler == nil {
 			continue
 		}
 
-		if _, ok := s.jobs[job.Name]; ok {
-			s.log.Info("job %s already registered, override", job.Name)
+		name := job.Handler.JobName()
+		if name == "" {
+			continue
 		}
 
-		s.jobs[job.Name] = job
+		if _, ok := s.jobs[name]; ok {
+			s.log.Info("job %s already registered, override", name)
+		}
+
+		s.jobs[name] = job
 	}
 }
 

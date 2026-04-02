@@ -34,12 +34,15 @@ func (m *mockJob) Handle(ctx context.Context) {
 	}
 }
 
+func (m *mockJob) JobName() string {
+	return m.name
+}
+
 func TestScheduler_Start_Idempotent(t *testing.T) {
 	s := New()
 
 	s.Register(&Job{
-		Name:    "job1",
-		Handler: &mockJob{},
+		Handler: &mockJob{name: "job1"},
 		Cron:    "@every 1s",
 		IsOn:    true,
 	})
@@ -56,10 +59,9 @@ func TestScheduler_Start_Idempotent(t *testing.T) {
 func TestScheduler_Stop_ContextCancel(t *testing.T) {
 	s := New()
 
-	job := &mockJob{done: make(chan struct{})}
+	job := &mockJob{name: "job1", done: make(chan struct{})}
 
 	s.Register(&Job{
-		Name:    "job1",
 		Handler: job,
 		Cron:    "@every 100ms",
 		IsOn:    true,
@@ -80,13 +82,12 @@ func TestScheduler_Stop_ContextCancel(t *testing.T) {
 
 func TestScheduler_RegisterJob_Success(t *testing.T) {
 	s := New()
-	job := &mockJob{}
+	job := &mockJob{name: "job1"}
 
 	s.Register(&Job{
 		Handler: job,
 		Cron:    "*/1 * * * *",
 		IsOn:    true,
-		Name:    "job1",
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -101,7 +102,6 @@ func TestScheduler_RegisterJob_Disabled(t *testing.T) {
 	s := New()
 
 	s.Register(&Job{
-		Name:    "job1",
 		IsOn:    false,
 		Cron:    "*/1 * * * *",
 		Handler: &mockJob{name: "job1"},
@@ -121,7 +121,6 @@ func TestScheduler_RegisterJob_EmptyCron(t *testing.T) {
 		Handler: &mockJob{name: "job1"},
 		Cron:    "",
 		IsOn:    true,
-		Name:    "job1",
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -135,12 +134,12 @@ func TestScheduler_JobPanicRecovered(t *testing.T) {
 	s := New()
 
 	job := &mockJob{
+		name:  "job1",
 		panic: true,
 		done:  make(chan struct{}),
 	}
 
 	s.Register(&Job{
-		Name:    "job1",
 		Handler: job,
 		Cron:    "@every 1s",
 		IsOn:    true,
@@ -165,21 +164,19 @@ func TestScheduler_JobPanicRecovered(t *testing.T) {
 
 func TestScheduler_All(t *testing.T) {
 	s := New()
-	j1 := &mockJob{name: "j1"}
-	j2 := &mockJob{name: "j2"}
+	j1 := &mockJob{name: "job1"}
+	j2 := &mockJob{name: "job2"}
 
 	s.Register(
 		&Job{
 			Handler: j1,
 			Cron:    "*/1 * * * *",
 			IsOn:    true,
-			Name:    "job1",
 		},
 		&Job{
 			Handler: j2,
 			Cron:    "*/1 * * * *",
 			IsOn:    true,
-			Name:    "job2",
 		},
 	)
 
@@ -207,13 +204,11 @@ func TestScheduler_Register_DuplicateOverride(t *testing.T) {
 			Handler: j1,
 			Cron:    "*/1 * * * *",
 			IsOn:    true,
-			Name:    "dup",
 		},
 		&Job{
 			Handler: j2,
 			Cron:    "*/1 * * * *",
 			IsOn:    true,
-			Name:    "dup",
 		},
 	)
 
@@ -230,7 +225,6 @@ func TestScheduler_InvalidCron(t *testing.T) {
 			Cron:    "invalid cron expression",
 			IsOn:    true,
 			Handler: j1,
-			Name:    "bad",
 		},
 	)
 

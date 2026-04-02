@@ -54,15 +54,20 @@ func (m *CM) Register(consumers ...*Consumer) {
 	defer m.mu.Unlock()
 
 	for _, c := range consumers {
-		if c.Queue == "" || c.Handler == nil {
+		if c.Handler == nil {
 			continue
 		}
 
-		if _, ok := m.consumers[c.Queue]; ok {
-			m.log.Info("queue %s already registered, override", c.Queue)
+		q := c.Handler.QueueName()
+		if q == "" {
+			continue
 		}
 
-		m.consumers[c.Queue] = c
+		if _, ok := m.consumers[q]; ok {
+			m.log.Info("queue %s already registered, override", q)
+		}
+
+		m.consumers[q] = c
 	}
 }
 
@@ -100,14 +105,14 @@ func (m *CM) Start(ctx context.Context) {
 	}
 
 	m.log.Info("consumer(s) %d are starting", len(m.consumers))
-	for _, c := range m.consumers {
+	for q, c := range m.consumers {
 		if !c.IsOn {
-			m.log.Info("consumer %s is off", c.Queue)
+			m.log.Info("consumer %s is off", q)
 			continue
 		}
 
 		m.wg.Add(1)
-		go m.Run(ctx, c)
+		go m.Run(ctx, q, c)
 	}
 
 	m.log.Info("all consumers started successfully")
@@ -119,7 +124,7 @@ func (m *CM) Start(ctx context.Context) {
 }
 
 // Run runs a single consumer with auto error handling and reconnection.
-func (m *CM) Run(ctx context.Context, c *Consumer) {
+func (m *CM) Run(ctx context.Context, queueName string, c *Consumer) {
 	defer m.wg.Done()
 
 	maxConsecutiveErrors := m.maxConsecutiveErrors
@@ -132,14 +137,13 @@ func (m *CM) Run(ctx context.Context, c *Consumer) {
 		retryDelay = c.RetryDelay
 	}
 
-	queueName := c.Queue
 	errs := 0
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
-			err := m.Consume(ctx, c)
+			err := m.Consume(ctx, queueName, c)
 			if err != nil {
 				errs++
 				m.log.Error("[%s] error: %v (consecutive errors: %d)",
@@ -168,9 +172,7 @@ func (m *CM) Run(ctx context.Context, c *Consumer) {
 }
 
 // Consume sets up the consumer and processes messages from the queue.
-func (m *CM) Consume(ctx context.Context, c *Consumer) error {
-	queueName := c.Queue
-
+func (m *CM) Consume(ctx context.Context, queueName string, c *Consumer) error {
 	ch, err := m.mq.GetChannel()
 	if err != nil {
 		return err
