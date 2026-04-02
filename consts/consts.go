@@ -6,6 +6,7 @@ const (
 	Basic_     = "Basic "
 	XRequestID = "x-request-id"
 	XClientID  = "x-client-id"
+	Signature  = "signature"
 )
 
 // form data

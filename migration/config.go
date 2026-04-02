@@ -5,6 +5,10 @@ import (
 	"time"
 )
 
+const (
+	defaultTimeout = 1 * time.Minute
+)
+
 // Config holds database Migration settings.
 type Config struct {
 	// Dir specifies the directory containing Migration scripts.
@@ -23,7 +27,7 @@ type Config struct {
 func (c *Config) clone() *Config {
 	cc := *c
 	if cc.Timeout <= 0 {
-		cc.Timeout = 1 * time.Minute
+		cc.Timeout = defaultTimeout
 	}
 	return &cc
 }

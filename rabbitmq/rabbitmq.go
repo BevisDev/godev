@@ -24,7 +24,7 @@ type MQ struct {
 
 	queue    *Queue
 	producer *Producer
-	consumer *M
+	consumer *CM
 
 	// Connection lifecycle management
 	closeNotify chan *amqp.Error
@@ -82,7 +82,7 @@ func New(cfg *Config, opts ...Option) (*MQ, error) {
 	}
 
 	if r.consumerOn {
-		r.consumer = newM(r)
+		r.consumer = newCM(r)
 	}
 
 	// Start connection monitor
@@ -315,7 +315,7 @@ func (r *MQ) Producer() *Producer {
 }
 
 // Consumer returns the consumer instance
-func (r *MQ) Consumer() *M {
+func (r *MQ) Consumer() *CM {
 	return r.consumer
 }
 

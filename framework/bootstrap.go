@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"sync"
@@ -198,6 +199,8 @@ func (b *Bootstrap) Init(ctx context.Context) error {
 }
 
 func (b *Bootstrap) runServices(c context.Context) error {
+	var initMu sync.Mutex
+
 	// Init services in parallel
 	g, ctx := errgroup.WithContext(c)
 
@@ -216,14 +219,18 @@ func (b *Bootstrap) runServices(c context.Context) error {
 			if err != nil {
 				return err
 			}
+			initMu.Lock()
 			b.database = db
-
 			b.migrationConf.DB = db.GetDB().DB
+			initMu.Unlock()
+
 			m, err := migration.New(b.migrationConf)
 			if err != nil {
 				return err
 			}
+			initMu.Lock()
 			b.migration = m
+			initMu.Unlock()
 			return nil
 		})
 	} else if b.dbConf != nil && b.database == nil {
@@ -232,7 +239,9 @@ func (b *Bootstrap) runServices(c context.Context) error {
 			if err != nil {
 				return err
 			}
+			initMu.Lock()
 			b.database = db
+			initMu.Unlock()
 			return nil
 		})
 	}
@@ -243,7 +252,9 @@ func (b *Bootstrap) runServices(c context.Context) error {
 			if err != nil {
 				return err
 			}
+			initMu.Lock()
 			b.migration = m
+			initMu.Unlock()
 			return nil
 		})
 	}
@@ -255,7 +266,9 @@ func (b *Bootstrap) runServices(c context.Context) error {
 			if err != nil {
 				return fmt.Errorf("[redis] %w", err)
 			}
+			initMu.Lock()
 			b.redisCache = cache
+			initMu.Unlock()
 			return nil
 		})
 	}
@@ -267,19 +280,23 @@ func (b *Bootstrap) runServices(c context.Context) error {
 			if err != nil {
 				return fmt.Errorf("[rabbitmq] %w", err)
 			}
+			initMu.Lock()
 			b.rabbitmq = mq
+			initMu.Unlock()
 			return nil
 		})
 	}
 
 	// Mailer
-	if b.mailerConf != nil && b.rabbitmq == nil {
+	if b.mailerConf != nil && b.mailer == nil {
 		g.Go(func() error {
-			mq, err := rabbitmq.New(b.rabbitConf, b.rabbitOpt...)
+			m, err := mailer.New(b.mailerConf)
 			if err != nil {
-				return fmt.Errorf("[rabbitmq] %w", err)
+				return fmt.Errorf("[mailer] %w", err)
 			}
-			b.rabbitmq = mq
+			initMu.Lock()
+			b.mailer = m
+			initMu.Unlock()
 			return nil
 		})
 	}
@@ -287,7 +304,9 @@ func (b *Bootstrap) runServices(c context.Context) error {
 	// Keycloak
 	if b.keycloakConf != nil && b.keycloak == nil {
 		g.Go(func() error {
+			initMu.Lock()
 			b.keycloak = keycloak.New(b.keycloakConf)
+			initMu.Unlock()
 			return nil
 		})
 	}
@@ -295,7 +314,9 @@ func (b *Bootstrap) runServices(c context.Context) error {
 	// Scheduler
 	if b.schedulerOn && b.scheduler == nil {
 		g.Go(func() error {
+			initMu.Lock()
 			b.scheduler = scheduler.New(b.schedulerOpt...)
+			initMu.Unlock()
 			return nil
 		})
 	}
@@ -307,7 +328,9 @@ func (b *Bootstrap) runServices(c context.Context) error {
 			if b.logger != nil {
 				opts = append(opts, rest.WithLogger(b.logger))
 			}
+			initMu.Lock()
 			b.restClient = rest.New(opts...)
+			initMu.Unlock()
 			return nil
 		})
 	}
@@ -319,7 +342,9 @@ func (b *Bootstrap) runServices(c context.Context) error {
 			if err != nil {
 				return err
 			}
+			initMu.Lock()
 			b.kafka = k
+			initMu.Unlock()
 			return nil
 		})
 	}
@@ -331,19 +356,9 @@ func (b *Bootstrap) runServices(c context.Context) error {
 			if err != nil {
 				return err
 			}
+			initMu.Lock()
 			b.tgBot = bot
-			return nil
-		})
-	}
-
-	// Mailer
-	if b.mailerConf != nil && b.mailer == nil {
-		g.Go(func() error {
-			mailer, err := mailer.New(b.mailerConf)
-			if err != nil {
-				return err
-			}
-			b.mailer = mailer
+			initMu.Unlock()
 			return nil
 		})
 	}
@@ -379,11 +394,11 @@ func (b *Bootstrap) Start(ctx context.Context) error {
 
 	// Start scheduler if configured
 	if b.scheduler != nil {
-		b.scheduler.Start(ctx)
+		b.scheduler.Start(b.ctx)
 	}
 
 	if b.rabbitmq != nil && b.rabbitmq.Consumer() != nil {
-		go b.rabbitmq.Consumer().Start(ctx)
+		go b.rabbitmq.Consumer().Start(b.ctx)
 	}
 
 	// Start Kafka consumer if configured (handler registered and consumer initialized)
@@ -571,6 +586,31 @@ func (b *Bootstrap) Shutdown() {
 }
 
 func (b *Bootstrap) closeServices() {
+	if b.restClient != nil {
+		if hc := b.restClient.GetClient(); hc != nil {
+			if tr, ok := hc.Transport.(*http.Transport); ok {
+				tr.CloseIdleConnections()
+			}
+		}
+		b.restClient = nil
+	}
+
+	if b.mailer != nil {
+		b.mailer = nil
+	}
+	if b.tgBot != nil {
+		b.tgBot = nil
+	}
+	if b.keycloak != nil {
+		b.keycloak = nil
+	}
+	if b.scheduler != nil {
+		b.scheduler = nil
+	}
+	if b.migration != nil {
+		b.migration = nil
+	}
+
 	// Close Logger
 	if b.logger != nil {
 		b.logger.Sync()

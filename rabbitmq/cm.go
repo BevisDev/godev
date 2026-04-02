@@ -18,10 +18,10 @@ const (
 	defaultPrefetchCount        = 1
 	defaultWorkerPool           = 10
 	defaultRetryDelay           = 5 * time.Second
-	defaultConsumerLogName      = "consumer"
+	defaultConsumerPrefix       = "consumer"
 )
 
-type M struct {
+type CM struct {
 	mq                   *MQ
 	consumers            map[string]*Consumer
 	mu                   sync.Mutex
@@ -33,11 +33,11 @@ type M struct {
 	workerPool           int
 }
 
-func newM(r *MQ) *M {
-	return &M{
+func newCM(r *MQ) *CM {
+	return &CM{
 		mq:                   r,
 		consumers:            make(map[string]*Consumer),
-		log:                  console.New(defaultConsumerLogName),
+		log:                  console.New(defaultConsumerPrefix),
 		maxConsecutiveErrors: defaultMaxConsecutiveErrors,
 		retryDelay:           defaultRetryDelay,
 		prefetchCount:        defaultPrefetchCount,
@@ -46,7 +46,7 @@ func newM(r *MQ) *M {
 }
 
 // Register adds one or more consumers to the manager.
-func (m *M) Register(consumers ...*Consumer) {
+func (m *CM) Register(consumers ...*Consumer) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -63,7 +63,7 @@ func (m *M) Register(consumers ...*Consumer) {
 	}
 }
 
-func (m *M) All() map[string]*Consumer {
+func (m *CM) All() map[string]*Consumer {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -76,7 +76,7 @@ func (m *M) All() map[string]*Consumer {
 }
 
 // Close waits for all consumer goroutines to exit (e.g. after context is cancelled).
-func (m *M) Close() {
+func (m *CM) Close() {
 	done := make(chan struct{})
 	go func() {
 		m.wg.Wait()
@@ -90,7 +90,7 @@ func (m *M) Close() {
 }
 
 // Start starts all registered consumers in separate goroutines until context is canceled.
-func (m *M) Start(ctx context.Context) {
+func (m *CM) Start(ctx context.Context) {
 	if len(m.consumers) == 0 {
 		m.log.Info("no consumer registered")
 		return
@@ -116,7 +116,7 @@ func (m *M) Start(ctx context.Context) {
 }
 
 // Run runs a single consumer with auto error handling and reconnection.
-func (m *M) Run(ctx context.Context, c *Consumer) {
+func (m *CM) Run(ctx context.Context, c *Consumer) {
 	defer m.wg.Done()
 
 	maxConsecutiveErrors := m.maxConsecutiveErrors
@@ -165,7 +165,7 @@ func (m *M) Run(ctx context.Context, c *Consumer) {
 }
 
 // Consume sets up the consumer and processes messages from the queue.
-func (m *M) Consume(ctx context.Context, c *Consumer) error {
+func (m *CM) Consume(ctx context.Context, c *Consumer) error {
 	queueName := c.Queue
 
 	ch, err := m.mq.GetChannel()
@@ -240,7 +240,7 @@ func (m *M) Consume(ctx context.Context, c *Consumer) error {
 	}
 }
 
-func (m *M) processMsg(
+func (m *CM) processMsg(
 	queueName string,
 	h Handler,
 	d amqp.Delivery,
@@ -267,7 +267,7 @@ func (m *M) processMsg(
 }
 
 // handleMsg runs Handler.Handle and recovers from panic.
-func (m *M) handleMsg(ctx context.Context, queueName string, h Handler, msg *MsgHandler) (err error) {
+func (m *CM) handleMsg(ctx context.Context, queueName string, h Handler, msg *MsgHandler) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("[RECOVER][%s] err: %v", queueName, r)
@@ -278,7 +278,7 @@ func (m *M) handleMsg(ctx context.Context, queueName string, h Handler, msg *Msg
 }
 
 // newMsgCtx creates a new context with correlation from msg
-func (m *M) newMsgCtx(msg *MsgHandler) context.Context {
+func (m *CM) newMsgCtx(msg *MsgHandler) context.Context {
 	newCtx := utils.NewCtx()
 	newCtx = utils.SetValueCtx(newCtx,
 		consts.RID,
