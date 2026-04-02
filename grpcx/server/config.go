@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"google.golang.org/grpc"
@@ -10,7 +11,7 @@ import (
 // Defaults applied by Config.clone when fields are zero.
 const (
 	defaultListenNetwork   = "tcp"
-	defaultListenAddress   = "9090"
+	defaultListenPort      = 9090
 	defaultShutdownTimeout = 15 * time.Second
 )
 
@@ -19,9 +20,15 @@ type Config struct {
 	// Network is the listener network. Typical value: "tcp".
 	Network string
 
-	// Address is the listen address (host:port).
-	// Examples: ":9090", "127.0.0.1:9090".
-	Address string
+	// Host is the listen host.
+	// - empty => listen on all interfaces (":port")
+	// - non-empty => listen on "host:port"
+	Host string
+
+	// Port is the TCP port the gRPC server listens on.
+	// When Host is empty and Port is 0, it defaults to defaultListenPort.
+	// You can set Port=0 with Host non-empty to let the OS pick an ephemeral port.
+	Port int
 
 	// ShutdownTimeout is the maximum duration for graceful shutdown.
 	ShutdownTimeout time.Duration
@@ -42,13 +49,21 @@ type Config struct {
 	Shutdown func(ctx context.Context) error
 }
 
+func (c *Config) listenAddr() string {
+	if c.Host == "" {
+		return fmt.Sprintf(":%d", c.Port)
+	}
+	return fmt.Sprintf("%s:%d", c.Host, c.Port)
+}
+
 func (c *Config) clone() *Config {
 	cc := *c
 	if cc.Network == "" {
 		cc.Network = defaultListenNetwork
 	}
-	if cc.Address == "" {
-		cc.Address = defaultListenAddress
+
+	if cc.Port == 0 {
+		cc.Port = defaultListenPort
 	}
 	if cc.ShutdownTimeout <= 0 {
 		cc.ShutdownTimeout = defaultShutdownTimeout

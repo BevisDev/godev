@@ -222,7 +222,7 @@ import (
 
 bootstrap := framework.New(
 	framework.WithServer(&server.Config{
-		Port: "8080",
+		Port: 8080,
 		Setup: func(r *gin.Engine) {
 			// Add rate limiter
 			r.Use(ratelimit.New(

@@ -14,7 +14,7 @@ func TestNew_SetupCalled(t *testing.T) {
 	setupCalled := false
 
 	app := New(&Config{
-		Port: "8080",
+		Port: 8080,
 		Setup: func(r *gin.Engine) {
 			setupCalled = true
 		},
@@ -34,7 +34,7 @@ func TestHTTPApp_Stop_ShutdownCalled(t *testing.T) {
 	shutdownCalled := false
 
 	app := New(&Config{
-		Port: "8080",
+		Port: 8080,
 		Shutdown: func(ctx context.Context) error {
 			shutdownCalled = true
 			return nil
@@ -52,7 +52,7 @@ func TestHTTPApp_Stop_ShutdownCalled(t *testing.T) {
 func TestHTTPApp_Run_ContextCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	app := New(&Config{Port: "8080"})
+	app := New(&Config{Port: 8080})
 
 	go func() {
 		time.Sleep(10 * time.Millisecond)
@@ -67,7 +67,7 @@ func TestHTTPApp_Stop_ShutdownTimeout(t *testing.T) {
 	start := time.Now()
 
 	app := New(&Config{
-		Port:            "8080",
+		Port:            8080,
 		ShutdownTimeout: 100 * time.Millisecond,
 		Shutdown: func(ctx context.Context) error {
 			<-ctx.Done()

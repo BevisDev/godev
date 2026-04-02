@@ -11,7 +11,6 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/BevisDev/godev/consts"
 	"github.com/BevisDev/godev/utils"
 	"google.golang.org/grpc"
 )
@@ -57,7 +56,7 @@ func New(cf *Config) (*GRPCApp, error) {
 // Start starts the gRPC server in a goroutine.
 // Returns immediately after the server starts listening.
 func (g *GRPCApp) Start() error {
-	lis, err := net.Listen(g.cf.Network, consts.Colon+g.cf.Address)
+	lis, err := net.Listen(g.cf.Network, g.cf.listenAddr())
 	if err != nil {
 		return err
 	}

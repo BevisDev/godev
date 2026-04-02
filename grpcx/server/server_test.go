@@ -14,7 +14,8 @@ func TestNew_SetupCalled(t *testing.T) {
 	setupCalled := false
 
 	app, err := New(&Config{
-		Address: "127.0.0.1:0",
+		Host: "127.0.0.1",
+		Port: 0,
 		Setup: func(s *grpc.Server) {
 			setupCalled = s != nil
 		},
@@ -33,7 +34,8 @@ func TestNew_NilConfig_Error(t *testing.T) {
 
 func TestGRPCApp_StartAndStop(t *testing.T) {
 	app, err := New(&Config{
-		Address: "127.0.0.1:0",
+		Host: "127.0.0.1",
+		Port: 0,
 	})
 	require.NoError(t, err)
 
@@ -50,7 +52,8 @@ func TestGRPCApp_Stop_ShutdownCalled(t *testing.T) {
 	shutdownCalled := false
 
 	app, err := New(&Config{
-		Address: "127.0.0.1:0",
+		Host: "127.0.0.1",
+		Port: 0,
 		Shutdown: func(ctx context.Context) error {
 			shutdownCalled = true
 			return nil
@@ -68,7 +71,8 @@ func TestGRPCApp_Run_ContextCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	app, err := New(&Config{
-		Address: "127.0.0.1:0",
+		Host: "127.0.0.1",
+		Port: 0,
 	})
 	require.NoError(t, err)
 
@@ -85,7 +89,8 @@ func TestGRPCApp_Stop_ShutdownTimeout(t *testing.T) {
 	start := time.Now()
 
 	app, err := New(&Config{
-		Address:         "127.0.0.1:0",
+		Host:            "127.0.0.1",
+		Port:            0,
 		ShutdownTimeout: 100 * time.Millisecond,
 		Shutdown: func(ctx context.Context) error {
 			<-ctx.Done()

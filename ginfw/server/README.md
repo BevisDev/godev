@@ -25,7 +25,7 @@ Configuration struct for the HTTP server:
 | Field              | Type                          | Description                                                      |
 |-------------------|-------------------------------|------------------------------------------------------------------|
 | `IsProduction`    | `bool`                        | Enable production mode (release mode, minimal logging)          |
-| `Port`            | `string`                      | TCP port to listen on (e.g., `"8080"`)                         |
+| `Port`            | `int`                         | TCP port to listen on (e.g., `8080`)                         |
 | `Proxies`         | `[]string`                    | List of trusted proxy IPs or CIDRs                              |
 | `ShutdownTimeout` | `time.Duration`               | Maximum duration for graceful shutdown (default: 15s)           |
 | `ReadHeaderTimeout` | `time.Duration`             | Timeout for reading request headers (default: 5s)               |
@@ -68,7 +68,7 @@ func main() {
 	ctx := context.Background()
 
 	app := server.New(&server.Config{
-		Port:         "8080",
+		Port:         8080,
 		IsProduction: false,
 		Setup: func(r *gin.Engine) {
 			r.GET("/health", func(c *gin.Context) {
@@ -88,7 +88,7 @@ func main() {
 
 ```go
 app := server.New(&server.Config{
-	Port: "8080",
+	Port: 8080,
 	Setup: func(r *gin.Engine) {
 		r.GET("/api/users", getUsersHandler)
 	},
@@ -113,7 +113,7 @@ if err := app.Stop(ctx); err != nil {
 
 ```go
 app := server.New(&server.Config{
-	Port: "8080",
+	Port: 8080,
 	Setup: func(r *gin.Engine) {
 		r.GET("/health", healthHandler)
 	},
@@ -131,7 +131,7 @@ app.Run(context.Background())
 
 ```go
 app := server.New(&server.Config{
-	Port:         "8080",
+	Port:         8080,
 	IsProduction: true,
 	Proxies:      []string{"127.0.0.1", "10.0.0.0/8"},
 	ShutdownTimeout: 30 * time.Second,
@@ -163,7 +163,7 @@ import (
 
 bootstrap := framework.New(
 	framework.WithServer(&server.Config{
-		Port: "8080",
+		Port: 8080,
 		Setup: func(r *gin.Engine) {
 			r.GET("/health", healthHandler)
 		},

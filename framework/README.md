@@ -76,7 +76,7 @@ func main() {
 
 		// HTTP Server
 		framework.WithServer(&server.Config{
-			Port:         "8080",
+			Port:         8080,
 			IsProduction: false,
 			Setup: func(r *gin.Engine) {
 				r.GET("/health", func(c *gin.Context) {
@@ -227,7 +227,7 @@ bootstrap := framework.New(
 
 	// HTTP Server
 	framework.WithServer(&server.Config{
-		Port:         "8080",
+		Port:         8080,
 		IsProduction: true,
 		Setup: func(r *gin.Engine) {
 			// Setup routes

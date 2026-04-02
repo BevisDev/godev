@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -68,7 +69,7 @@ func New(cfg *Config) *HTTPApp {
 // Use Run() to start and wait for shutdown signals.
 func (h *HTTPApp) Start() error {
 	go func() {
-		log.Printf("[server] listening on :%s", h.config.Port)
+		log.Printf("[server] listening on :%d", h.config.Port)
 		if err := h.server.ListenAndServe(); err != nil &&
 			!errors.Is(err, http.ErrServerClosed) {
 			h.errCh <- err
@@ -79,7 +80,7 @@ func (h *HTTPApp) Start() error {
 
 func newHTTPServer(handler http.Handler, config *Config) *http.Server {
 	return &http.Server{
-		Addr:              consts.Colon + config.Port,
+		Addr:              fmt.Sprintf("%s%d", consts.Colon, config.Port),
 		Handler:           handler,
 		ReadHeaderTimeout: config.ReadHeaderTimeout,
 		ReadTimeout:       config.ReadTimeout,

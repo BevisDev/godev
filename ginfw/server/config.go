@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	defaultHTTPPort          = "8080"
+	defaultHTTPPort          = 8080
 	defaultShutdownTimeout   = 15 * time.Second
 	defaultReadHeaderTimeout = 5 * time.Second
 	defaultReadTimeout       = 10 * time.Second
@@ -26,8 +26,7 @@ type Config struct {
 	Debug bool
 
 	// Port is the TCP port the HTTP server listens on.
-	// Example: "8080"
-	Port string
+	Port int
 
 	// Proxies defines a list of trusted proxy IPs or CIDRs.
 	// If empty, no trusted proxies are configured.
@@ -80,7 +79,7 @@ type Config struct {
 
 func (c *Config) clone() *Config {
 	cc := *c
-	if cc.Port == "" {
+	if cc.Port == 0 {
 		cc.Port = defaultHTTPPort
 	}
 

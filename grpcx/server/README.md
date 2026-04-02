@@ -6,13 +6,11 @@ Package **`server`** (import path `github.com/BevisDev/godev/grpcx/server`) wrap
 
 ## Defaults
 
-Định nghĩa trong [`defaults.go`](./defaults.go), áp dụng khi field trong `Config` để trống / zero:
+Các giá trị mặc định áp dụng khi field trong `Config` để trống / zero:
 
-| Hằng | Giá trị |
-|------|---------|
-| `DefaultListenNetwork` | `"tcp"` |
-| `DefaultListenAddress` | `":9090"` |
-| `DefaultShutdownTimeout` | `15s` |
+- `Network`: `"tcp"`
+- `Port`: `9090` (chỉ khi `Host` rỗng và `Port == 0`)
+- `ShutdownTimeout`: `15s`
 
 ---
 
@@ -29,8 +27,9 @@ Package **`server`** (import path `github.com/BevisDev/godev/grpcx/server`) wrap
 
 | Field | Mô tả |
 |-------|--------|
-| `Network` | Listener network (mặc định: `DefaultListenNetwork`) |
-| `Address` | `host:port` (mặc định: `DefaultListenAddress`) |
+| `Network` | Listener network (mặc định: `"tcp"`) |
+| `Host` | Listen host (rỗng => listen on all interfaces) |
+| `Port` | TCP port để listen |
 | `ShutdownTimeout` | Thời gian tối đa cho graceful stop (mặc định: `DefaultShutdownTimeout`) |
 | `UnaryInterceptors` | Chain unary interceptor |
 | `StreamInterceptors` | Chain stream interceptor |
@@ -68,7 +67,7 @@ func main() {
 	ctx := context.Background()
 
 	app, err := grpcsrv.New(&grpcsrv.Config{
-		Address: ":9090",
+		Port: 9090,
 		Setup: func(s *grpc.Server) {
 			// pb.RegisterYourServiceServer(s, handler)
 		},

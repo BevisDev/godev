@@ -216,7 +216,7 @@ import (
 bootstrap := framework.New(
 	framework.WithLogger(&logger.Config{...}),
 	framework.WithServer(&server.Config{
-		Port: "8080",
+		Port: 8080,
 		Setup: func(r *gin.Engine) {
 			// Add HTTP logger middleware
 			r.Use(httplogger.New(
