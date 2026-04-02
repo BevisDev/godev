@@ -16,6 +16,10 @@ import (
 
 const maxMessageSize = 50000 // max size of message body in bytes
 
+// Producer publishes messages over AMQP. Each Send / PublishEvent / BroadcastEvent
+// acquires a channel, publishes with PublishWithContext(ctx, ...), and releases the channel.
+// Pass ctx with a deadline or timeout when you need a bounded wait; the client does not
+// impose a default publish timeout.
 type Producer struct {
 	mq  *MQ
 	log *console.Logger
@@ -61,21 +65,14 @@ func (p *Producer) BroadcastEvent(
 
 // publish is the shared internal publish logic for all producer APIs.
 // It sends a message to the specified exchange and routing key.
-// If ctx has no deadline, publishTimeout from MQ options is applied.
+// Callers should pass a ctx with a deadline or timeout when needed.
 func (p *Producer) publish(
-	c context.Context,
+	ctx context.Context,
 	exchange string,
 	routingKey string,
 	message any,
 	props ...MsgProperties,
 ) error {
-	var ctx = c
-	if _, ok := c.Deadline(); !ok && p.mq.publishTimeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, p.mq.publishTimeout)
-		defer cancel()
-	}
-
 	return p.mq.WithChannel(func(ch *amqp.Channel) error {
 		publishing, err := p.buildPublishing(ctx, message, props...)
 		if err != nil {

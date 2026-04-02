@@ -276,7 +276,7 @@ func (b *Bootstrap) runServices(c context.Context) error {
 	// MQ
 	if b.rabbitConf != nil && b.rabbitmq == nil {
 		g.Go(func() error {
-			mq, err := rabbitmq.New(b.rabbitConf, b.rabbitOpt...)
+			mq, err := rabbitmq.New(b.ctx, b.rabbitConf, b.rabbitOpt...)
 			if err != nil {
 				return fmt.Errorf("[rabbitmq] %w", err)
 			}

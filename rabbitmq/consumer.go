@@ -20,11 +20,11 @@ type Consumer struct {
 	Handler Handler
 
 	// PrefetchCount sets the AMQP QoS prefetch count (messages) per queue/consumer.
-	// If <= 0, it falls back to the MQ default (WithPrefetchCount).
+	// If <= 0, CM uses its default (prefetch 1).
 	PrefetchCount int
 
 	// WorkerPool is number of concurrent workers for this consumer.
-	// If <= 0, it falls back to 10
+	// If <= 0, CM uses its default (10).
 	WorkerPool int
 
 	// MaxConsecutiveErrors caps the number of consecutive consume errors before stopping this consumer.

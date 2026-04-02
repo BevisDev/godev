@@ -48,7 +48,7 @@ type MQ struct {
 //
 // Returns an error if the configuration is nil, the connection fails,
 // or the channel cannot be created.
-func New(cfg *Config, opts ...Option) (*MQ, error) {
+func New(c context.Context, cfg *Config, opts ...Option) (*MQ, error) {
 	if cfg == nil {
 		return nil, ErrNilConfig
 	}
@@ -58,8 +58,7 @@ func New(cfg *Config, opts ...Option) (*MQ, error) {
 		f(opt)
 	}
 
-	ctx, cancel := utils.NewCtxCancel(context.Background())
-
+	ctx, cancel := utils.NewCtxCancel(c)
 	r := &MQ{
 		config:      cfg.clone(),
 		options:     opt,

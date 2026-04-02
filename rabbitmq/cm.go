@@ -21,6 +21,9 @@ const (
 	defaultConsumerPrefix       = "consumer"
 )
 
+// CM is the consumer manager: register Consumer values, then Start(ctx) to run
+// queue workers until ctx is cancelled. Optional rabbitmq.WithAutoCommit controls
+// whether successful handlers are acked automatically.
 type CM struct {
 	mq                   *MQ
 	consumers            map[string]*Consumer
