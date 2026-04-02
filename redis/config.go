@@ -5,6 +5,11 @@ import (
 	"time"
 )
 
+const (
+	defaultPoolSize      = 10
+	defaultClientTimeout = 5 * time.Second
+)
+
 // Config holds configuration options for connecting to a Redis instance.
 //
 // It includes host address, port, authentication credentials, selected DB index,
@@ -22,10 +27,10 @@ type Config struct {
 func (c *Config) clone() *Config {
 	cc := *c
 	if cc.Timeout <= 0 {
-		cc.Timeout = 5 * time.Second
+		cc.Timeout = defaultClientTimeout
 	}
 	if cc.PoolSize <= 0 {
-		cc.PoolSize = 10
+		cc.PoolSize = defaultPoolSize
 	}
 	return &cc
 }

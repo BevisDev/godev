@@ -6,6 +6,8 @@ import (
 	"github.com/BevisDev/godev/logger"
 )
 
+const defaultClientTimeout = 5 * time.Second
+
 type Option func(*options)
 
 type options struct {
@@ -33,7 +35,7 @@ type options struct {
 
 func withDefaults() *options {
 	return &options{
-		timeout:                5 * time.Second,
+		timeout:                defaultClientTimeout,
 		skipBodyByPaths:        make(map[string]struct{}),
 		skipBodyByContentTypes: make(map[string]struct{}),
 	}

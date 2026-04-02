@@ -1,26 +1,46 @@
 package rabbitmq
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
-func NewMQTest() (*MQ, error) {
-	mq, err := New(&Config{
-		Host:     "localhost",
-		Port:     5672,
-		Username: "admin",
-		Password: "pass123",
-		VHost:    "/",
-	})
-	return mq, err
+// Defaults for integration tests against a local RabbitMQ broker.
+// Override with env in the future if needed.
+const (
+	testRabbitHost     = "localhost"
+	testRabbitPort     = 5672
+	testRabbitUsername = "guest"
+	testRabbitPassword = "guest"
+	testRabbitVHost    = "/"
+)
+
+func testRabbitConfig() *Config {
+	return &Config{
+		Host:     testRabbitHost,
+		Port:     testRabbitPort,
+		Username: testRabbitUsername,
+		Password: testRabbitPassword,
+		VHost:    testRabbitVHost,
+	}
+}
+
+// newTestMQ connects to RabbitMQ; skips the test if the broker is unavailable.
+func newTestMQ(t *testing.T) *MQ {
+	t.Helper()
+	mq, err := New(context.Background(), testRabbitConfig())
+	if err != nil {
+		t.Skipf("skip when RabbitMQ is not available: %v", err)
+	}
+	t.Cleanup(func() { mq.Close() })
+	return mq
 }
 
 func TestConnectMQ(t *testing.T) {
-	mq, err := NewMQTest()
+	mq := newTestMQ(t)
 
-	require.NoError(t, err, "should connect to rabbitmq")
 	require.NotNil(t, mq, "mq must not be nil")
 	require.NotNil(t, mq.connection, "connection must not be nil")
 
@@ -29,5 +49,4 @@ func TestConnectMQ(t *testing.T) {
 	require.NotNil(t, ch, "channel must not be nil")
 
 	_ = ch.Close()
-	mq.Close()
 }

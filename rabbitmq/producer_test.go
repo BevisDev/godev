@@ -70,7 +70,7 @@ func TestBuildMessage_TooLarge(t *testing.T) {
 }
 
 func TestRabbitMQ_New_NilConfig(t *testing.T) {
-	mq, err := New(nil)
+	mq, err := New(nil, nil)
 	require.Error(t, err)
 	assert.Nil(t, mq)
 	assert.Contains(t, err.Error(), "config is nil")

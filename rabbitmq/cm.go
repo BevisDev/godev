@@ -15,7 +15,7 @@ import (
 
 const (
 	defaultMaxConsecutiveErrors = 10
-	defaultPrefetchCount        = 1
+	defaultPrefetchCount        = 10
 	defaultWorkerPool           = 10
 	defaultRetryDelay           = 5 * time.Second
 	defaultConsumerPrefix       = "consumer"

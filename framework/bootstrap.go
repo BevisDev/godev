@@ -143,6 +143,13 @@ func (b *Bootstrap) Init(ctx context.Context) error {
 	}
 	b.mu.Unlock()
 
+	initOK := false
+	defer func() {
+		if !initOK {
+			b.closeServices()
+		}
+	}()
+
 	// Consume before init hooks
 	for _, fn := range b.beforeInit {
 		if err := fn(ctx); err != nil {
@@ -193,21 +200,22 @@ func (b *Bootstrap) Init(ctx context.Context) error {
 	b.mu.Lock()
 	b.initialized = true
 	b.mu.Unlock()
+	initOK = true
 
 	b.log.Info("initialization completed")
 	return nil
 }
 
-func (b *Bootstrap) runServices(c context.Context) error {
+func (b *Bootstrap) runServices(ctx context.Context) error {
 	var initMu sync.Mutex
 
 	// Init services in parallel
-	g, ctx := errgroup.WithContext(c)
+	g, gCtx := errgroup.WithContext(ctx)
 
 	for _, f := range b.services {
 		fn := f
 		g.Go(func() error {
-			return fn(ctx)
+			return fn(gCtx)
 		})
 	}
 
@@ -276,7 +284,7 @@ func (b *Bootstrap) runServices(c context.Context) error {
 	// MQ
 	if b.rabbitConf != nil && b.rabbitmq == nil {
 		g.Go(func() error {
-			mq, err := rabbitmq.New(b.ctx, b.rabbitConf, b.rabbitOpt...)
+			mq, err := rabbitmq.New(ctx, b.rabbitConf, b.rabbitOpt...)
 			if err != nil {
 				return fmt.Errorf("[rabbitmq] %w", err)
 			}
@@ -394,11 +402,11 @@ func (b *Bootstrap) Start(ctx context.Context) error {
 
 	// Start scheduler if configured
 	if b.scheduler != nil {
-		b.scheduler.Start(b.ctx)
+		b.scheduler.Start(ctx)
 	}
 
 	if b.rabbitmq != nil && b.rabbitmq.Consumer() != nil {
-		go b.rabbitmq.Consumer().Start(b.ctx)
+		go b.rabbitmq.Consumer().Start(ctx)
 	}
 
 	// Start Kafka consumer if configured (handler registered and consumer initialized)
@@ -408,11 +416,11 @@ func (b *Bootstrap) Start(ctx context.Context) error {
 			maxRetries := b.kafkaConsumerRetry.maxRetries
 			retryDelay := b.kafkaConsumerRetry.retryDelay
 			go func() {
-				_ = b.kafka.ConsumeWithRetry(b.ctx, handler, maxRetries, retryDelay)
+				_ = b.kafka.ConsumeWithRetry(ctx, handler, maxRetries, retryDelay)
 			}()
 		} else {
 			go func() {
-				_ = b.kafka.Consume(b.ctx, handler)
+				_ = b.kafka.Consume(ctx, handler)
 			}()
 		}
 		b.log.Info("Kafka consumer started")
@@ -517,11 +525,7 @@ func (b *Bootstrap) Run(ctx context.Context) error {
 		return fmt.Errorf("start failed: %w", err)
 	}
 
-	// Graceful shutdown
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	return b.Stop(shutdownCtx)
+	return b.Stop(ctx)
 }
 
 // Health checks the health of all configured services plus any custom health checkers

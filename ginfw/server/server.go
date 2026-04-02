@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/BevisDev/godev/consts"
 	"github.com/BevisDev/godev/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
@@ -78,7 +79,7 @@ func (h *HTTPApp) Start() error {
 
 func newHTTPServer(handler http.Handler, config *Config) *http.Server {
 	return &http.Server{
-		Addr:              ":" + config.Port,
+		Addr:              consts.Colon + config.Port,
 		Handler:           handler,
 		ReadHeaderTimeout: config.ReadHeaderTimeout,
 		ReadTimeout:       config.ReadTimeout,

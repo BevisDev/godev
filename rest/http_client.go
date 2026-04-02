@@ -385,7 +385,7 @@ func (r *HTTPRequest[T]) buildURL() {
 		if strings.HasPrefix(key, ":") {
 			r.url = strings.ReplaceAll(r.url, key, val)
 		} else {
-			r.url = strings.ReplaceAll(r.url, ":"+key, val)
+			r.url = strings.ReplaceAll(r.url, consts.Colon+key, val)
 		}
 	}
 

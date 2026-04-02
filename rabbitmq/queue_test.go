@@ -7,28 +7,24 @@ import (
 )
 
 func TestDeclare_DirectExchange(t *testing.T) {
-	mq, err := NewMQTest()
-	require.NoError(t, err)
-	defer mq.Close()
+	mq := newTestMQ(t)
 
 	queues := []string{
 		"it.direct.queue",
 		"it.direct.queue1",
 	}
 
-	err = mq.Queue().CreateQueues(queues...)
+	err := mq.Queue().CreateQueues(queues...)
 	require.NoError(t, err)
 }
 
 func TestDeclare_TopicExchange(t *testing.T) {
-	mq, err := NewMQTest()
-	require.NoError(t, err)
-	defer mq.Close()
+	mq := newTestMQ(t)
 
 	queue := "it.topic.queue"
 	exchange := "it.topic.exchange"
 
-	err = mq.Queue().Declare(Spec{
+	err := mq.Queue().Declare(Spec{
 		Queues: []QueueSpec{
 			{Name: queue},
 		},
@@ -49,17 +45,13 @@ func TestDeclare_TopicExchange(t *testing.T) {
 }
 
 func TestDeclare_FanoutExchange(t *testing.T) {
-	mq, err := NewMQTest()
-	if err != nil {
-		t.Skipf("skip when RabbitMQ is not available: %v", err)
-	}
-	defer mq.Close()
+	mq := newTestMQ(t)
 
 	queue1 := "it.fanout.q1"
 	queue2 := "it.fanout.q2"
 	exchange := "it.fanout.exchange"
 
-	err = mq.Queue().Declare(Spec{
+	err := mq.Queue().Declare(Spec{
 		Queues: []QueueSpec{
 			{Name: queue1},
 			{Name: queue2},
