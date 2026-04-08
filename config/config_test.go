@@ -267,3 +267,119 @@ func TestMapStruct_BoolVariants(t *testing.T) {
 		})
 	}
 }
+
+func TestMapStructAny_Panic(t *testing.T) {
+	cfMap := map[string]interface{}{"name": "abc"}
+
+	_, err := MapStructAny[*TestConfig](cfMap)
+	require.Error(t, err)
+}
+
+func TestMapStructAny_AllTypesInterface(t *testing.T) {
+	cfMap := map[string]interface{}{
+		"name":           "Alice",
+		"age":            30,
+		"rate32":         1.23,
+		"rate64":         4.56,
+		"active":         true,
+		"tags":           []interface{}{"red", "green", "blue"},
+		"numbers":        []interface{}{1, 2, 3, 4},
+		"threshold":      []interface{}{0.1, 0.5, 1.5},
+		"server_name":    "ServerApp",
+		"server_profile": "test_profile",
+		"client_name":    "ClientApp",
+	}
+
+	cfg, err := MapStructAny[TestConfig](cfMap)
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+
+	assert.Equal(t, "Alice", cfg.Name)
+	assert.Equal(t, 30, cfg.Age)
+	assert.InDelta(t, 1.23, float64(cfg.Rate32), 0.001)
+	assert.Equal(t, 4.56, cfg.Rate64)
+	assert.True(t, cfg.Active)
+	assert.True(t, equalSlice(cfg.Tags, []string{"red", "green", "blue"}))
+	assert.True(t, equalSlice(cfg.Numbers, []int{1, 2, 3, 4}))
+	assert.True(t, equalSlice(cfg.Threshold, []float64{0.1, 0.5, 1.5}))
+	assert.Equal(t, "ServerApp", cfg.Server.Name)
+	assert.Equal(t, "test_profile", cfg.Server.Profile)
+	require.NotNil(t, cfg.Client)
+	assert.Equal(t, "ClientApp", cfg.Client.Name)
+}
+
+func TestMapStructAny_StringCommaSlices(t *testing.T) {
+	cfMap := map[string]interface{}{
+		"name":      "Bob",
+		"active":    "true",
+		"tags":      "red, green ,blue",
+		"numbers":   "1,2,3,4",
+		"threshold": "0.1,0.5,1.5",
+	}
+
+	cfg, err := MapStructAny[TestConfig](cfMap)
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+
+	assert.Equal(t, "Bob", cfg.Name)
+	assert.True(t, cfg.Active)
+	assert.True(t, equalSlice(cfg.Tags, []string{"red", "green", "blue"}))
+	assert.True(t, equalSlice(cfg.Numbers, []int{1, 2, 3, 4}))
+	assert.True(t, equalSlice(cfg.Threshold, []float64{0.1, 0.5, 1.5}))
+}
+
+func TestMapStructViper_AllTypesAndCSV(t *testing.T) {
+	type server struct {
+		Name    string `config:"server_name"`
+		Profile string `config:"server_profile"`
+	}
+
+	type client struct {
+		Name string `config:"client_name"`
+	}
+
+	type Cfg struct {
+		Name      string    `config:"name"`
+		Age       int       `config:"age"`
+		Rate32    float32   `config:"rate32"`
+		Rate64    float64   `config:"rate64"`
+		Active    bool      `config:"active"`
+		Tags      []string  `config:"tags"`
+		Numbers   []int     `config:"numbers"`
+		Threshold []float64 `config:"threshold"`
+
+		Server server `config:",squash"`
+		Client *client `config:",squash"`
+	}
+
+	cfMap := map[string]interface{}{
+		"name":           "Alice",
+		"age":            "30",
+		"rate32":         1.23,
+		"rate64":         "4.56",
+		"active":         "yes",
+		"tags":           "red, green ,blue",
+		"numbers":        "1,2,3,4",
+		"threshold":      "0.1,0.5,1.5",
+		"server_name":    "ServerApp",
+		"server_profile": "test_profile",
+		"client_name":    "ClientApp",
+	}
+
+	cfg, err := MapStructViper[Cfg](cfMap)
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+
+	assert.Equal(t, "Alice", cfg.Name)
+	assert.Equal(t, 30, cfg.Age)
+	assert.InDelta(t, 1.23, float64(cfg.Rate32), 0.001)
+	assert.Equal(t, 4.56, cfg.Rate64)
+	assert.True(t, cfg.Active)
+	assert.True(t, equalSlice(cfg.Tags, []string{"red", "green", "blue"}))
+	assert.True(t, equalSlice(cfg.Numbers, []int{1, 2, 3, 4}))
+	assert.True(t, equalSlice(cfg.Threshold, []float64{0.1, 0.5, 1.5}))
+	assert.Equal(t, "ServerApp", cfg.Server.Name)
+	assert.Equal(t, "test_profile", cfg.Server.Profile)
+	require.NotNil(t, cfg.Client)
+	assert.Equal(t, "ClientApp", cfg.Client.Name)
+}

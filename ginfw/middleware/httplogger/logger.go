@@ -46,7 +46,7 @@ func (h *HTTPLogger) Handler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		startTime := time.Now()
 
-		// Get or generate Request ID
+		// Get or generate Request ApplicationID
 		rid := c.Request.Header.Get(consts.XRequestID)
 		if rid == "" {
 			rid = random.NewUUID()

@@ -36,22 +36,22 @@ func TestSendValidation(t *testing.T) {
 
 	tests := []struct {
 		name string
-		mail Mail
+		mail Email
 		err  error
 	}{
 		{
 			"no recipients",
-			Mail{Subject: "Hi", Body: "Body"},
+			Email{Subject: "Hi", Body: "Body"},
 			ErrNoRecipients,
 		},
 		{
 			"empty subject",
-			Mail{To: []string{"a@test.com"}, Body: "Body"},
+			Email{To: []string{"a@test.com"}, Body: "Body"},
 			ErrEmptySubject,
 		},
 		{
 			"empty body",
-			Mail{To: []string{"a@test.com"}, Subject: "Hi"},
+			Email{To: []string{"a@test.com"}, Subject: "Hi"},
 			ErrEmptyBody,
 		},
 	}
@@ -75,7 +75,7 @@ func TestBuildMessage(t *testing.T) {
 	}
 
 	t.Run("simple text email", func(t *testing.T) {
-		mail := Mail{
+		mail := Email{
 			To:      []string{"recipient@example.com"},
 			Subject: "Test",
 			Body:    "Hello World",
@@ -89,18 +89,18 @@ func TestBuildMessage(t *testing.T) {
 
 		msgStr := string(message)
 		if !strings.Contains(msgStr, "Hello World") {
-			t.Errorf("Message should contain body text")
+			t.Errorf("Email should contain body text")
 		}
 		if !strings.Contains(msgStr, "From:") {
-			t.Errorf("Message should contain From header")
+			t.Errorf("Email should contain From header")
 		}
 		if !strings.Contains(msgStr, "To:") {
-			t.Errorf("Message should contain To header")
+			t.Errorf("Email should contain To header")
 		}
 	})
 
 	t.Run("HTML email", func(t *testing.T) {
-		mail := Mail{
+		mail := Email{
 			To:      []string{"recipient@example.com"},
 			Subject: "Test HTML",
 			Body:    "<h1>Hello</h1>",
@@ -119,7 +119,7 @@ func TestBuildMessage(t *testing.T) {
 	})
 
 	t.Run("email with attachment", func(t *testing.T) {
-		mail := Mail{
+		mail := Email{
 			To:      []string{"recipient@example.com"},
 			Subject: "Test Attachment",
 			Body:    "See attachment",
@@ -142,7 +142,7 @@ func TestBuildMessage(t *testing.T) {
 			t.Errorf("Email with attachment should use multipart/mixed")
 		}
 		if !strings.Contains(msgStr, "test.txt") {
-			t.Errorf("Message should contain attachment filename")
+			t.Errorf("Email should contain attachment filename")
 		}
 	})
 }
@@ -175,7 +175,7 @@ func BenchmarkBuildMessage(b *testing.B) {
 		},
 	}
 
-	mail := Mail{
+	mail := Email{
 		To:      []string{"recipient@example.com"},
 		Subject: "Benchmark Test",
 		Body:    "This is a benchmark test message",

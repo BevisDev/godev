@@ -2,12 +2,10 @@ package consts
 
 // punctuation — quotes & apostrophe
 const (
-	Apostrophe          = "'"
-	QuoteSingle         = "'"
-	QuoteDouble         = `"`
-	QuoteBacktick       = "`"
-	QuoteLeftGuillemet  = "«"
-	QuoteRightGuillemet = "»"
+	Apostrophe    = "'"
+	QuoteSingle   = "'"
+	QuoteDouble   = `"`
+	QuoteBacktick = "`"
 )
 
 // punctuation — brackets & grouping
@@ -27,11 +25,10 @@ const (
 	Comma       = ","
 	Semicolon   = ";"
 	Colon       = ":"
-	Period      = "."
+	Dot         = "."
 	Ellipsis    = "…"
 	Exclamation = "!"
 	Question    = "?"
-	Interpunct  = "·"
 )
 
 // punctuation — dash & hyphen variants
@@ -69,4 +66,5 @@ const (
 	Newline = "\n"
 	CR      = "\r"
 	NBSP    = "\u00a0" // no-break space
+	CRLF    = "\r\n"
 )

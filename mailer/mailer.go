@@ -12,34 +12,25 @@ import (
 	"time"
 
 	"github.com/BevisDev/godev/consts"
+	"github.com/BevisDev/godev/utils/crypto"
+	"github.com/BevisDev/godev/utils/datetime"
 )
 
-// Mailer handles email sending.
-type Mailer struct {
+type Mailer interface {
+	Send(mail *Email) error
+	SendTemplate(to []string, subject string, templatePath string, data any) error
+	SendTemplateString(to []string, subject string, templateStr string, data any) error
+}
+
+// smtpMailer handles email sending.
+type smtpMailer struct {
 	cfg  *Config
 	auth smtp.Auth
 	addr string
 }
 
-// Mail represents an email message.
-type Mail struct {
-	To          []string
-	Cc          []string
-	Bcc         []string
-	Subject     string
-	Body        string
-	IsHTML      bool
-	Attachments []Attachment
-}
-
-// Attachment represents an email attachment.
-type Attachment struct {
-	Filename string
-	Content  []byte
-}
-
 // New creates a Mailer with the given config.
-func New(cfg *Config) (*Mailer, error) {
+func New(cfg *Config) (*smtpMailer, error) {
 	if cfg == nil {
 		return nil, ErrConfigNil
 	}
@@ -47,7 +38,7 @@ func New(cfg *Config) (*Mailer, error) {
 	auth := smtp.PlainAuth("", cfg.Username, cfg.Password, cfg.Host)
 	addr := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
 
-	return &Mailer{
+	return &smtpMailer{
 		cfg:  cfg,
 		auth: auth,
 		addr: addr,
@@ -55,8 +46,8 @@ func New(cfg *Config) (*Mailer, error) {
 }
 
 // Send sends an email. It validates the mail and returns an error if send fails.
-func (m *Mailer) Send(mail Mail) error {
-	if err := validateMail(mail); err != nil {
+func (m *smtpMailer) Send(mail *Email) error {
+	if err := mail.validate(); err != nil {
 		return err
 	}
 
@@ -69,79 +60,79 @@ func (m *Mailer) Send(mail Mail) error {
 		m.addr,
 		m.auth,
 		m.cfg.From,
-		append(mail.To, mail.Cc...),
+		mail.To,
 		message,
 	)
 }
 
-func validateMail(mail Mail) error {
-	if len(mail.To) == 0 {
-		return ErrNoRecipients
-	}
-	if mail.Subject == "" {
-		return ErrEmptySubject
-	}
-	if mail.Body == "" {
-		return ErrEmptyBody
-	}
-	return nil
-}
-
 // buildMessage constructs the full email message (headers + body, with optional attachments).
-func (m *Mailer) buildMessage(mail Mail) ([]byte, error) {
+func (m *smtpMailer) buildMessage(mail *Email) ([]byte, error) {
 	var buf bytes.Buffer
-
-	m.writeHeaders(&buf, mail)
-
-	if len(mail.Attachments) == 0 {
-		m.writeSimpleBody(&buf, mail)
-		return buf.Bytes(), nil
+	var boundary string
+	if len(mail.Attachments) > 0 {
+		boundary = fmt.Sprintf("boundary_%d", time.Now().UnixNano())
 	}
 
-	boundary := fmt.Sprintf("boundary_%d", time.Now().UnixNano())
-	fmt.Fprintf(&buf, "Content-Type: multipart/mixed; boundary=\"%s\"\r\n\r\n", boundary)
+	// write headers
+	m.writeHeaders(&buf, mail, boundary)
 
-	m.writeBodyPart(&buf, mail, boundary)
-	for _, att := range mail.Attachments {
-		m.writeAttachmentPart(&buf, att, boundary)
+	// write body
+	if boundary == "" {
+		buf.WriteString(mail.Body + consts.CRLF)
+	} else {
+		m.writeBodyPart(&buf, mail, boundary)
+		for _, att := range mail.Attachments {
+			m.writeAttachmentPart(&buf, att, boundary)
+		}
+		fmt.Fprintf(&buf, "--%s--%s", boundary, consts.CRLF)
 	}
-	fmt.Fprintf(&buf, "--%s--\r\n", boundary)
 
 	return buf.Bytes(), nil
 }
 
-func (m *Mailer) writeHeaders(buf *bytes.Buffer, mail Mail) {
-	fmt.Fprintf(buf, "From: %s\r\n", m.cfg.From)
-	fmt.Fprintf(buf, "To: %s\r\n", strings.Join(mail.To, ", "))
+func (m *smtpMailer) writeHeaders(buf *bytes.Buffer, mail *Email, boundary string) {
+	fmt.Fprintf(buf, "%s: %s%s", consts.From, m.cfg.From, consts.CRLF)
+	fmt.Fprintf(buf, "%s: %s%s",
+		consts.To, strings.Join(mail.To, ", "), consts.CRLF)
 	if len(mail.Cc) > 0 {
-		fmt.Fprintf(buf, "Cc: %s\r\n", strings.Join(mail.Cc, ", "))
+		fmt.Fprintf(buf, "%s: %s%s",
+			consts.Cc, strings.Join(mail.Cc, ", "), consts.CRLF)
 	}
-	fmt.Fprintf(buf, "Subject: %s\r\n", mail.Subject)
-	fmt.Fprintf(buf, "MIME-Version: 1.0\r\n")
-}
 
-func (m *Mailer) writeSimpleBody(buf *bytes.Buffer, mail Mail) {
-	if mail.IsHTML {
-		buf.WriteString("Content-Type: text/html; charset=UTF-8\r\n")
+	subjectEncoded := base64.StdEncoding.EncodeToString([]byte(mail.Subject))
+	fmt.Fprintf(buf, "%s: =?UTF-8?B?%s?=%s",
+		consts.Subject, subjectEncoded, consts.CRLF)
+
+	fmt.Fprintf(buf, "MIME-Version: 1.0%s", consts.CRLF)
+	fmt.Fprintf(buf, "%s: %s%s",
+		consts.Date, datetime.ToString(time.Now(), time.RFC1123Z), consts.CRLF)
+
+	if boundary != "" {
+		fmt.Fprintf(buf, "Content-Type: multipart/mixed; boundary=\"%s\"%s", boundary, consts.CRLF)
 	} else {
-		buf.WriteString("Content-Type: text/plain; charset=UTF-8\r\n")
+		contentType := consts.TextPlain
+		if mail.IsHTML {
+			contentType = consts.TextHTML
+		}
+		fmt.Fprintf(buf, "%s: %s; %s%s",
+			consts.ContentType, contentType, consts.CharsetUTF8, consts.CRLF)
 	}
-	buf.WriteString("\r\n")
-	buf.WriteString(mail.Body)
+	buf.WriteString(consts.CRLF)
 }
 
-func (m *Mailer) writeBodyPart(buf *bytes.Buffer, mail Mail, boundary string) {
-	fmt.Fprintf(buf, "--%s\r\n", boundary)
+func (m *smtpMailer) writeBodyPart(buf *bytes.Buffer, mail *Email, boundary string) {
+	fmt.Fprintf(buf, "--%s%s", boundary, consts.CRLF)
+	contentType := consts.TextPlain
 	if mail.IsHTML {
-		fmt.Fprintf(buf, "Content-Type: text/html; charset=UTF-8\r\n")
-	} else {
-		fmt.Fprintf(buf, "Content-Type: text/plain; charset=UTF-8\r\n")
+		contentType = consts.TextHTML
 	}
-	fmt.Fprintf(buf, "\r\n")
-	fmt.Fprintf(buf, "%s\r\n", mail.Body)
+	fmt.Fprintf(buf, "%s: %s; %s%s",
+		consts.ContentType, contentType, consts.CharsetUTF8, consts.CRLF)
+	buf.WriteString(consts.CRLF)
+	buf.WriteString(mail.Body + consts.CRLF)
 }
 
-func (m *Mailer) writeAttachmentPart(buf *bytes.Buffer, att Attachment, boundary string) {
+func (m *smtpMailer) writeAttachmentPart(buf *bytes.Buffer, att *Attachment, boundary string) {
 	fmt.Fprintf(buf, "--%s\r\n", boundary)
 
 	contentType := mime.TypeByExtension(filepath.Ext(att.Filename))
@@ -149,11 +140,15 @@ func (m *Mailer) writeAttachmentPart(buf *bytes.Buffer, att Attachment, boundary
 		contentType = consts.ApplicationOctetStream
 	}
 
-	fmt.Fprintf(buf, "Content-Type: %s; name=\"%s\"\r\n", contentType, att.Filename)
-	fmt.Fprintf(buf, "Content-Disposition: attachment; filename=\"%s\"\r\n", att.Filename)
-	fmt.Fprintf(buf, "Content-Transfer-Encoding: base64\r\n\r\n")
+	fmt.Fprintf(buf, `%s: %s; name="%s"%s`,
+		consts.ContentType, contentType, att.Filename, consts.CRLF)
+	fmt.Fprintf(buf, `%s: %s%s`,
+		consts.ContentDisposition, fmt.Sprintf(consts.ContentDispositionAttachment, att.Filename), consts.CRLF)
+	fmt.Fprintf(buf, "%s: base64%s",
+		consts.ContentTransferEncoding, consts.CRLF)
+	buf.WriteString(consts.CRLF)
 
-	encoded := base64.StdEncoding.EncodeToString(att.Content)
+	encoded := crypto.EncodeBase64Bytes(att.Content)
 	const lineLen = 76
 	for i := 0; i < len(encoded); i += lineLen {
 		end := min(i+lineLen, len(encoded))
@@ -163,12 +158,12 @@ func (m *Mailer) writeAttachmentPart(buf *bytes.Buffer, att Attachment, boundary
 }
 
 // SendTemplate sends an email by rendering the template at templatePath with data.
-func (m *Mailer) SendTemplate(to []string, subject string, templatePath string, data any) error {
+func (m *smtpMailer) SendTemplate(to []string, subject string, templatePath string, data any) error {
 	body, err := executeTemplateFile(templatePath, data)
 	if err != nil {
 		return err
 	}
-	return m.Send(Mail{
+	return m.Send(&Email{
 		To:      to,
 		Subject: subject,
 		Body:    body,
@@ -177,12 +172,12 @@ func (m *Mailer) SendTemplate(to []string, subject string, templatePath string, 
 }
 
 // SendTemplateString sends an email by rendering the template string with data.
-func (m *Mailer) SendTemplateString(to []string, subject string, templateStr string, data any) error {
+func (m *smtpMailer) SendTemplateString(to []string, subject string, templateStr string, data any) error {
 	body, err := executeTemplateString(templateStr, data)
 	if err != nil {
 		return err
 	}
-	return m.Send(Mail{
+	return m.Send(&Email{
 		To:      to,
 		Subject: subject,
 		Body:    body,

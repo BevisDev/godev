@@ -24,6 +24,15 @@ const (
 )
 
 const (
+	Subject = "Subject"
+	From    = "From"
+	To      = "To"
+	Cc      = "Cc"
+	Bcc     = "Bcc"
+	Date    = "Date"
+)
+
+const (
 	RID         = "rid"
 	Status      = "status"
 	Header      = "header"
