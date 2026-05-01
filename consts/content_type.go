@@ -7,6 +7,10 @@ const (
 	ContentDispositionInline     = `inline; filename="%s"`
 	ContentDispositionAttachment = `attachment; filename="%s"`
 
+	CharsetUTF8             = "charset=UTF-8"
+	UTF8                    = "UTF-8"
+	ContentTransferEncoding = "Content-Transfer-Encoding"
+
 	Authorization          = "Authorization"
 	ApplicationJSON        = "application/json"
 	ApplicationFormData    = "application/x-www-form-urlencoded"
@@ -39,6 +43,7 @@ const (
 	TextPlain         = "text/plain"
 	TextHTML          = "text/html"
 	MultipartFormData = "multipart/form-data"
+	MultipartMixed    = "multipart/mixed"
 
 	// ImagePNG for using image
 	ImagePNG  = "image/png"

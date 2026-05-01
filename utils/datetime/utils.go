@@ -288,8 +288,13 @@ func IsYesterday(t time.Time) bool {
 	return IsSameDate(t, yesterday)
 }
 
-// Timestamp returns the current Unix timestamp in milliseconds.
+// Timestamp returns the current Unix timestamp in seconds.
 func Timestamp() int64 {
+	return time.Now().Unix()
+}
+
+// TimestampMilli returns the current Unix timestamp in milliseconds.
+func TimestampMilli() int64 {
 	return time.Now().UnixMilli()
 }
 

@@ -7,6 +7,7 @@ const (
 	XRequestID = "x-request-id"
 	XClientID  = "x-client-id"
 	Signature  = "signature"
+	Timestamp  = "timestamp"
 )
 
 // form data
@@ -24,6 +25,15 @@ const (
 )
 
 const (
+	Subject = "Subject"
+	From    = "From"
+	To      = "To"
+	Cc      = "Cc"
+	Bcc     = "Bcc"
+	Date    = "Date"
+)
+
+const (
 	RID         = "rid"
 	Status      = "status"
 	Header      = "header"
@@ -33,4 +43,5 @@ const (
 	Method      = "method"
 	Url         = "url"
 	Query       = "query"
+	VND         = "VND"
 )

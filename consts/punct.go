@@ -65,8 +65,10 @@ const (
 const (
 	Empty   = ""
 	Space   = " "
+	Dot     = "."
 	Tab     = "\t"
 	Newline = "\n"
 	CR      = "\r"
 	NBSP    = "\u00a0" // no-break space
+	CRLF    = "\r\n"
 )
