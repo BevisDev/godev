@@ -1,8 +1,5 @@
 package types
 
-// VND Money type
-type VND = int64
-
 // SignedInteger Integer type
 type SignedInteger interface {
 	~int | ~int8 | ~int16 | ~int32 | ~int64
@@ -17,5 +14,3 @@ type SignedUint interface {
 type SignedFloat interface {
 	~float32 | ~float64
 }
-
-type Object map[string]any

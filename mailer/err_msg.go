@@ -5,6 +5,7 @@ import "errors"
 // Errors
 var (
 	ErrConfigNil     = errors.New("[mailer] config is nil")
+	ErrMessageNil    = errors.New("[mailer] message is nil")
 	ErrNoRecipients  = errors.New("[mailer] no recipients specified")
 	ErrEmptySubject  = errors.New("[mailer] subject is empty")
 	ErrEmptyBody     = errors.New("[mailer] body is empty")

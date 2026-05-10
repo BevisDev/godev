@@ -25,24 +25,6 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
-type RequestLogger struct {
-	RID    string
-	URL    string
-	Time   time.Time
-	Query  string
-	Method string
-	Header any
-	Body   string
-}
-
-type ResponseLogger struct {
-	RID      string
-	Duration time.Duration
-	Status   int
-	Header   any
-	Body     string
-}
-
 type Logger struct {
 	cf   *Config
 	zap  *zap.Logger

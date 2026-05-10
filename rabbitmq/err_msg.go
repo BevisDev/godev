@@ -19,4 +19,7 @@ var (
 	// producer
 	ErrMessageTooLarge = errors.New("[producer] message exceeds maximum size limit")
 	ErrInvalidMessage  = errors.New("[producer] invalid message format")
+
+	// consumer
+	ErrMsgAcked = "[consumer] %s message already acked"
 )

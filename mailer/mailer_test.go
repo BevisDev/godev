@@ -36,29 +36,34 @@ func TestSendValidation(t *testing.T) {
 
 	tests := []struct {
 		name string
-		mail Mail
+		msg  *Message
 		err  error
 	}{
 		{
+			name: "nil message",
+			msg:  nil,
+			err:  ErrMessageNil,
+		},
+		{
 			"no recipients",
-			Mail{Subject: "Hi", Body: "Body"},
+			&Message{Subject: "Hi", Body: "Body"},
 			ErrNoRecipients,
 		},
 		{
 			"empty subject",
-			Mail{To: []string{"a@test.com"}, Body: "Body"},
+			&Message{To: []string{"a@test.com"}, Body: "Body"},
 			ErrEmptySubject,
 		},
 		{
 			"empty body",
-			Mail{To: []string{"a@test.com"}, Subject: "Hi"},
+			&Message{To: []string{"a@test.com"}, Subject: "Hi"},
 			ErrEmptyBody,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := m.Send(tt.mail)
+			err := m.Send(tt.msg)
 			if !errors.Is(err, tt.err) {
 				t.Fatalf("expected %v, got %v", tt.err, err)
 			}
@@ -67,7 +72,7 @@ func TestSendValidation(t *testing.T) {
 }
 
 func TestBuildMessage(t *testing.T) {
-	m := &Mailer{
+	m := &smtpMailer{
 		cfg: &Config{
 			From: "sender@example.com",
 			Host: "smtp.example.com",
@@ -75,14 +80,14 @@ func TestBuildMessage(t *testing.T) {
 	}
 
 	t.Run("simple text email", func(t *testing.T) {
-		mail := Mail{
+		msg := &Message{
 			To:      []string{"recipient@example.com"},
 			Subject: "Test",
 			Body:    "Hello World",
 			IsHTML:  false,
 		}
 
-		message, err := m.buildMessage(mail)
+		message, err := m.buildMessage(msg)
 		if err != nil {
 			t.Fatalf("buildMessage() error = %v", err)
 		}
@@ -100,14 +105,14 @@ func TestBuildMessage(t *testing.T) {
 	})
 
 	t.Run("HTML email", func(t *testing.T) {
-		mail := Mail{
+		msg := &Message{
 			To:      []string{"recipient@example.com"},
 			Subject: "Test HTML",
 			Body:    "<h1>Hello</h1>",
 			IsHTML:  true,
 		}
 
-		message, err := m.buildMessage(mail)
+		message, err := m.buildMessage(msg)
 		if err != nil {
 			t.Fatalf("buildMessage() error = %v", err)
 		}
@@ -119,12 +124,12 @@ func TestBuildMessage(t *testing.T) {
 	})
 
 	t.Run("email with attachment", func(t *testing.T) {
-		mail := Mail{
+		msg := &Message{
 			To:      []string{"recipient@example.com"},
 			Subject: "Test Attachment",
 			Body:    "See attachment",
 			IsHTML:  false,
-			Attachments: []Attachment{
+			Attachments: []*Attachment{
 				{
 					Filename: "test.txt",
 					Content:  []byte("Test file content"),
@@ -132,7 +137,7 @@ func TestBuildMessage(t *testing.T) {
 			},
 		}
 
-		message, err := m.buildMessage(mail)
+		message, err := m.buildMessage(msg)
 		if err != nil {
 			t.Fatalf("buildMessage() error = %v", err)
 		}
@@ -145,6 +150,33 @@ func TestBuildMessage(t *testing.T) {
 			t.Errorf("Message should contain attachment filename")
 		}
 	})
+}
+
+func TestCollectRecipients(t *testing.T) {
+	msg := &Message{
+		To:  []string{"to1@example.com", "to2@example.com"},
+		Cc:  []string{"cc1@example.com"},
+		Bcc: []string{"bcc1@example.com", "bcc2@example.com"},
+	}
+
+	got := collectRecipients(msg)
+	want := []string{
+		"to1@example.com",
+		"to2@example.com",
+		"cc1@example.com",
+		"bcc1@example.com",
+		"bcc2@example.com",
+	}
+
+	if len(got) != len(want) {
+		t.Fatalf("expected %d recipients, got %d", len(want), len(got))
+	}
+
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("recipient at index %d: want %q, got %q", i, want[i], got[i])
+		}
+	}
 }
 
 func TestSendTemplateString(t *testing.T) {
@@ -168,14 +200,14 @@ func TestSendTemplateString(t *testing.T) {
 
 // Benchmark tests
 func BenchmarkBuildMessage(b *testing.B) {
-	m := &Mailer{
+	m := &smtpMailer{
 		cfg: &Config{
 			From: "sender@example.com",
 			Host: "smtp.example.com",
 		},
 	}
 
-	mail := Mail{
+	msg := &Message{
 		To:      []string{"recipient@example.com"},
 		Subject: "Benchmark Test",
 		Body:    "This is a benchmark test message",
@@ -184,6 +216,6 @@ func BenchmarkBuildMessage(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = m.buildMessage(mail)
+		_, _ = m.buildMessage(msg)
 	}
 }

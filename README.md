@@ -27,7 +27,7 @@
 | Package | Description | README |
 |---------|-------------|--------|
 | **`framework`** | Application bootstrap with lifecycle management, service initialization, and graceful shutdown | [📖 Read More](framework/README.md) |
-| **`config`** | Configuration management with file loading, environment variables, and placeholder expansion | [📖 Read More](config/README.md) |
+| **`config`** | Configuration management with file loading, environment variables, and placeholder expansion | [📖 Read More](setting/README.md) |
 | **`logger`** | Structured logging with Zap, file rotation, and HTTP logging | [📖 Read More](logger/README.md) |
 
 ### Data & Storage
@@ -272,7 +272,7 @@ Each package includes comprehensive documentation with examples:
 - [Redis](redis/README.md) - Redis client and operations
 - [HTTP Server](ginfw/server/README.md) - Gin server setup
 - [REST Client](rest/README.md) - HTTP client utilities
-- [Config](config/README.md) - Configuration management
+- [Config](setting/README.md) - Configuration management
 - [Scheduler](scheduler/README.md) - Cron job scheduling
 - [Utils](utils/README.md) - Utility functions
 
